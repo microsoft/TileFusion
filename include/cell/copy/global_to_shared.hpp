@@ -23,6 +23,10 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
                                           tl::Layout::kRowMajor> {
     using Global = Global_;
     using Shared = Shared_;
+    using DType = Global::DType;
+    using LoadBase =
+        GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kRowMajor>;
+    using BaseShape = traits::BaseTileShape<DType>;
 
     static_assert(Global::kRows == Shared::kRows &&
                       Global::kCols == Shared::kCols,
@@ -33,24 +37,18 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
     static_assert(Global::kType == tl::Layout::kRowMajor,
                   "The layout of Global memory and Shared memory tile should "
                   "be row-major.");
-
-    using DType = Global::DType;
-
     static_assert(std::is_same_v<typename Shared::DType, DType>,
                   "The data type of Shared and Global must be the same.");
 
-    using LoadBase =
-        GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kRowMajor>;
-    using BaseShape = traits::BaseTileShape<DType>;
-
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
-
     static constexpr int kNumPerAccess = LoadBase::kNumPerAccess;
 
     // strides to iterate over each 16x16 `BaseTile` in the shared memory
     static constexpr int kSrcRowStride = BaseShape::kRows * Global::kRowStride;
     static constexpr int kSrcColStride = BaseShape::kCols;
+
+    static constexpr int kDstRowStride = BaseShape::kRows * Shared::kRowStride;
 
     DEVICE void operator()(const DType* src, DType* dst) {
         int lane_row = this->lane_row_id();
@@ -62,12 +60,12 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
         int src_offset = 0, dst_offset = 0;
 #pragma unroll
         for (int i = 0; i < kRowExec; ++i) {
+            src_offset = i * kDstRowStride;
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
                 src_offset =
                     i * kSrcRowStride + j * kSrcColStride + src_lane_offset;
-                dst_offset =
-                    (i * kColExec + j) * BaseShape::kNumel + dst_lane_offset;
+                dst_offset += (j * BaseShape::kNumel + dst_lane_offset);
 
                 this->copy(src + src_offset, dst + dst_offset);
             }
@@ -87,6 +85,11 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
                                           tl::Layout::kColMajor> {
     using Global = Global_;
     using Shared = Shared_;
+    using DType = Global::DType;
+
+    using LoadBase =
+        GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kColMajor>;
+    using BaseShape = traits::BaseTileShape<DType>;
 
     static_assert(Global::kRows == Shared::kRows &&
                       Global::kCols == Shared::kCols,
@@ -98,14 +101,8 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
                   "The layout of Global memory and Shared memory tile should "
                   "be column-major.");
 
-    using DType = Global::DType;
-
     static_assert(std::is_same_v<typename Shared::DType, DType>,
                   "The data type of Shared and Global must be the same.");
-
-    using LoadBase =
-        GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kColMajor>;
-    using BaseShape = traits::BaseTileShape<DType>;
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
@@ -321,7 +318,6 @@ struct SharedToGlobalStorer : public Base {
         DType* dst = dst_.mutable_data();
 
         int offset_src = offset_helper_.get_warp_offset();
-
         int offset_dst = Base::template get_warp_offset<Global>();
 
         using Storer = SharedToGlobalStorerImpl<Shared, Global, kRowExec,
@@ -338,5 +334,4 @@ struct SharedToGlobalStorer : public Base {
                                  WarpLayout::layout_type, kWarpTileNumel>;
     OffsetHelper offset_helper_;
 };
-
 }  // namespace tilefusion::cell::copy

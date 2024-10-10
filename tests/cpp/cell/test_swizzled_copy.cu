@@ -74,17 +74,17 @@ __global__ void swizzled_copy(const Element* data, G2S1& g2s,
             if (thread(0)) {
                 printf("\niteration [%d, %d]\n", k, i);
 
-                printf("s_tile:\n");
-                s_tile.dump_value();
+                // printf("s_tile:\n");
+                // s_tile.dump_value();
 
-                printf("\ns_swizzled_tile:\n");
-                s_swizzled_tile.dump_value();
+                // printf("\ns_swizzled_tile:\n");
+                // s_swizzled_tile.dump_value();
 
-                // printf("r_tile:\n");
-                // r_tile.dump_value();
+                printf("r_tile:\n");
+                r_tile.dump_value();
 
-                // printf("\nr_tile_swizzled:\n");
-                // r_tile_swizzled.dump_value();
+                printf("\nr_tile_swizzled:\n");
+                r_tile_swizzled.dump_value();
             }
 
             // check_results<Reg, Element>(r_tile, r_tile_swizzled, Reg::kRows,
