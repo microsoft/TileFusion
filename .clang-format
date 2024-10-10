@@ -1,0 +1,23 @@
+# Run manually to reformat a file:
+# clang-format -i --style=file <file>
+BasedOnStyle: Google
+ColumnLimit: 80
+IndentWidth: 4
+AccessModifierOffset: -2
+DerivePointerAlignment: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '<([A-Za-z0-9\Q/-_\E])+>'
+    Priority: 4
+  - Regex: '<(catch2|boost)\/'
+    Priority: 3
+  - Regex: '<([A-Za-z0-9.\Q/-_\E])+>'
+    Priority: 2
+  - Regex: '"([A-Za-z0-9.\Q/-_\E])+"'
+    Priority: 1
+
+AllowShortLoopsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: true
+Cpp11BracedListStyle: true
