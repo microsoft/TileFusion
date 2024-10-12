@@ -36,7 +36,7 @@ struct B2BGemmTraits {
     // operand A
     using GlobalA = GlobalTile<InType, tl::RowMajor<kTM, kK>>;
     // chunk the K dimension to fit into shared memory
-    using GIteratorA = TileIterator<GlobalA, TileShape<kTM, kTK>>;
+    using GIteratorA = GTileIterator<GlobalA, TileShape<kTM, kTK>>;
 
     static const bool kUseSwizzling = true;
 
@@ -52,7 +52,7 @@ struct B2BGemmTraits {
 
     // operand B
     using GlobalB = GlobalTile<InType, tl::ColMajor<kK, kN>>;
-    using GIteratorB = TileIterator<GlobalB, TileShape<kTK, kTN>>;
+    using GIteratorB = GTileIterator<GlobalB, TileShape<kTK, kTN>>;
     using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, kUseSwizzling>;
 
     static constexpr int kBKs = kTK / BaseShape::kTileSize;
@@ -66,7 +66,7 @@ struct B2BGemmTraits {
     // operand C
     using GlobalC = GlobalTile<InType, tl::ColMajor<kN, kTP>>;
     // chunk the N dimension to fit into shared memory
-    using GIteratorC = TileIterator<GlobalC, TileShape<kTN, kTP>>;
+    using GIteratorC = GTileIterator<GlobalC, TileShape<kTN, kTP>>;
     using SharedC = SharedTile<InType, tl::ColMajor<kTN, kTP>, kUseSwizzling>;
 
     static constexpr int kCNs = kTN / BaseShape::kTileSize;

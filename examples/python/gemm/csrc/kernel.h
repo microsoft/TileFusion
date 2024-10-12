@@ -35,7 +35,7 @@ __global__ void gemm(const InType* dA, const InType* dB, AccType* dC) {
         loader_b(gBs(k), rB);
         __syncthreads();
 
-        compute::gemm_(rA, rB, acc);
+        compute::gemm(rA, rB, acc);
     }
     __syncthreads();
 

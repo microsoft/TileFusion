@@ -41,7 +41,7 @@ struct FlashAttentionTraits {
     // operand A
     using GlobalA = GlobalTile<InType, tl::RowMajor<kTM, kK>>;
     // chunk the K dimension to fit into shared memory
-    using GIteratorA = TileIterator<GlobalA, TileShape<kTM, kTK>>;
+    using GIteratorA = GTileIterator<GlobalA, TileShape<kTM, kTK>>;
 
     using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, true>;
 
@@ -55,7 +55,7 @@ struct FlashAttentionTraits {
 
     // operand B
     using GlobalB = GlobalTile<InType, tl::ColMajor<kK, kN>>;
-    using GIteratorB = TileIterator<GlobalB, TileShape<kTK, kTN>>;
+    using GIteratorB = GTileIterator<GlobalB, TileShape<kTK, kTN>>;
     using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, true>;
 
     static constexpr int kBKs = kTK / BaseShape::kTileSize;
@@ -69,7 +69,7 @@ struct FlashAttentionTraits {
     // operand C
     using GlobalC = GlobalTile<InType, tl::ColMajor<kN, kTP>>;
     // chunk the N dimension to fit into shared memory
-    using GIteratorC = TileIterator<GlobalC, TileShape<kTN, kTP>>;
+    using GIteratorC = GTileIterator<GlobalC, TileShape<kTN, kTP>>;
     using SharedC = SharedTile<InType, tl::ColMajor<kTN, kTP>, true>;
 
     static constexpr int kCNs = kTN / BaseShape::kTileSize;

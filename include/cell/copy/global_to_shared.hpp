@@ -42,6 +42,7 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
+
     static constexpr int kNumPerAccess = LoadBase::kNumPerAccess;
 
     // strides to iterate over each 16x16 `BaseTile` in the shared memory
@@ -57,15 +58,20 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
         int src_lane_offset = src_layout_(lane_row, lane_col);
         int dst_lane_offset = dst_layout_(lane_row, lane_col);
 
+        if (thread0()) {
+            printf("kExecs: %d %d\n", kRowExec, kColExec);
+            printf("kDstRowStride: %d\n", kDstRowStride);
+        }
+
         int src_offset = 0, dst_offset = 0;
 #pragma unroll
         for (int i = 0; i < kRowExec; ++i) {
-            src_offset = i * kDstRowStride;
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
                 src_offset =
                     i * kSrcRowStride + j * kSrcColStride + src_lane_offset;
-                dst_offset += (j * BaseShape::kNumel + dst_lane_offset);
+                dst_offset =
+                    (i * kColExec + j) * BaseShape::kNumel + dst_lane_offset;
 
                 this->copy(src + src_offset, dst + dst_offset);
             }
@@ -154,6 +160,9 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, kRowExec_, kColExec_,
                                           tl::Layout::kRowMajor> {
     using Shared = Shared_;
     using Global = Global_;
+    using DType = Shared::DType;
+    using BaseShape = traits::BaseTileShape<DType>;
+
     static_assert(Global::kRows == Shared::kRows &&
                       Global::kCols == Shared::kCols,
                   "Global and shared memory should have the same shape.");
@@ -163,13 +172,8 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, kRowExec_, kColExec_,
     static_assert(Global::kType == tl::Layout::kRowMajor,
                   "The layout of Global memory and Shared memory tile should "
                   "be row-major.");
-
-    using DType = Shared::DType;
-
     static_assert(std::is_same_v<typename Global::DType, DType>,
                   "The data type of Shared and Global must be the same.");
-
-    using BaseShape = traits::BaseTileShape<DType>;
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
@@ -199,6 +203,9 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, kRowExec_, kColExec_,
                                           tl::Layout::kColMajor> {
     using Shared = Shared_;
     using Global = Global_;
+    using DType = Shared::DType;
+    using BaseShape = traits::BaseTileShape<DType>;
+
     static_assert(Global::kRows == Shared::kRows &&
                       Global::kCols == Shared::kCols,
                   "Global and shared memory should have the same shape.");
@@ -208,13 +215,8 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, kRowExec_, kColExec_,
     static_assert(Global::kType == tl::Layout::kColMajor,
                   "The layout of Global memory and Shared memory tile should "
                   "be row-major.");
-
-    using DType = Shared::DType;
-
     static_assert(std::is_same_v<typename Global::DType, DType>,
                   "The data type of Shared and Global must be the same.");
-
-    using BaseShape = traits::BaseTileShape<DType>;
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
@@ -242,7 +244,6 @@ struct GlobalToSharedLoader : public Base {
     using Shared = Shared_;
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
-
     using BaseShape = traits::BaseTileShape<DType>;
 
     static_assert(
@@ -292,12 +293,11 @@ struct SharedToGlobalStorer : public Base {
     using Shared = Shared_;
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
+    using BaseShape = traits::BaseTileShape<DType>;
 
     static_assert(
         (Shared::kSwizzled && sizeof(DType) == 4 || Shared::kSwizzled == false),
         "Not implemented for swizzled layout with 2-byte data types.");
-
-    using BaseShape = traits::BaseTileShape<DType>;
 
     static_assert(Shared::kRows % BaseShape::kRows == 0,
                   "Shared::kRows must be divisible by BaseShape::kRows.");

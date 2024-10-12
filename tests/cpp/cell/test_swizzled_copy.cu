@@ -105,17 +105,17 @@ void run_test_rowmajor() {
     static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
 
     using Global = GlobalTile<Element, tl::RowMajor<kRows, kCols>>;
-    using GIterator = TileIterator<Global, TileShape<kRows, kShmCols>>;
+    using GIterator = GTileIterator<Global, TileShape<kRows, kShmCols>>;
 
     // for non-swizzled layout
     using Shared1 = SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>,
                                false /*enable swizzled layout on shared*/>;
-    using SIterator1 = TileIterator<Shared1, TileShape<kShmRows, kChunkShm>>;
+    using SIterator1 = STileIterator<Shared1, TileShape<kShmRows, kChunkShm>>;
 
     // for swizzled layout
     using Shared2 = SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>,
                                true /*enable swizzled layout on shared*/>;
-    using SIterator2 = TileIterator<Shared2, TileShape<kShmRows, kChunkShm>>;
+    using SIterator2 = STileIterator<Shared2, TileShape<kShmRows, kChunkShm>>;
 
     using BaseShape = traits::BaseTileShape<Element>;
 
@@ -187,17 +187,17 @@ void run_test_colmajor() {
     static_assert(kShmCols == kCols, "kShmCols must be equal to kCols.");
 
     using Global = GlobalTile<Element, tl::ColMajor<kRows, kCols>>;
-    using GIterator = TileIterator<Global, TileShape<kShmRows, kShmCols>>;
+    using GIterator = GTileIterator<Global, TileShape<kShmRows, kShmCols>>;
 
     // for non-swizzled layout
     using Shared1 = SharedTile<Element, tl::ColMajor<kShmRows, kShmCols>,
                                false /*enable swizzled layout on shared*/>;
-    using SIterator1 = TileIterator<Shared1, TileShape<kChunkShm, kShmCols>>;
+    using SIterator1 = STileIterator<Shared1, TileShape<kChunkShm, kShmCols>>;
 
     // for swizzled layout
     using Shared2 = SharedTile<Element, tl::ColMajor<kShmRows, kShmCols>,
                                true /*enable swizzled layout on shared*/>;
-    using SIterator2 = TileIterator<Shared2, TileShape<kChunkShm, kShmCols>>;
+    using SIterator2 = STileIterator<Shared2, TileShape<kChunkShm, kShmCols>>;
 
     using BaseShape = traits::BaseTileShape<Element>;
 
