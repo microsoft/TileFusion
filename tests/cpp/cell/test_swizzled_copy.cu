@@ -107,14 +107,15 @@ void run_test_rowmajor() {
     using Global = GlobalTile<Element, tl::RowMajor<kRows, kCols>>;
     using GIterator = GTileIterator<Global, TileShape<kRows, kShmCols>>;
 
+    const bool kSwizzle = true;
     // for non-swizzled layout
-    using Shared1 = SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>,
-                               false /*enable swizzled layout on shared*/>;
+    using Shared1 =
+        SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, kSwizzled>;
     using SIterator1 = STileIterator<Shared1, TileShape<kShmRows, kChunkShm>>;
 
     // for swizzled layout
-    using Shared2 = SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>,
-                               true /*enable swizzled layout on shared*/>;
+    using Shared2 =
+        SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, kSwizzled>;
     using SIterator2 = STileIterator<Shared2, TileShape<kShmRows, kChunkShm>>;
 
     using BaseShape = traits::BaseTileShape<Element>;
@@ -395,7 +396,7 @@ void test_col_major_store() {
 };
 }  // namespace
 
-TEST(TestSwizzledLayout, test_load_row_major) {
+TEST(TestSwizzledLoad, test_load_row_major) {
     run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 32>();
 
     // run_test_rowmajor<tl::RowMajor<1, 2>, 16, 64, 16, 32, 32>();
@@ -418,7 +419,7 @@ TEST(TestSwizzledLayout, test_load_row_major) {
     // run_test_rowmajor<tl::RowMajor<8, 1>, 128, 512, 128, 256, 128>();
 }
 
-// TEST(TestSwizzledLayout, test_load_col_major) {
+// TEST(TestSwizzledLoad, test_load_col_major) {
 //     run_test_colmajor<tl::RowMajor<1, 1>, 16 /*K*/, 16 /*N*/, 16, 16, 16>();
 //     run_test_colmajor<tl::RowMajor<1, 1>, 64 /*K*/, 64 /*N*/, 32, 64, 16>();
 //     run_test_colmajor<tl::RowMajor<1, 2>, 128 /*K*/, 32 /*N*/, 64, 32, 32>();
