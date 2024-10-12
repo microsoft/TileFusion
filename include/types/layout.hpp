@@ -37,7 +37,7 @@ struct MatrixLayout {
 
     static constexpr int kNumel = kRows * kCols;
 
-    static constexpr Layout layout_type =
+    static constexpr Layout kType =
         kColStride == 1 ? Layout::kRowMajor : Layout::kColMajor;
 
     DEVICE int operator()(int i, int j) const {
@@ -260,7 +260,7 @@ static constexpr size_t get_numel = Layout::kNumel;
 // NOTE: A potential issue is that `ColMajor<1, 1>` will also be indentified as
 // a row-major layout.
 template <typename Layout_>
-static constexpr Layout layout_type = Layout_::layout_type;
+static constexpr Layout layout_type = Layout_::kType;
 
 template <const int kShape1, const int kShape2, const int kStride1,
           const int kStride2>

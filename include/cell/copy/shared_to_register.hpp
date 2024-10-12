@@ -166,7 +166,7 @@ struct SharedToRegLoader : public Base {
   private:
     static constexpr int kWarpTileNumel = Reg::kNumel * Reg::DType::kNumel * 32;
     using OffsetHelper =
-        warp::SharedOffsetHelper<WarpLayout, kMode, WarpLayout::layout_type,
+        warp::SharedOffsetHelper<WarpLayout, kMode, WarpLayout::kType,
                                  kWarpTileNumel>;
     OffsetHelper offset_helper_;
 };
@@ -242,7 +242,7 @@ struct RegToSharedStorer {
     static constexpr int kWarpTileNumel = Reg::kNumel * Reg::DType::kNumel * 32;
     using OffsetHelper =
         warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-                                 WarpLayout::layout_type, kWarpTileNumel>;
+                                 WarpLayout::kType, kWarpTileNumel>;
     OffsetHelper offset_helper_;
 };
 

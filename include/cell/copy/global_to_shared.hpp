@@ -58,11 +58,6 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
         int src_lane_offset = src_layout_(lane_row, lane_col);
         int dst_lane_offset = dst_layout_(lane_row, lane_col);
 
-        if (thread0()) {
-            printf("kExecs: %d %d\n", kRowExec, kColExec);
-            printf("kDstRowStride: %d\n", kDstRowStride);
-        }
-
         int src_offset = 0, dst_offset = 0;
 #pragma unroll
         for (int i = 0; i < kRowExec; ++i) {
@@ -283,7 +278,7 @@ struct GlobalToSharedLoader : public Base {
     constexpr static int kWarpTileNumel = Shared::kNumel / WarpLayout::kNumel;
     using OffsetHelper =
         warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-                                 WarpLayout::layout_type, kWarpTileNumel>;
+                                 WarpLayout::kType, kWarpTileNumel>;
     OffsetHelper offset_helper_;
 };
 
@@ -331,7 +326,7 @@ struct SharedToGlobalStorer : public Base {
     constexpr static int kWarpTileNumel = Shared::kNumel / WarpLayout::kNumel;
     using OffsetHelper =
         warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-                                 WarpLayout::layout_type, kWarpTileNumel>;
+                                 WarpLayout::kType, kWarpTileNumel>;
     OffsetHelper offset_helper_;
 };
 }  // namespace tilefusion::cell::copy
