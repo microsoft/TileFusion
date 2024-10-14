@@ -19,6 +19,8 @@ namespace tilefusion::cell {
 
 namespace tile_layout {
 
+namespace detail {}  // namespace detail
+
 enum class Layout {
     kRowMajor = 0,  // Tile layout for shared memory.
     kColMajor = 1,
@@ -57,6 +59,36 @@ using ColMajor = MatrixLayout<kRow, kCol, 1, kStride>;
 
 namespace detail {
 using namespace cute;
+
+template <const int kRows_, const int kCols_, const int kRowStride_,
+          const int kColStride_>
+struct SharedLayout {
+    static constexpr int kRows = kRows_;
+    static constexpr int kCols = kCols_;
+
+    static constexpr int kRowStride = kRowStride_;
+    static constexpr int kColStride = kColStride_;
+
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr Layout kType =
+        kColStride == 1 ? Layout::kRowMajor : Layout::kColMajor;
+
+    DEVICE int operator()(int i, int j) const { return layout_(i, j); }
+
+  private:
+    using LayoutAtom = std::conditional_t<
+        kColStride == 1,
+        cute::Layout<Shape<_16, _16>, Stride<_16, _1>>,  /*RowMajor*/
+        cute::Layout<Shape<_16, _16>, Stride<_1, _16>>>; /*ColMajor*/
+
+    using Layout_ = decltype(tile_to_shape(
+        LayoutAtom{},
+        cute::Layout<Shape<Int<kRows>, Int<kCols>>,
+                     Stride<Int<kRowStride>, Int<kColStride>>>{}));
+
+    Layout_ layout_;
+};
 
 /// @brief Swizzled layout for 16x16 BaseTile.
 template <const int kBitsPerAccess>
@@ -175,7 +207,8 @@ struct SwizzledColMajor<128> {
 template <const bool kSwizzled, const Layout kType, const int kBitsPerAcces>
 struct SharedLayoutWrapperImpl;
 
-/// @brief Shared memory layout for non-swizzled layout with 32-bit data type.
+/// @brief Shared memory layout for non-swizzled layout with 32-bit data
+/// type.
 template <const int kBitsPerAcces>
 struct SharedLayoutWrapperImpl<false, Layout::kRowMajor, kBitsPerAcces> {
     using BaseShape = traits::BaseTileShape<__half>;
@@ -185,7 +218,8 @@ struct SharedLayoutWrapperImpl<false, Layout::kRowMajor, kBitsPerAcces> {
                      Stride<Int<BaseShape::kCols>, _1>>;
 };
 
-/// @brief Shared memory layout for non-swizzled layout with 32-bit data type.
+/// @brief Shared memory layout for non-swizzled layout with 32-bit data
+/// type.
 template <const int kBitsPerAcces>
 struct SharedLayoutWrapperImpl<false, Layout::kColMajor, kBitsPerAcces> {
     using BaseShape = traits::BaseTileShape<__half>;
@@ -194,7 +228,8 @@ struct SharedLayoutWrapperImpl<false, Layout::kColMajor, kBitsPerAcces> {
                      Stride<_1, Int<BaseShape::kRows>>>;
 };
 
-/// @brief Shared memory layout for swizzled row-major layout with 16-bit data
+/// @brief Shared memory layout for swizzled row-major layout with 16-bit
+/// data
 ///        type.
 template <>
 struct SharedLayoutWrapperImpl<true, Layout::kRowMajor, 64> {
@@ -203,7 +238,8 @@ struct SharedLayoutWrapperImpl<true, Layout::kRowMajor, 64> {
     using Layout = SwizzledRowMajor<64>;
 };
 
-/// @brief Shared memory layout for swizzled col-major layout with 16-bit data
+/// @brief Shared memory layout for swizzled col-major layout with 16-bit
+/// data
 ///        type.
 template <>
 struct SharedLayoutWrapperImpl<true, Layout::kColMajor, 64> {
@@ -212,7 +248,8 @@ struct SharedLayoutWrapperImpl<true, Layout::kColMajor, 64> {
     using Layout = SwizzledColMajor<64>;
 };
 
-/// @brief Shared memory layout for swizzled row-major layout with 16-bit data
+/// @brief Shared memory layout for swizzled row-major layout with 16-bit
+/// data
 ///        type.
 template <>
 struct SharedLayoutWrapperImpl<true, Layout::kRowMajor, 128> {
@@ -221,7 +258,8 @@ struct SharedLayoutWrapperImpl<true, Layout::kRowMajor, 128> {
     using Layout = SwizzledRowMajor<128>;
 };
 
-/// @brief Shared memory layout for swizzled col-major layout with 16-bit data
+/// @brief Shared memory layout for swizzled col-major layout with 16-bit
+/// data
 ///        type.
 template <>
 struct SharedLayoutWrapperImpl<true, Layout::kColMajor, 128> {
@@ -231,7 +269,8 @@ struct SharedLayoutWrapperImpl<true, Layout::kColMajor, 128> {
 };
 }  // namespace detail
 
-/// @brief: Wapper for creating non-swizzled or swizzled shared memory layout.
+/// @brief: Wapper for creating non-swizzled or swizzled shared memory
+/// layout.
 template <typename Shared, const int kBitsPerAccess>
 struct SharedLayoutWrapper {
     using Layout =
@@ -256,16 +295,20 @@ static constexpr size_t get_numel = Layout::kNumel;
 
 // We wrap CuTe's `Layout`, which consists of `Shape` and `Stride`, into an
 // intelligent row-major or column-major layout. In a row-major layout, the
-// column stride is 1, whereas in a column-major layout, the row stride is 1.
-// NOTE: A potential issue is that `ColMajor<1, 1>` will also be indentified as
-// a row-major layout.
+// column stride is 1, whereas in a column-major layout, the row stride
+// is 1. NOTE: A potential issue is that `ColMajor<1, 1>` will also be
+// indentified as a row-major layout.
 template <typename Layout_>
 static constexpr Layout layout_type = Layout_::kType;
 
 template <const int kShape1, const int kShape2, const int kStride1,
-          const int kStride2>
+          const int kStride2, const bool kIsShared = false>
 HOST_DEVICE auto make_tile_layout() {
-    using Layout = MatrixLayout<kShape1, kShape2, kStride1, kStride2>;
+    using Layout_ = MatrixLayout<kShape1, kShape2, kStride1, kStride2>;
+    using SharedLayout_ =
+        detail::SharedLayout<kShape1, kShape2, kStride1, kStride2>;
+
+    using Layout = std::conditional_t<kIsShared, SharedLayout_, Layout_>;
     return Layout{};
 }
 

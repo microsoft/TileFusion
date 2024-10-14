@@ -3,11 +3,14 @@
 
 #pragma once
 
+#include "cell/traits/base.hpp"
 #include "types/shared.hpp"
 #include "types/tile_shape.hpp"
 
 namespace tilefusion::cell {
 namespace tl = tile_layout;
+
+using namespace cute;
 
 namespace detail {
 /// @brief Helper for pretty printing a tile iterator's static shape-related
@@ -34,6 +37,7 @@ class STileIterator {
     using Tile = Tile_;
     using DType = Tile::DType;
     using ChunkShape = ChunkShape_;
+    using BaseShape = traits::BaseTileShape<DType>;
 
     static_assert(Tile::kRows >= dim_size<0, ChunkShape>,
                   "Tile::kRows must be >= dim_size<0, ChunkShape>");
@@ -64,17 +68,19 @@ class STileIterator {
                       "A single index is supported only when the strip count "
                       "of one of the iterator's dimensions is 1.");
 
-        int x = sc0 == 1 ? 0 : i;
-        int y = sc0 == 1 ? i : 0;
+        // int x = sc0 == 1 ? 0 : i;
+        // int y = sc0 == 1 ? i : 0;
 
         using TileLayout =
             decltype(tl::make_tile_layout<kStride0, kStride1, Tile::kRowStride,
-                                          Tile::kColStride>());
+                                          Tile::kColStride, true>());
         using NewTile = SharedTile<DType, TileLayout, Tile::kSwizzled>;
 
-        int offset = Tile::kType == tl::Layout::kRowMajor
-                         ? x * (kStride0 * Tile::kRowStride) + y * kStride1
-                         : x * kStride0 + y * (Tile::kColStride * kStride1);
+        // int offset = Tile::kType == tl::Layout::kRowMajor
+        //                  ? x * (kStride0 * Tile::kRowStride) + y * kStride1
+        //                  : x * kStride0 + y * (Tile::kColStride * kStride1);
+
+        int offset = i * 256;
 
         NewTile tile(data_ + offset);
 

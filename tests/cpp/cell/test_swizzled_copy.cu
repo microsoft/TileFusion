@@ -66,19 +66,40 @@ __global__ void swizzled_copy(const Element* data, G2S1& g2s,
         __copy_async();
         __syncthreads();
 
+        // if (thread0()) {
+        //     // printf("g_tiles(%d)\n", k);
+        //     // g_tiles(k).dump_value();
+
+        //     // printf("\ns_tile:\n");
+        //     // s_tile.dump_value();
+
+        //     // printf("\ns_swizzled_tile:\n");
+        //     // s_swizzled_tile.dump_value();
+        // }
+
         for (int i = 0; i < SIterator1::sc1; ++i) {
             s2r(s_tiles(i), r_tile);
             s2r(s_swizzled_tiles(i), r_tile_swizzled);
             __syncthreads();
 
             if (thread(0)) {
-                printf("\niteration [%d, %d]\n", k, i);
+                // printf("\niteration [%d, %d]\n", k, i);
+                // printf("shared tile:\n");
+                // s_tiles(i).dump_value();
+                // printf("\nshared swizzled tile:\n");
+                // s_swizzled_tiles(i).dump_value();
 
-                // printf("s_tile:\n");
-                // s_tile.dump_value();
-
-                // printf("\ns_swizzled_tile:\n");
-                // s_swizzled_tile.dump_value();
+                // printf("\nshared:\n");
+                // __half* data = reinterpret_cast<__half*>(buf);
+                // int count = 0;
+                // for (int m = 0; m < 16; ++m) {
+                //     for (int n = 0; n < 32; ++n) {
+                //         // printf("%.0f, ", __half2float(data[layout_(m,
+                //         n)])); printf("%.0f, ",
+                // __half2float(data[count++]));
+                //     }
+                //     printf("\n");
+                // }
 
                 printf("r_tile:\n");
                 r_tile.dump_value();
@@ -87,8 +108,8 @@ __global__ void swizzled_copy(const Element* data, G2S1& g2s,
                 r_tile_swizzled.dump_value();
             }
 
-            // check_results<Reg, Element>(r_tile, r_tile_swizzled, Reg::kRows,
-            //                             Reg::kCols);
+            check_results<Reg, Element>(r_tile, r_tile_swizzled, Reg::kRows,
+                                        Reg::kCols);
         }
     }
 }
@@ -107,15 +128,13 @@ void run_test_rowmajor() {
     using Global = GlobalTile<Element, tl::RowMajor<kRows, kCols>>;
     using GIterator = GTileIterator<Global, TileShape<kRows, kShmCols>>;
 
-    const bool kSwizzle = true;
     // for non-swizzled layout
     using Shared1 =
-        SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, kSwizzled>;
+        SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, false>;
     using SIterator1 = STileIterator<Shared1, TileShape<kShmRows, kChunkShm>>;
 
     // for swizzled layout
-    using Shared2 =
-        SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, kSwizzled>;
+    using Shared2 = SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, true>;
     using SIterator2 = STileIterator<Shared2, TileShape<kShmRows, kChunkShm>>;
 
     using BaseShape = traits::BaseTileShape<Element>;
@@ -148,7 +167,9 @@ void run_test_rowmajor() {
     const int numel = kRows * kCols;
     using Element = __half;
     thrust::host_vector<Element> hA(numel);
-    for (int i = 0; i < hA.size(); ++i) hA[i] = static_cast<Element>(i);
+    for (int i = 0; i < hA.size(); ++i) {
+        hA[i] = static_cast<Element>(i % 2048);
+    }
     thrust::device_vector<Element> dA = hA;
 
     G2S1 g2s;
@@ -231,7 +252,9 @@ void run_test_colmajor() {
     const int numel = kRows * kCols;
     using Element = __half;
     thrust::host_vector<Element> hA(numel);
-    for (int i = 0; i < hA.size(); ++i) hA[i] = static_cast<Element>(i);
+    for (int i = 0; i < hA.size(); ++i) {
+        hA[i] = static_cast<Element>(i % 2048);
+    }
     thrust::device_vector<Element> dA = hA;
 
     G2S1 g2s;
@@ -397,13 +420,18 @@ void test_col_major_store() {
 }  // namespace
 
 TEST(TestSwizzledLoad, test_load_row_major) {
+    run_test_rowmajor<tl::RowMajor<1, 1>, 16, 16, 16, 16, 16>();
+    run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 16>();
     run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 32>();
+    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 32, 32, 32, 16>();
+    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 64, 32, 32, 16>();
 
-    // run_test_rowmajor<tl::RowMajor<1, 2>, 16, 64, 16, 32, 32>();
-    // run_test_rowmajor<tl::RowMajor<1, 2>, 16, 128, 16, 64, 32>();
-    // run_test_rowmajor<tl::RowMajor<1, 2>, 32, 32, 32, 32, 16>();
+    run_test_rowmajor<tl::RowMajor<1, 2>, 16, 64, 16, 32, 32>();
+    run_test_rowmajor<tl::RowMajor<1, 2>, 16, 128, 16, 64, 32>();
+    run_test_rowmajor<tl::RowMajor<1, 2>, 32, 32, 32, 32, 16>();
 
-    // run_test_rowmajor<tl::RowMajor<2, 2>, 32, 32, 32, 32, 16>();
+    run_test_rowmajor<tl::RowMajor<2, 2>, 32, 32, 32, 32, 16>();
+
     // run_test_rowmajor<tl::RowMajor<2, 2>, 32, 32, 32, 32, 32>();
     // run_test_rowmajor<tl::RowMajor<2, 2>, 128, 256, 128, 128, 64>();
 

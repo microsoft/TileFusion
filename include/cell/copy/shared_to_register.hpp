@@ -33,13 +33,20 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
+    // using BaseTilesLayout =
+    //     tl::MatrixLayout<kRowExec, kColExec,
+    //                      BaseShape::kRows * Shared::kRowStride,
+    //                      BaseShape::kCols>;
+
     using BaseTilesLayout =
         tl::MatrixLayout<kRowExec, kColExec,
                          BaseShape::kRows * Shared::kRowStride,
-                         BaseShape::kCols>;
+                         BaseShape::kNumel>;
 
     using BaseTileSharedLayout =
         tl::SharedLayoutWrapper<Shared, LoadMat::kAccessInBits>::Layout;
+
+    static constexpr int kSrcRowStride = Shared::kRowStride * BaseShape::kRows;
 
     DEVICE SharedToRegLoaderImpl()
         : base_tiles_(BaseTilesLayout{}),
