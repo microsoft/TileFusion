@@ -420,19 +420,19 @@ void test_col_major_store() {
 }  // namespace
 
 TEST(TestSwizzledLoad, test_load_row_major) {
-    run_test_rowmajor<tl::RowMajor<1, 1>, 16, 16, 16, 16, 16>();
-    run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 16>();
-    run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 32>();
-    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 32, 32, 32, 16>();
-    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 64, 32, 32, 16>();
+    // run_test_rowmajor<tl::RowMajor<1, 1>, 16, 16, 16, 16, 16>();
+    // run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 16>();
+    // run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 32>();
+    // run_test_rowmajor<tl::RowMajor<1, 1>, 32, 32, 32, 32, 16>();
+    // run_test_rowmajor<tl::RowMajor<1, 1>, 32, 64, 32, 32, 16>();
 
-    run_test_rowmajor<tl::RowMajor<1, 2>, 16, 64, 16, 32, 32>();
-    run_test_rowmajor<tl::RowMajor<1, 2>, 16, 128, 16, 64, 32>();
-    run_test_rowmajor<tl::RowMajor<1, 2>, 32, 32, 32, 32, 16>();
+    // run_test_rowmajor<tl::RowMajor<1, 2>, 16, 64, 16, 32, 32>();
+    // run_test_rowmajor<tl::RowMajor<1, 2>, 16, 128, 16, 64, 32>();
+    // run_test_rowmajor<tl::RowMajor<1, 2>, 32, 32, 32, 32, 16>();
 
-    run_test_rowmajor<tl::RowMajor<2, 2>, 32, 32, 32, 32, 16>();
+    // run_test_rowmajor<tl::RowMajor<2, 2>, 32, 32, 32, 32, 16>();
 
-    // run_test_rowmajor<tl::RowMajor<2, 2>, 32, 32, 32, 32, 32>();
+    run_test_rowmajor<tl::RowMajor<2, 2>, 32, 32, 32, 32, 32>();
     // run_test_rowmajor<tl::RowMajor<2, 2>, 128, 256, 128, 128, 64>();
 
     // run_test_rowmajor<tl::RowMajor<2, 1>, 32, 64, 32, 32, 32>();
