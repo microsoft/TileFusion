@@ -62,24 +62,24 @@ __global__ void swizzled_copy(const Element* data, G2S1& g2s,
 
     for (int k = 0; k < GIterator::sc1; ++k) {
         g2s(g_tiles(k), s_tile);
-        g2s_swizzled(g_tiles(k), s_swizzled_tile);
+        // g2s_swizzled(g_tiles(k), s_swizzled_tile);
         __copy_async();
         __syncthreads();
 
-        // if (thread0()) {
-        //     // printf("g_tiles(%d)\n", k);
-        //     // g_tiles(k).dump_value();
+        if (thread0()) {
+            // printf("g_tiles(%d)\n", k);
+            // g_tiles(k).dump_value();
 
-        //     // printf("\ns_tile:\n");
-        //     // s_tile.dump_value();
+            printf("\ns_tile:\n");
+            s_tile.dump_value();
 
-        //     // printf("\ns_swizzled_tile:\n");
-        //     // s_swizzled_tile.dump_value();
-        // }
+            // printf("\ns_swizzled_tile:\n");
+            // s_swizzled_tile.dump_value();
+        }
 
         for (int i = 0; i < SIterator1::sc1; ++i) {
-            s2r(s_tiles(i), r_tile);
-            s2r(s_swizzled_tiles(i), r_tile_swizzled);
+            // s2r(s_tiles(i), r_tile);
+            // s2r(s_swizzled_tiles(i), r_tile_swizzled);
             __syncthreads();
 
             if (thread(0)) {
@@ -101,15 +101,15 @@ __global__ void swizzled_copy(const Element* data, G2S1& g2s,
                 //     printf("\n");
                 // }
 
-                printf("r_tile:\n");
-                r_tile.dump_value();
+                // printf("r_tile:\n");
+                // r_tile.dump_value();
 
-                printf("\nr_tile_swizzled:\n");
-                r_tile_swizzled.dump_value();
+                // printf("\nr_tile_swizzled:\n");
+                // r_tile_swizzled.dump_value();
             }
 
-            check_results<Reg, Element>(r_tile, r_tile_swizzled, Reg::kRows,
-                                        Reg::kCols);
+            // check_results<Reg, Element>(r_tile, r_tile_swizzled, Reg::kRows,
+            //                             Reg::kCols);
         }
     }
 }

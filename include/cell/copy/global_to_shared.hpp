@@ -284,7 +284,13 @@ struct GlobalToSharedLoader : public Base {
         DType* dst_ptr = dst.mutable_data();
 
         int offset_src = Base::template get_warp_offset<Global>();  // global
-        int offset_dst = offset_helper_.get_warp_offset();          // shared
+        int offset_dst = Base::template get_warp_offset<Shared>();  // shared
+
+        // int offset_dst = offset_helper_.get_warp_offset();          // shared
+
+        if (thread(97)) {
+            printf("offset_dst: %d\n", offset_dst);
+        }
 
         using Loader = GlobalToSharedLoaderImpl<Global, Shared, kRowExec,
                                                 kColExec, Shared::kType>;
@@ -293,13 +299,15 @@ struct GlobalToSharedLoader : public Base {
         loader(src_ptr + offset_src, dst_ptr + offset_dst);
     }
 
-  private:
-    // constexpr static int kWarpTileNumel = Shared::kNumel /
-    // WarpLayout::kNumel;
-    using OffsetHelper =
-        warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-                                 WarpLayout::kType, BaseShape::kNumel>;
-    OffsetHelper offset_helper_;
+    //   private:
+    //     constexpr static int kWarpTileNumel = Shared::kNumel /
+    //     WarpLayout::kNumel; using OffsetHelper =
+    //         warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
+    //                                  WarpLayout::kType, kWarpTileNumel>;
+    //     // using OffsetHelper =
+    //     //     warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
+    //     //                              WarpLayout::kType,
+    //     BaseShape::kNumel>; OffsetHelper offset_helper_;
 };
 
 template <typename Shared_, typename WarpLayout_,
