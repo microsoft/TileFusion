@@ -161,7 +161,18 @@ struct SharedToRegLoader : public Base {
         // advance the pointer to input data to the current warp according to
         // warp reuse mode.
         const DType* src = src_.data();
+
+        using OffsetHelper =
+            warp::SharedOffsetHelper<WarpLayout, kMode, WarpLayout::kType,
+                                     Shared, kWarpTileNumel>;
+        OffsetHelper offset_helper_;
         int offset = offset_helper_.get_warp_offset();
+
+        // if (thread(64)) {
+        //     printf("warp index 1d = %d\n", offset_helper_.warp_index_1d());
+        //     printf("warpTileNumel: %d\n", kWarpTileNumel);
+        //     printf("shared-offset: %d\n", offset);
+        // }
 
         using Loader =
             detail::SharedToRegLoaderImpl<Shared, Reg, kRowExec, kColExec,
@@ -172,10 +183,6 @@ struct SharedToRegLoader : public Base {
 
   private:
     static constexpr int kWarpTileNumel = Reg::kNumel * Reg::DType::kNumel * 32;
-    using OffsetHelper =
-        warp::SharedOffsetHelper<WarpLayout, kMode, WarpLayout::kType,
-                                 kWarpTileNumel>;
-    OffsetHelper offset_helper_;
 };
 
 /// @brief partial specialization for 16x16x16 wmma's output, and
@@ -225,6 +232,11 @@ struct RegToSharedStorer {
         static constexpr int kColExec =
             Shared::kCols / BaseShape::kCols / tl::num_cols<WarpLayout>;
 
+        using OffsetHelper =
+            warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
+                                     WarpLayout::kType, Shared, kWarpTileNumel>;
+        OffsetHelper offset_helper_;
+
         // 1. advance the pointer to input data to the current warp
         // according to warp reuse mode. During the store process, threads
         // do not write to the same shared memory location, thus the warp
@@ -247,10 +259,6 @@ struct RegToSharedStorer {
 
   private:
     static constexpr int kWarpTileNumel = Reg::kNumel * Reg::DType::kNumel * 32;
-    using OffsetHelper =
-        warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-                                 WarpLayout::kType, kWarpTileNumel>;
-    OffsetHelper offset_helper_;
 };
 
 }  // namespace tilefusion::cell::copy

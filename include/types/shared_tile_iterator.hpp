@@ -80,7 +80,7 @@ class STileIterator {
         //                  ? x * (kStride0 * Tile::kRowStride) + y * kStride1
         //                  : x * kStride0 + y * (Tile::kColStride * kStride1);
 
-        int offset = i * 256;
+        int offset = i * BaseShape::kNumel;
 
         NewTile tile(data_ + offset);
 

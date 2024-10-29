@@ -60,6 +60,13 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
         for (int i = 0; i < kRowExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
+                // if (thread(32)) {
+                //     printf("lane_row: %d\n", lane_row);
+                //     printf("lane_col: %d\n", lane_col);
+                //     printf("src_lane_offset: %d\n", src_lane_offset);
+                //     printf("dst_lane_offset: %d\n", dst_lane_offset);
+                // }
+
                 // src_offset =
                 //     i * kSrcRowStride + j * kSrcColStride + src_lane_offset;
                 // dst_offset =
@@ -68,6 +75,11 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
                 src_offset = src_base_tiles_(i, j) + src_lane_offset;
                 // a BaseTile is contiguously stored in shared memory
                 dst_offset = dst_base_tiles_(i, j) + dst_lane_offset;
+
+                // if (thread(32)) {
+                //     printf("src_offset[%d, %d]: %d\n", i, j, src_offset);
+                //     printf("dst_offset[%d, %d]: %d\n", i, j, dst_offset);
+                // }
 
                 this->copy(src + src_offset, dst + dst_offset);
             }
@@ -284,13 +296,15 @@ struct GlobalToSharedLoader : public Base {
         DType* dst_ptr = dst.mutable_data();
 
         int offset_src = Base::template get_warp_offset<Global>();  // global
-        int offset_dst = Base::template get_warp_offset<Shared>();  // shared
+        // int offset_dst = Base::template get_warp_offset<Shared>();  // shared
+        int offset_dst = offset_helper_.get_warp_offset();  // shared
 
-        // int offset_dst = offset_helper_.get_warp_offset();          // shared
-
-        if (thread(97)) {
-            printf("offset_dst: %d\n", offset_dst);
-        }
+        // if (thread(32)) {
+        //     // printf("g2s, warp_id_1d = %d\n",
+        //     offset_helper_.warp_index_1d()); printf("g2s, shared offset_dst:
+        //     %d\n", offset_dst); printf("kRowExec: %d, kColExec: %d\n",
+        //     kRowExec, kColExec);
+        // }
 
         using Loader = GlobalToSharedLoaderImpl<Global, Shared, kRowExec,
                                                 kColExec, Shared::kType>;
@@ -299,15 +313,16 @@ struct GlobalToSharedLoader : public Base {
         loader(src_ptr + offset_src, dst_ptr + offset_dst);
     }
 
-    //   private:
-    //     constexpr static int kWarpTileNumel = Shared::kNumel /
-    //     WarpLayout::kNumel; using OffsetHelper =
-    //         warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-    //                                  WarpLayout::kType, kWarpTileNumel>;
-    //     // using OffsetHelper =
-    //     //     warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-    //     //                              WarpLayout::kType,
-    //     BaseShape::kNumel>; OffsetHelper offset_helper_;
+  private:
+    // constexpr static int kWarpTileNumel = Shared::kNumel /
+    // WarpLayout::kNumel; using OffsetHelper =
+    //     warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
+    //                              WarpLayout::kType, kWarpTileNumel>;
+
+    using OffsetHelper =
+        warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
+                                 WarpLayout::kType, Shared, BaseShape::kNumel>;
+    OffsetHelper offset_helper_;
 };
 
 template <typename Shared_, typename WarpLayout_,
@@ -354,7 +369,7 @@ struct SharedToGlobalStorer : public Base {
     constexpr static int kWarpTileNumel = Shared::kNumel / WarpLayout::kNumel;
     using OffsetHelper =
         warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-                                 WarpLayout::kType, kWarpTileNumel>;
+                                 WarpLayout::kType, Shared, kWarpTileNumel>;
     OffsetHelper offset_helper_;
 };
 }  // namespace tilefusion::cell::copy
