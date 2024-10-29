@@ -84,7 +84,7 @@ __global__ void swizzled_copy(const Element* data, G2S1& g2s,
             s2r(s_swizzled_tiles(i), r_tile_swizzled);
             __syncthreads();
 
-            // if (thread(32)) {
+            // if (thread(0)) {
             //     printf("\niteration [%d, %d]\n", k, i);
             //     // printf("shared tile:\n");
             //     // s_tiles(i).dump_value();
@@ -203,7 +203,7 @@ void run_test_colmajor() {
 
     // for non-swizzled layout
     using Shared1 = SharedTile<Element, tl::ColMajor<kShmRows, kShmCols>,
-                               false /*enable swizzled layout on shared*/>;
+                               false /*disable swizzled layout on shared*/>;
     using SIterator1 = STileIterator<Shared1, TileShape<kChunkShm, kShmCols>>;
 
     // for swizzled layout
@@ -443,13 +443,14 @@ TEST(TestSwizzledLoad, test_load_row_major) {
 }
 
 // TEST(TestSwizzledLoad, test_load_col_major) {
-//     run_test_colmajor<tl::RowMajor<1, 1>, 16 /*K*/, 16 /*N*/, 16, 16, 16>();
-//     run_test_colmajor<tl::RowMajor<1, 1>, 64 /*K*/, 64 /*N*/, 32, 64, 16>();
-//     run_test_colmajor<tl::RowMajor<1, 2>, 128 /*K*/, 32 /*N*/, 64, 32, 32>();
-//     run_test_colmajor<tl::RowMajor<2, 1>, 256 /*K*/, 64 /*N*/, 128, 64,
-//     32>(); run_test_colmajor<tl::RowMajor<2, 2>, 256 /*K*/, 128 /*N*/, 64,
-//     128, 32>(); run_test_colmajor<tl::RowMajor<4, 1>, 128 /*K*/, 64 /*N*/,
-//     64, 64, 64>();
+//     // run_test_colmajor<tl::RowMajor<1, 1>, 16, 16, 16, 16, 16>();
+//     run_test_colmajor<tl::RowMajor<1, 1>, 32, 16, 32, 16, 16>();
+
+//     // run_test_colmajor<tl::RowMajor<1, 1>, 64, 64, 32, 64, 16>();
+//     // run_test_colmajor<tl::RowMajor<1, 2>, 128, 32, 64, 32, 32>();
+//     // run_test_colmajor<tl::RowMajor<2, 1>, 256, 64, 128, 64, 32>();
+//     // run_test_colmajor<tl::RowMajor<2, 2>, 256, 128, 64, 128, 32>();
+//     // run_test_colmajor<tl::RowMajor<4, 1>, 128, 64, 64, 64, 64>();
 // }
 
 // TEST(TestNonSwizzledStore, test_row_major) {

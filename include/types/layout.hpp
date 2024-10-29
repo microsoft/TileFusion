@@ -19,8 +19,6 @@ namespace tilefusion::cell {
 
 namespace tile_layout {
 
-namespace detail {}  // namespace detail
-
 enum class Layout {
     kRowMajor = 0,  // Tile layout for shared memory.
     kColMajor = 1,
