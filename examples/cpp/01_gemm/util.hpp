@@ -10,7 +10,7 @@
 
 #include <cfloat>
 
-float rand_float(float a = 1e-4, float b = 1e-2) {
+float rand_float(float a = 5e-4, float b = 1e-2) {
     float random = ((float)rand()) / (float)RAND_MAX;
     float diff = b - a;
     float r = random * diff;
@@ -65,12 +65,12 @@ bool check_results(const float* values1, const __half* values2, int numel) {
     int cut_off = 128;
     printf("ground truth:\n");
     for (int i = 0; i < cut_off; ++i) {
-        printf("%.3f, ", __half2float(values2[i]));
+        printf("%.4f, ", __half2float(values2[i]));
         if (i && (i + 1) % 16 == 0) printf("\n");
     }
     printf("\ncomputed values:\n");
     for (int i = 0; i < cut_off; ++i) {
-        printf("%.3f, ", values1[i]);
+        printf("%.4f, ", values1[i]);
         if (i && (i + 1) % 16 == 0) printf("\n");
     }
 #endif

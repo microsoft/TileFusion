@@ -186,6 +186,8 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, kRowExec_, kColExec_,
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
+    static constexpr int kSrcRowStride = BaseShape::kRows * Shared::kRowStride;
+
     // strides to iterate over each 16x16 `BaseTile` in the shared memory
     static constexpr int kDstRowStride = BaseShape::kRows * Global::kRowStride;
     static constexpr int kDstColStride = BaseShape::kCols;
@@ -194,8 +196,8 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, kRowExec_, kColExec_,
         int src_offset = 0, dst_offset = 0;
         for (int i = 0; i < kRowExec; ++i) {
             for (int j = 0; j < kColExec; ++j) {
-                src_offset = (i * kColExec + j) * BaseShape::kNumel;  // shared
-                dst_offset = i * kDstRowStride + j * kDstColStride;   // global
+                src_offset = i * kSrcRowStride + j * BaseShape::kNumel;
+                dst_offset = i * kDstRowStride + j * kDstColStride;
 
                 this->copy(src + src_offset, dst + dst_offset);
             }

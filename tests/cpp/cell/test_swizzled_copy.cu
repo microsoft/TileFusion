@@ -278,19 +278,18 @@ __global__ void swizzled_store(const Element* src, Element* dst) {
     storer2(s_tile, g_dst_tile);
     __syncthreads();
 
+#if defined(DEBUG)
     if (thread0()) {
-        // printf("\nglobal tile source:\n");
-        // g_src_tile.dump_value();
-
-        // printf("\nreg tile:\n");
-        // r_tile.dump_value();
+        printf("\nglobal tile source:\n");
+        g_src_tile.dump_value();
 
         printf("\nshared tile:\n");
         s_tile.dump_value();
 
-        printf("\nglobal tile:\n");
+        printf("\nglobal tile target:\n");
         g_dst_tile.dump_value();
     }
+#endif
 }
 
 template <typename Element, typename WarpLayout, const int kRows,
@@ -339,8 +338,10 @@ void test_row_major_store() {
 
     thrust::host_vector<Element> h_dst = d_dst;
 
-    // assert_equal(thrust::raw_pointer_cast(h_src.data()),
-    //              thrust::raw_pointer_cast(h_dst.data()), numel, 1e-4);
+    assert_equal(thrust::raw_pointer_cast(h_src.data()),
+                 thrust::raw_pointer_cast(h_dst.data()), numel, 1e-4);
+
+    LOG(INFO) << "[" << kRows << ", " << kCols << "] test passed!" << std::endl;
 };
 
 template <typename Element, typename WarpLayout, const int kRows,
@@ -388,10 +389,11 @@ void test_col_major_store() {
 
     assert_equal(thrust::raw_pointer_cast(h_src.data()),
                  thrust::raw_pointer_cast(h_dst.data()), numel, 1e-4);
+
+    LOG(INFO) << "[" << kRows << ", " << kCols << "] test passed!" << std::endl;
 };
 }  // namespace
 
-/*
 TEST(TestSwizzledLoad, test_load_row_major) {
     run_test_rowmajor<tl::RowMajor<1, 1>, 16, 16, 16, 16, 16>();
     run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 16>();
@@ -444,55 +446,61 @@ TEST(TestSwizzledLoad, test_load_col_major) {
 
     run_test_colmajor<tl::RowMajor<2, 4>, 128, 128, 64, 128, 64>();
 }
-*/
 
 TEST(TestNonSwizzledStore, test_row_major) {
     static constexpr int kSwizzled = false;
-    // test_row_major_store<float, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
-    // test_row_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
+    test_row_major_store<float, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
+    test_row_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
     test_row_major_store<float, tl::RowMajor<1, 2>, 32, 32, kSwizzled>();
 
-    // test_row_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
-    // test_row_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+    test_row_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
+    test_row_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
 
-    // test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 16,
-    // kSwizzled>(); test_row_major_store<__half, tl::RowMajor<2, 1>, 64,
-    // 32, kSwizzled>(); test_row_major_store<__half, tl::RowMajor<1, 2>,
-    // 128, 64, kSwizzled>(); test_row_major_store<__half, tl::RowMajor<2,
-    // 2>, 64, 64, kSwizzled>();
+    test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+    test_row_major_store<__half, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
+    test_row_major_store<__half, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
+    test_row_major_store<__half, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
 }
 
-// TEST(TestSwizzledStored, test_row_major) {
-//     static constexpr int kSwizzled = true;
+TEST(TestSwizzledStored, test_row_major) {
+    static constexpr int kSwizzled = true;
 
-//     test_row_major_store<float, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
-//     test_row_major_store<float, tl::RowMajor<1, 1>, 16, 48, kSwizzled>();
-//     test_row_major_store<float, tl::RowMajor<2, 1>, 32, 48, kSwizzled>();
-//     test_row_major_store<float, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
-//     test_row_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
-//     test_row_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
-//     test_row_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
-// }
+    test_row_major_store<float, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
+    test_row_major_store<float, tl::RowMajor<1, 1>, 16, 48, kSwizzled>();
+    test_row_major_store<float, tl::RowMajor<2, 1>, 32, 48, kSwizzled>();
+    test_row_major_store<float, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
+    test_row_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
+    test_row_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
+    test_row_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+}
 
-// TEST(TestNonSwizzledStored, test_col_major) {
-//     static constexpr int kSwizzled = false;
-//     test_col_major_store<__half, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
-//     test_row_major_store<__half, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
-//     test_row_major_store<__half, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
-//     test_row_major_store<__half, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+TEST(TestNonSwizzledStored, test_col_major) {
+    // FIXME(ying): This test is disabled because the changes of the master
+    // branch. Store a column-major tile is not supported after the changes.
 
-//     test_col_major_store<float, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
-//     test_col_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
-//     test_col_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
-//     test_col_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
-// }
+    // static constexpr int kSwizzled = false;
 
-// TEST(TestSwizzledStored, test_col_major) {
-//     static constexpr int kSwizzled = true;
-//     test_col_major_store<float, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
-//     test_col_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
-//     test_col_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
-//     test_col_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
-// }
+    // test_col_major_store<__half, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+    // test_row_major_store<__half, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
+
+    // test_row_major_store<__half, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
+    // test_row_major_store<__half, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+
+    // test_col_major_store<float, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+    // test_col_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
+    // test_col_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
+    // test_col_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+}
+
+TEST(TestSwizzledStored, test_col_major) {
+    // FIXME(ying): This test is disabled because the changes of the master
+    // branch. Store a column-major tile is not supported after the changes.
+
+    // static constexpr int kSwizzled = true;
+    // test_col_major_store<float, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+    // test_col_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
+    // test_col_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
+    // test_col_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+}
 
 }  // namespace tilefusion::testing

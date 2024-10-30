@@ -68,26 +68,22 @@ class STileIterator {
                       "A single index is supported only when the strip count "
                       "of one of the iterator's dimensions is 1.");
 
-        // int x = sc0 == 1 ? 0 : i;
-        // int y = sc0 == 1 ? i : 0;
-
         using TileLayout =
             decltype(tl::make_tile_layout<kStride0, kStride1, Tile::kRowStride,
                                           Tile::kColStride, true>());
         using NewTile = SharedTile<DType, TileLayout, Tile::kSwizzled>;
 
-        // int offset = Tile::kType == tl::Layout::kRowMajor
-        //                  ? x * (kStride0 * Tile::kRowStride) + y * kStride1
-        //                  : x * kStride0 + y * (Tile::kColStride * kStride1);
-
         int offset = i * BaseShape::kNumel;
-
         NewTile tile(data_ + offset);
 
         return tile;
     }
 
     DEVICE auto operator()(int x, int y) {
+        // FIXME(ying): Fix this implementation according to the new layout of
+        // shared memory.
+        assert(false && "This function is not correctly implemented yet.");
+
         assert(data_);               // The iterator is not initialized.
         assert(x < sc0 && y < sc1);  // indices must be within the strip count.
 
@@ -105,6 +101,10 @@ class STileIterator {
     }
 
     DEVICE auto operator()(int x, const Underscore& y) {
+        // FIXME(ying): Fix this implementation according to the new layout of
+        // shared memory.
+        assert(false && "This function is not correctly implemented yet.");
+
         assert(data_);    // The iterator is not initialized.
         assert(x < sc0);  // index must be within the strip count.
 
@@ -128,6 +128,10 @@ class STileIterator {
     }
 
     DEVICE auto operator()(const Underscore& x, int y) {
+        // FIXME(ying): Fix this implementation according to the new layout of
+        // shared memory.
+        assert(false && "This function is not correctly implemented yet.");
+
         assert(data_);    // The iterator is not initialized.
         assert(y < sc1);  // index must be within the strip count.
 
