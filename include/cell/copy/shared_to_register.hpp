@@ -218,29 +218,31 @@ struct RegToSharedStorer {
             warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
                                      WarpLayout::kType, Shared>;
         OffsetHelper offset_helper_;
+        int offset = offset_helper_.get_warp_offset();
 
         // 1. advance the pointer to input data to the current warp
         // according to warp reuse mode. During the store process, threads
         // do not write to the same shared memory location, thus the warp
         // reuse mode is set to `Cont`.
-        DType* dst = dst_.mutable_data() + offset_helper_.get_warp_offset();
+        DType* dst = dst_.mutable_data() + offset;
 
         using Storer = BaseTileStorer<Shared, Shared::kType, sizeof(DType) * 8>;
         Storer storer;
 
-        int offset = 0;
 #pragma unroll
         for (int i = 0; i < kRowExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
                 offset = (i * kColExec + j) * BaseShape::kNumel;
+
+                if (thread(32)) {
+                    printf("offset-[%d, %d]: %d\n", i, j, offset);
+                }
+
                 storer(src(i, j).data(), dst + offset);
             }
         }
     }
-
-  private:
-    static constexpr int kWarpTileNumel = Reg::kNumel * Reg::DType::kNumel * 32;
 };
 
 }  // namespace tilefusion::cell::copy

@@ -132,7 +132,6 @@ struct GTileIteratorTester<Layout_, ChunkShape, tl::Layout::kColMajor> {
                 }
 
 #if defined(DEBUG_PRINT)
-
                 printf("\nIteration-[%d, %d]:\n", i, j);
                 iter(i, j).dump_value();
                 printf("\n");
@@ -156,5 +155,4 @@ TEST(TestGTileIterator, col_major) {
     Tester tester;
     tester();
 }
-
 }  // namespace tilefusion::testing

@@ -205,8 +205,7 @@ struct SwizzledColMajor<128> {
 template <const bool kSwizzled, const Layout kType, const int kBitsPerAcces>
 struct SharedLayoutWrapperImpl;
 
-/// @brief Shared memory layout for non-swizzled layout with 32-bit data
-/// type.
+/// @brief Shared memory layout for non-swizzled layout with 32-bit data type.
 template <const int kBitsPerAcces>
 struct SharedLayoutWrapperImpl<false, Layout::kRowMajor, kBitsPerAcces> {
     using BaseShape = traits::BaseTileShape<__half>;
@@ -216,8 +215,7 @@ struct SharedLayoutWrapperImpl<false, Layout::kRowMajor, kBitsPerAcces> {
                      Stride<Int<BaseShape::kCols>, _1>>;
 };
 
-/// @brief Shared memory layout for non-swizzled layout with 32-bit data
-/// type.
+/// @brief Shared memory layout for non-swizzled layout with 32-bit data type.
 template <const int kBitsPerAcces>
 struct SharedLayoutWrapperImpl<false, Layout::kColMajor, kBitsPerAcces> {
     using BaseShape = traits::BaseTileShape<__half>;
@@ -226,8 +224,7 @@ struct SharedLayoutWrapperImpl<false, Layout::kColMajor, kBitsPerAcces> {
                      Stride<_1, Int<BaseShape::kRows>>>;
 };
 
-/// @brief Shared memory layout for swizzled row-major layout with 16-bit
-/// data
+/// @brief Shared memory layout for swizzled row-major layout with 16-bit data
 ///        type.
 template <>
 struct SharedLayoutWrapperImpl<true, Layout::kRowMajor, 64> {
@@ -236,8 +233,7 @@ struct SharedLayoutWrapperImpl<true, Layout::kRowMajor, 64> {
     using Layout = SwizzledRowMajor<64>;
 };
 
-/// @brief Shared memory layout for swizzled col-major layout with 16-bit
-/// data
+/// @brief Shared memory layout for swizzled col-major layout with 16-bit data
 ///        type.
 template <>
 struct SharedLayoutWrapperImpl<true, Layout::kColMajor, 64> {
@@ -246,8 +242,7 @@ struct SharedLayoutWrapperImpl<true, Layout::kColMajor, 64> {
     using Layout = SwizzledColMajor<64>;
 };
 
-/// @brief Shared memory layout for swizzled row-major layout with 16-bit
-/// data
+/// @brief Shared memory layout for swizzled row-major layout with 16-bit data
 ///        type.
 template <>
 struct SharedLayoutWrapperImpl<true, Layout::kRowMajor, 128> {
@@ -256,8 +251,7 @@ struct SharedLayoutWrapperImpl<true, Layout::kRowMajor, 128> {
     using Layout = SwizzledRowMajor<128>;
 };
 
-/// @brief Shared memory layout for swizzled col-major layout with 16-bit
-/// data
+/// @brief Shared memory layout for swizzled col-major layout with 16-bit data
 ///        type.
 template <>
 struct SharedLayoutWrapperImpl<true, Layout::kColMajor, 128> {
@@ -267,8 +261,7 @@ struct SharedLayoutWrapperImpl<true, Layout::kColMajor, 128> {
 };
 }  // namespace detail
 
-/// @brief: Wapper for creating non-swizzled or swizzled shared memory
-/// layout.
+/// @brief: Wapper for creating non-swizzled or swizzled shared memory layout.
 template <typename Shared, const int kBitsPerAccess>
 struct SharedLayoutWrapper {
     using Layout =

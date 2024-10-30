@@ -132,11 +132,6 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
                 src_offset = src_base_tiles_(j, i) + src_lane_offset;  // global
                 dst_offset = dst_base_tiles_(j, i) + dst_lane_offset;  // shared
 
-                // if (thread(0)) {
-                //     printf("\nsrc_offset-[%d, %d] = %d\n", i, j, src_offset);
-                //     printf("dst_offset-[%d, %d] = %d\n", i, j, dst_offset);
-                // }
-
                 this->copy(src + src_offset, dst + dst_offset);
             }
         }
@@ -284,11 +279,6 @@ struct GlobalToSharedLoader : public Base {
 
         int offset_src = Base::template get_warp_offset<Global>();  // global
         int offset_dst = offset_helper_.get_warp_offset();          // shared
-
-        // if (thread(0)) {
-        //     printf("\ng2s, shared offset_dst:%d\n", offset_dst);
-        //     printf("kRowExec: %d, kColExec: %d\n", kRowExec, kColExec);
-        // }
 
         using Loader = GlobalToSharedLoaderImpl<Global, Shared, kRowExec,
                                                 kColExec, Shared::kType>;

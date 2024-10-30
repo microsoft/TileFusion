@@ -45,7 +45,6 @@ DEVICE int warp_offset_impl<WarpReuse::kRowReuseCont>(int warp_row,
                                                       int warp_cstride) {
     return warp_row * warp_rstride;
 }
-
 }  // namespace detail
 
 template <typename WarpLayout_, const WarpReuse kMode_>
@@ -258,8 +257,11 @@ struct SharedOffsetHelper<WarpLayout, kMode_, tl::Layout::kRowMajor, Shared_> {
     }
 
     DEVICE int get_warp_offset() {
-        int tile_id =
-            base_tiles_layout_(warp_row_id<kMode>(), warp_col_id<kMode>());
+        int tile_id = Shared::kType == tl::Layout::kRowMajor
+                          ? base_tiles_row_major_(warp_row_id<kMode>(),
+                                                  warp_col_id<kMode>())
+                          : base_tiles_col_major_(warp_row_id<kMode>(),
+                                                  warp_col_id<kMode>());
         return tile_id * BaseShape::kNumel;
     }
 
@@ -273,14 +275,24 @@ struct SharedOffsetHelper<WarpLayout, kMode_, tl::Layout::kRowMajor, Shared_> {
     constexpr static int kBaseTilePerRow = Shared::kRows / BaseShape::kRows;
     constexpr static int kBaseTilePerCol = Shared::kCols / BaseShape::kCols;
 
-    constexpr static int kRowStride =
+    constexpr static int kRowStride1 =
         kBaseTilePerRow / tl::num_rows<WarpLayout> * kBaseTilePerCol;
-    constexpr static int kColStride =
+    constexpr static int kColStride1 =
         kBaseTilePerCol / tl::num_cols<WarpLayout>;
-    using BaseTilesLayout =
+
+    using BaseTilesRowMajorLayout =
         cute::Layout<Shape<Int<kBaseTilePerRow>, Int<kBaseTilePerCol>>,
-                     Stride<Int<kRowStride>, Int<kColStride>>>;
-    BaseTilesLayout base_tiles_layout_;
+                     Stride<Int<kRowStride1>, Int<kColStride1>>>;
+    BaseTilesRowMajorLayout base_tiles_row_major_;
+
+    constexpr static int kRowStride2 =
+        kBaseTilePerRow / tl::num_rows<WarpLayout>;
+    constexpr static int kColStride2 =
+        kBaseTilePerCol / tl::num_cols<WarpLayout> * kBaseTilePerRow;
+    using BaseTilesColMajorLayout =
+        cute::Layout<Shape<Int<kBaseTilePerRow>, Int<kBaseTilePerCol>>,
+                     Stride<Int<kRowStride2>, Int<kColStride2>>>;
+    BaseTilesColMajorLayout base_tiles_col_major_;
 };
 
 }  // namespace tilefusion::cell::copy::warp
