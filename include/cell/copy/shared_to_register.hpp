@@ -33,21 +33,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
-    // using BaseTilesLayout =
-    //     tl::MatrixLayout<kRowExec, kColExec,
-    //                      BaseShape::kRows * Shared::kRowStride,
-    //                      BaseShape::kCols>;
-
-    using BaseTilesLayout =
-        tl::MatrixLayout<kRowExec, kColExec,
-                         BaseShape::kRows * Shared::kRowStride,
-                         BaseShape::kNumel>;
-
-    using BaseTileSharedLayout =
-        tl::SharedLayoutWrapper<Shared, LoadMat::kAccessInBits>::Layout;
-
-    static constexpr int kSrcRowStride = Shared::kRowStride * BaseShape::kRows;
-
     DEVICE SharedToRegLoaderImpl()
         : base_tiles_(BaseTilesLayout{}),
           in_base_tile_(BaseTileSharedLayout{}) {}
@@ -66,13 +51,20 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
                 // advance pointer to the 16x16 `BaseTile` indexed by(i, j).
                 offset = base_tiles_(i, j) + lane_offset;
                 // issue the hardware-backed memory access instruction.
-                this->ldmatrix(&src[offset], dst(i, j).mutable_data());
+                this->ldmatrix(src + offset, dst(i, j).mutable_data());
             }
         }
     }
 
   private:
+    using BaseTilesLayout =
+        tl::MatrixLayout<kRowExec, kColExec,
+                         BaseShape::kRows * Shared::kRowStride,
+                         BaseShape::kNumel>;
     BaseTilesLayout base_tiles_;
+
+    using BaseTileSharedLayout =
+        tl::SharedLayoutWrapper<Shared, LoadMat::kAccessInBits>::Layout;
     BaseTileSharedLayout in_base_tile_;
 };
 
@@ -89,13 +81,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
-
-    using BaseTilesLayout =
-        tl::MatrixLayout<kRowExec, kColExec, BaseShape::kRows,
-                         BaseShape::kCols * Shared::kColStride>;
-
-    using BaseTileSharedLayout =
-        tl::SharedLayoutWrapper<Shared, LoadMat::kAccessInBits>::Layout;
 
     DEVICE SharedToRegLoaderImpl()
         : base_tiles_(BaseTilesLayout{}),
@@ -117,13 +102,19 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
                 offset = base_tiles_(j, i) + lane_offset;
 
                 // issue the hardware-backed memory access instruction
-                this->ldmatrix(&src[offset], dst(j, i).mutable_data());
+                this->ldmatrix(src + offset, dst(j, i).mutable_data());
             }
         }
     }
 
   private:
+    using BaseTilesLayout =
+        tl::MatrixLayout<kRowExec, kColExec, BaseShape::kNumel,
+                         BaseShape::kCols * Shared::kColStride>;
     BaseTilesLayout base_tiles_;
+
+    using BaseTileSharedLayout =
+        tl::SharedLayoutWrapper<Shared, LoadMat::kAccessInBits>::Layout;
     BaseTileSharedLayout in_base_tile_;
 };
 }  // namespace  detail
@@ -164,15 +155,9 @@ struct SharedToRegLoader : public Base {
 
         using OffsetHelper =
             warp::SharedOffsetHelper<WarpLayout, kMode, WarpLayout::kType,
-                                     Shared, kWarpTileNumel>;
+                                     Shared>;
         OffsetHelper offset_helper_;
         int offset = offset_helper_.get_warp_offset();
-
-        // if (thread(64)) {
-        //     printf("warp index 1d = %d\n", offset_helper_.warp_index_1d());
-        //     printf("warpTileNumel: %d\n", kWarpTileNumel);
-        //     printf("shared-offset: %d\n", offset);
-        // }
 
         using Loader =
             detail::SharedToRegLoaderImpl<Shared, Reg, kRowExec, kColExec,
@@ -180,9 +165,6 @@ struct SharedToRegLoader : public Base {
         Loader loader;
         loader(src + offset, dst);
     }
-
-  private:
-    static constexpr int kWarpTileNumel = Reg::kNumel * Reg::DType::kNumel * 32;
 };
 
 /// @brief partial specialization for 16x16x16 wmma's output, and
@@ -234,7 +216,7 @@ struct RegToSharedStorer {
 
         using OffsetHelper =
             warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-                                     WarpLayout::kType, Shared, kWarpTileNumel>;
+                                     WarpLayout::kType, Shared>;
         OffsetHelper offset_helper_;
 
         // 1. advance the pointer to input data to the current warp

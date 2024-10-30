@@ -46,37 +46,6 @@ DEVICE int warp_offset_impl<WarpReuse::kRowReuseCont>(int warp_row,
     return warp_row * warp_rstride;
 }
 
-// /// for access shared memory
-// template <const WarpReuse kMode>
-// DEVICE int warp_index_1d(int warp_row, int warp_col, int warp_rstride,
-//                          int warp_cstride) {
-//     assert(false && "Not implemented yet.");
-//     return -1;
-// };
-
-// template <>
-// DEVICE int warp_index_1d<WarpReuse::kCont>(int warp_row, int warp_col,
-//                                            int warp_rstride, int
-//                                            warp_cstride) {
-//     return warp_row * warp_rstride + warp_col * warp_cstride;
-// }
-
-// template <>
-// DEVICE int warp_index_1d<WarpReuse::kColReuseCont>(int warp_row, int
-// warp_col,
-//                                                    int warp_rstride,
-//                                                    int warp_cstride) {
-//     return warp_col * warp_cstride;
-// }
-
-// template <>
-// DEVICE int warp_index_1d<WarpReuse::kRowReuseCont>(int warp_row, int
-// warp_col,
-//                                                    int warp_rstride,
-//                                                    int warp_cstride) {
-//     return warp_row;
-//     // return warp_row * warp_rstride;
-// }
 }  // namespace detail
 
 template <typename WarpLayout_, const WarpReuse kMode_>
@@ -245,13 +214,11 @@ struct CopyBase {
 };
 
 template <typename WarpLayout, const WarpReuse kMode_, const tl::Layout kType,
-          typename Shared_, const int kWarpTileNumel_>
+          typename Shared_>
 struct SharedOffsetHelper;
 
-template <typename WarpLayout, const WarpReuse kMode_, typename Shared_,
-          const int kWarpTileNumel_>
-struct SharedOffsetHelper<WarpLayout, kMode_, tl::Layout::kRowMajor, Shared_,
-                          kWarpTileNumel_> {
+template <typename WarpLayout, const WarpReuse kMode_, typename Shared_>
+struct SharedOffsetHelper<WarpLayout, kMode_, tl::Layout::kRowMajor, Shared_> {
     template <const WarpReuse kMode>
     DEVICE int warp_row_id() {
         int warp_row = 0;

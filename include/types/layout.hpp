@@ -293,9 +293,9 @@ static constexpr size_t get_numel = Layout::kNumel;
 
 // We wrap CuTe's `Layout`, which consists of `Shape` and `Stride`, into an
 // intelligent row-major or column-major layout. In a row-major layout, the
-// column stride is 1, whereas in a column-major layout, the row stride
-// is 1. NOTE: A potential issue is that `ColMajor<1, 1>` will also be
-// indentified as a row-major layout.
+// column stride is 1, whereas in a column-major layout, the row stride is 1.
+// NOTE: A potential issue is that `ColMajor<1, 1>` will also be indentified as
+// a row-major layout.
 template <typename Layout_>
 static constexpr Layout layout_type = Layout_::kType;
 
