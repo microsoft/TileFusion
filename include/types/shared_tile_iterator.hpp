@@ -3,16 +3,19 @@
 
 #pragma once
 
+#include "cell/traits/base.hpp"
 #include "types/shared.hpp"
 #include "types/tile_shape.hpp"
 
 namespace tilefusion::cell {
 namespace tl = tile_layout;
 
+using namespace cute;
+
 namespace detail {
 /// @brief Helper for pretty printing a tile iterator's static shape-related
 ///        information. This printer works ONLY on the host.
-struct TileIteratorPrettyPrinter {
+struct STileIteratorPrettyPrinter {
     template <typename TileIterator>
     static HOST void print(std::ostream& out, const TileIterator& itr) {
         out << "numel = " << TileIterator::Tile::kNumel << ", ChunkShape["
@@ -23,20 +26,18 @@ struct TileIteratorPrettyPrinter {
 };
 }  // namespace detail
 
-struct Underscore {};                  // dummy type for underscore
-static const __device__ Underscore _;  // for slicing
-
 /// @brief `SharedTileIterator` chunks a shared memory tile into smaller tiles
 ///         and iterates over these smaller sub-tiles.
 /// @tparam Tile_: The type of the large tile to chunk.
 /// @tparam ChunkShape_: The shape of the smaller tiles into which the large
 ///                      tile is partitioned (chunk shape).
 template <class Tile_, class ChunkShape_>
-class TileIterator {
+class STileIterator {
   public:
     using Tile = Tile_;
     using DType = Tile::DType;
     using ChunkShape = ChunkShape_;
+    using BaseShape = traits::BaseTileShape<DType>;
 
     static_assert(Tile::kRows >= dim_size<0, ChunkShape>,
                   "Tile::kRows must be >= dim_size<0, ChunkShape>");
@@ -49,11 +50,11 @@ class TileIterator {
     static constexpr int sc0 = Tile::kRows / kStride0;
     static constexpr int sc1 = Tile::kCols / kStride1;
 
-    HOST_DEVICE TileIterator() : data_(nullptr) {}
+    HOST_DEVICE STileIterator() : data_(nullptr) {}
 
-    DEVICE TileIterator(DType* data) : data_(data) {}
+    DEVICE STileIterator(DType* data) : data_(data) {}
 
-    DEVICE TileIterator(const DType* data) : data_(const_cast<DType*>(data)) {}
+    DEVICE STileIterator(const DType* data) : data_(const_cast<DType*>(data)) {}
 
     // Since a Tile is considered to be at most a 2D array, the iterator
     // traverses over these two dimensions. The current rules are:
@@ -67,24 +68,22 @@ class TileIterator {
                       "A single index is supported only when the strip count "
                       "of one of the iterator's dimensions is 1.");
 
-        int x = sc0 == 1 ? 0 : i;
-        int y = sc0 == 1 ? i : 0;
-
         using TileLayout =
             decltype(tl::make_tile_layout<kStride0, kStride1, Tile::kRowStride,
-                                          Tile::kColStride>());
+                                          Tile::kColStride, true>());
         using NewTile = SharedTile<DType, TileLayout, Tile::kSwizzled>;
 
-        int offset = Tile::kType == tl::Layout::kRowMajor
-                         ? x * (kStride0 * Tile::kRowStride) + y * kStride1
-                         : x * kStride0 + y * (Tile::kColStride * kStride1);
-
+        int offset = i * BaseShape::kNumel;
         NewTile tile(data_ + offset);
 
         return tile;
     }
 
     DEVICE auto operator()(int x, int y) {
+        // FIXME(ying): Fix this implementation according to the new layout of
+        // shared memory.
+        assert(false && "This function is not correctly implemented yet.");
+
         assert(data_);               // The iterator is not initialized.
         assert(x < sc0 && y < sc1);  // indices must be within the strip count.
 
@@ -102,6 +101,10 @@ class TileIterator {
     }
 
     DEVICE auto operator()(int x, const Underscore& y) {
+        // FIXME(ying): Fix this implementation according to the new layout of
+        // shared memory.
+        assert(false && "This function is not correctly implemented yet.");
+
         assert(data_);    // The iterator is not initialized.
         assert(x < sc0);  // index must be within the strip count.
 
@@ -112,7 +115,7 @@ class TileIterator {
                                                          Tile::kColStride>());
 
         using NewTile = SharedTile<DType, TileLayout, Tile::kSwizzled>;
-        using Iter = TileIterator<NewTile, ChunkShape>;
+        using Iter = STileIterator<NewTile, ChunkShape>;
         static_assert(Iter::sc0 == 1);
 
         // advance pointer to the correct start position
@@ -125,6 +128,10 @@ class TileIterator {
     }
 
     DEVICE auto operator()(const Underscore& x, int y) {
+        // FIXME(ying): Fix this implementation according to the new layout of
+        // shared memory.
+        assert(false && "This function is not correctly implemented yet.");
+
         assert(data_);    // The iterator is not initialized.
         assert(y < sc1);  // index must be within the strip count.
 
@@ -135,7 +142,7 @@ class TileIterator {
                                                          Tile::kColStride>());
 
         using NewTile = SharedTile<DType, TileLayout, Tile::kSwizzled>;
-        using Iter = TileIterator<NewTile, ChunkShape>;
+        using Iter = STileIterator<NewTile, ChunkShape>;
         static_assert(Iter::sc1 == 1);
 
         // advance pointer to the correct start position
@@ -160,8 +167,8 @@ class TileIterator {
 ///        Note: This printer function works ONLY on the host.
 template <typename TileShape, typename ChunkShape>
 static HOST std::ostream& operator<<(
-    std::ostream& out, const TileIterator<TileShape, ChunkShape>& itr) {
-    detail::TileIteratorPrettyPrinter::print(out, itr);
+    std::ostream& out, const STileIterator<TileShape, ChunkShape>& itr) {
+    detail::STileIteratorPrettyPrinter::print(out, itr);
     return out;
 }
 

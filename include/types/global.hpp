@@ -9,13 +9,7 @@
 namespace tilefusion::cell {
 namespace tl = tile_layout;
 
-// FIXME(haruhi): The last boolean template parameter kSwizzled_ is not
-// meaningful for GlobalTile. This issue arises from the current implementation
-// of TileIterator, which always creates a SharedTile containing a kSwizzled_
-// flag. This is a temporary workaround to make TileIterator functional for both
-// GlobalTile and SharedTile. This should be addressed and properly fixed in the
-// future.
-template <typename Element_, typename Layout_, const bool kSwizzled_ = false>
+template <typename Element_, typename Layout_>
 struct GlobalTile {
     using DType = Element_;
     using Layout = Layout_;
@@ -29,7 +23,6 @@ struct GlobalTile {
     static constexpr int kColStride = tl::col_stride<Layout>;
 
     static constexpr tl::Layout kType = tl::layout_type<Layout>;
-    static constexpr bool kSwizzled = kSwizzled_;
 
     DEVICE GlobalTile(DType* data) : data_(data), layout_(Layout{}) {}
 
