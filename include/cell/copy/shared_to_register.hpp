@@ -237,10 +237,9 @@ struct SharedToRegLoader : public Base {
     }
 };
 
-/// @brief partial specialization for 16x16x16 wmma's output, and
-/// st.shared.f32
-///        to revert the data distrubution into an comphrehensive
-///        row-major matrix.
+/// @brief partial specialization for 16x16x16 wmma's output, and st.shared.f32
+///        to revert the data distrubution into an comphrehensive row-major
+///        matrix.
 template <typename Reg_, typename WarpLayout_>
 struct RegToSharedStorer {
     using Reg = Reg_;
@@ -249,10 +248,9 @@ struct RegToSharedStorer {
     using BaseShape = BaseTileShape<DType>;
     using WarpLayout = WarpLayout_;
 
-    /// @brief Store the WMMA output register tile to shared memory. The
-    /// source
-    ///        is the current thread's local register tile, and the
-    ///        destination is shared memory.
+    /// @brief Store the WMMA output register tile to shared memory. The source
+    ///        is the current thread's local register tile, and the destination
+    ///        is shared memory.
     template <typename Shared>
     DEVICE void operator()(const Reg& src, Shared& dst_) {
         static_assert(std::is_same_v<typename Shared::DType, DType>,
@@ -284,10 +282,10 @@ struct RegToSharedStorer {
         static constexpr int kColExec =
             Shared::kCols / BaseShape::kCols / tl::num_cols<WarpLayout>;
 
-        // 1. advance the pointer to input data to the current warp
-        // according to warp reuse mode. During the store process, threads
-        // do not write to the same shared memory location, thus the warp
-        // reuse mode is set to `Cont`.
+        // 1. advance the pointer to input data to the current warp according to
+        // warp reuse mode. During the store process, threads do not write to
+        // the same shared memory location, thus the warp reuse mode is set to
+        // `Cont`.
         using OffsetHelper =
             warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
                                      WarpLayout::kType, Shared>;

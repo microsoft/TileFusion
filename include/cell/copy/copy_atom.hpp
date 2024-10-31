@@ -552,9 +552,6 @@ struct SharedToGlobalBaseTileStorer<Shared, Global, tl::Layout::kColMajor> {
     static constexpr int kRowStride = kThreadsPerRow * kNumPerAccess;
     static constexpr int kExecCount = BaseShape::kRows / kRowStride;
 
-    // using BaseTileSharedLayout =
-    // tl::SharedStorerLayoutWrapper<Shared>::Layout;
-
     // NOTE: Do not modify `kAccessInBits` here to ensure the parameters remain
     // consistent with those used in `SharedLayoutWrapper` within
     // register-to-shared-storer.
