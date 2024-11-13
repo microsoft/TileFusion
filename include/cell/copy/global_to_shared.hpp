@@ -7,6 +7,8 @@
 #include "cell/traits/base.hpp"
 #include "types/mod.hpp"
 
+#include <cute/tensor.hpp>
+
 namespace tilefusion::cell::copy {
 using namespace atom;
 namespace tl = tile_layout;
@@ -131,6 +133,10 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
                 // two lines
                 src_offset = src_base_tiles_(j, i) + src_lane_offset;  // global
                 dst_offset = dst_base_tiles_(j, i) + dst_lane_offset;  // shared
+
+                // if (thread(32)) {
+                //     printf("[%d, %d], dst offset = %d\n", i, j, dst_offset);
+                // }
 
                 this->copy(src + src_offset, dst + dst_offset);
             }
@@ -283,6 +289,10 @@ struct GlobalToSharedLoader : public Base {
 
         int offset_src = Base::template get_warp_offset<Global>();  // global
         int offset_dst = offset_helper_.get_warp_offset();          // shared
+
+        if (thread(32)) {
+            printf("offset_dst = %d\n", offset_dst);
+        }
 
         using Loader = GlobalToSharedLoaderImpl<Global, Shared, kRowExec,
                                                 kColExec, Shared::kType>;

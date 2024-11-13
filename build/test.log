@@ -1,0 +1,15 @@
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TestGemm
+[ RUN      ] TestGemm.test
+I20241116 10:22:22.877609 123196533002240 test_gemm.cu:295] [32, 32, 32], warps: [1, 2], k_chunk_size: 16, kThreads: 64
+I20241116 10:22:22.877915 123196533002240 test_gemm.cu:308] TileIteratorA: numel = 1024, ChunkShape[32, 16], sc0 = 1, sc1 = 2
+TileIteratorB: numel = 1024, ChunkShape[16, 32], sc0 = 2, sc1 = 1
+RegA: RowMajor[4, 4]
+RegB: ColMajor[4, 2]
+RegC: RowMajor[4, 4]
+Shared::kRowStride = 32, Shared::kColStride = 1
+warp_row = 0, warp_col = 1, offset = 1
+offset_dst = 1
+terminate called after throwing an instance of 'thrust::THRUST_200301_800_NS::system::system_error'
+  what():  CUDA free failed: cudaErrorMisalignedAddress: misaligned address

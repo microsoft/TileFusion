@@ -59,8 +59,10 @@ namespace detail {
 using namespace cute;
 
 template <const int kRows_, const int kCols_, const int kRowStride_,
-          const int kColStride_>
+          const int kColStride_, const Layout kType_>
 struct SharedLayout {
+    using BaseShape = traits::BaseTileShape<float>;
+
     static constexpr int kRows = kRows_;
     static constexpr int kCols = kCols_;
 
@@ -69,23 +71,40 @@ struct SharedLayout {
 
     static constexpr int kNumel = kRows * kCols;
 
-    static constexpr Layout kType =
-        kColStride == 1 ? Layout::kRowMajor : Layout::kColMajor;
+    static constexpr Layout kType = kType_;
+    // static constexpr Layout kType =
+    //     kColStride == 1 ? Layout::kRowMajor : Layout::kColMajor;
 
-    DEVICE int operator()(int i, int j) const { return layout_(i, j); }
+    DEVICE int operator()(int i, int j) const {
+        int tile_x = i / BaseShape::kRows;
+        int tile_y = j / BaseShape::kCols;
+
+        int in_tile_x = i % BaseShape::kRows;
+        int in_tile_y = j % BaseShape::kCols;
+
+        int tile_offset = tile_x * kRowStride + tile_y * kColStride;
+        int in_tile_offset = in_tile_(in_tile_x, in_tile_y);
+
+        // if (thread(0) && i == 16 && j == 0) {
+        //     printf("kRowStride = %d, kColStride = %d\n", kRowStride,
+        //            kColStride);
+        //     printf(
+        //         "tile_x = %d, tile_y = %d, in_tile_x = %d, in_tile_y = %d, "
+        //         "tile_offset = %d, in_tile_offset = %d\n",
+        //         tile_x, tile_y, in_tile_x, in_tile_y, tile_offset,
+        //         in_tile_offset);
+        // }
+
+        return tile_offset + in_tile_offset;
+        // return layout_(i, j);
+    }
 
   private:
-    using LayoutAtom = std::conditional_t<
-        kColStride == 1,
+    using BaseTileLayout = std::conditional_t<
+        kType == Layout::kRowMajor,
         cute::Layout<Shape<_16, _16>, Stride<_16, _1>>,  /*RowMajor*/
         cute::Layout<Shape<_16, _16>, Stride<_1, _16>>>; /*ColMajor*/
-
-    using Layout_ = decltype(tile_to_shape(
-        LayoutAtom{},
-        cute::Layout<Shape<Int<kRows>, Int<kCols>>,
-                     Stride<Int<kRowStride>, Int<kColStride>>>{}));
-
-    Layout_ layout_;
+    BaseTileLayout in_tile_;
 };
 
 /// @brief Swizzled layout for 16x16 BaseTile.
@@ -293,13 +312,22 @@ template <typename Layout_>
 static constexpr Layout layout_type = Layout_::kType;
 
 template <const int kShape1, const int kShape2, const int kStride1,
-          const int kStride2, const bool kIsShared = false>
+          const int kStride2>
 HOST_DEVICE auto make_tile_layout() {
-    using Layout_ = MatrixLayout<kShape1, kShape2, kStride1, kStride2>;
-    using SharedLayout_ =
-        detail::SharedLayout<kShape1, kShape2, kStride1, kStride2>;
+    using Layout = MatrixLayout<kShape1, kShape2, kStride1, kStride2>;
+    // using SharedLayout_ =
+    //     detail::SharedLayout<kShape1, kShape2, kStride1, kStride2>;
 
-    using Layout = std::conditional_t<kIsShared, SharedLayout_, Layout_>;
+    // using Layout = std::conditional_t<kIsShared, SharedLayout_, Layout_>;
+    return Layout{};
+}
+
+template <const int kShape1, const int kShape2, const int kStride1,
+          const int kStride2, const Layout kType>
+HOST_DEVICE auto make_shared_tile_layout() {
+    using Layout =
+        detail::SharedLayout<kShape1, kShape2, kStride1, kStride2, kType>;
+
     return Layout{};
 }
 
