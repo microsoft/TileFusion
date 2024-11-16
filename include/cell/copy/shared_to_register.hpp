@@ -239,13 +239,13 @@ struct SharedToRegLoader : public Base {
                       "The current implementation requires Shared::kCols must "
                       "be divisible by tl::num_cols<WarpLayout>");
 
-        if (thread(32)) {
-            printf("warp-offset:\n");
-            printf("Shared::kRows = %d, Shared::kCols = %d\n", Shared::kRows,
-                   Shared::kCols);
-            printf("Shared::kRowStride = %d, Shared::kColStride = %d\n",
-                   Shared::kRowStride, Shared::kColStride);
-        }
+        // if (thread(32)) {
+        //     printf("warp-offset:\n");
+        //     printf("Shared::kRows = %d, Shared::kCols = %d\n", Shared::kRows,
+        //            Shared::kCols);
+        //     printf("Shared::kRowStride = %d, Shared::kColStride = %d\n",
+        //            Shared::kRowStride, Shared::kColStride);
+        // }
 
         // how many times a `BaseTile` is executed along the row and column
         // direction.
@@ -259,8 +259,7 @@ struct SharedToRegLoader : public Base {
         const DType* src = src_.data();
 
         using OffsetHelper =
-            warp::SharedOffsetHelper<WarpLayout, kMode, WarpLayout::kType,
-                                     Shared>;
+            warp::SharedOffsetHelper<WarpLayout, kMode, Shared>;
 
         OffsetHelper offset_helper_;
         int offset = offset_helper_.get_warp_offset();
@@ -287,7 +286,7 @@ struct SharedToRegLoader : public Base {
         //     printf("\n");
         // }
 
-        // loader(src + offset, dst);
+        loader(src + offset, dst);
     }
 };
 
@@ -341,8 +340,7 @@ struct RegToSharedStorer {
         // the same shared memory location, thus the warp reuse mode is set to
         // `Cont`.
         using OffsetHelper =
-            warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-                                     WarpLayout::kType, Shared>;
+            warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont, Shared>;
         OffsetHelper offset_helper_;
         int offset = offset_helper_.get_warp_offset();
 

@@ -290,9 +290,9 @@ struct GlobalToSharedLoader : public Base {
         int offset_src = Base::template get_warp_offset<Global>();  // global
         int offset_dst = offset_helper_.get_warp_offset();          // shared
 
-        if (thread(32)) {
-            printf("offset_dst = %d\n", offset_dst);
-        }
+        // if (thread(32)) {
+        //     printf("offset_dst = %d\n", offset_dst);
+        // }
 
         using Loader = GlobalToSharedLoaderImpl<Global, Shared, kRowExec,
                                                 kColExec, Shared::kType>;
@@ -302,8 +302,8 @@ struct GlobalToSharedLoader : public Base {
     }
 
   private:
-    using OffsetHelper = warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-                                                  WarpLayout::kType, Shared>;
+    using OffsetHelper =
+        warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont, Shared>;
     OffsetHelper offset_helper_;
 };
 
@@ -348,8 +348,8 @@ struct SharedToGlobalStorer : public Base {
     }
 
   private:
-    using OffsetHelper = warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont,
-                                                  WarpLayout::kType, Shared>;
+    using OffsetHelper =
+        warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont, Shared>;
     OffsetHelper offset_helper_;
 };
 }  // namespace tilefusion::cell::copy

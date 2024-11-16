@@ -28,7 +28,7 @@ bool check_correctness(const half* hc1, const float* hc2, int row, int col) {
     bool pass_unittest = true;
     static const float eps = 5e-2;
 
-#if defined(DEBUG)
+    // #if defined(DEBUG)
     int cut_off = 128;
     std::stringstream ss;
     ss << std::setprecision(3) << std::endl
@@ -49,31 +49,30 @@ bool check_correctness(const half* hc1, const float* hc2, int row, int col) {
         }
     }
     LOG(INFO) << ss.str();
-#endif
+    // #endif
 
-    // double total_diff = 0.;
-    // double max_abs_diff = FLT_MIN;
-    // double diff = 0.;
+    double total_diff = 0.;
+    double max_abs_diff = FLT_MIN;
+    double diff = 0.;
 
-    // LOG(INFO) << std::endl;
-    // for (int i = 0; i < numel; ++i) {
-    //     diff = abs(__half2float(hc1[i]) - hc2[i]);
-    //     max_abs_diff = max_abs_diff < diff ? diff : max_abs_diff;
-    //     total_diff += diff;
+    LOG(INFO) << std::endl;
+    for (int i = 0; i < numel; ++i) {
+        diff = abs(__half2float(hc1[i]) - hc2[i]);
+        max_abs_diff = max_abs_diff < diff ? diff : max_abs_diff;
+        total_diff += diff;
 
-    //     if (diff > eps) {
-    //         LOG(INFO) << i
-    //                   << "-th value has large numeric absolute diff: " <<
-    //                   diff
-    //                   << ", Expected: " << __half2float(hc1[i])
-    //                   << "; Got: " << hc2[i] << std::endl;
-    //     }
-    // }
+        if (diff > eps) {
+            LOG(INFO) << i
+                      << "-th value has large numeric absolute diff: " << diff
+                      << ", Expected: " << __half2float(hc1[i])
+                      << "; Got: " << hc2[i] << std::endl;
+        }
+    }
 
-    // double avg_diff = total_diff / numel;
-    // LOG(INFO) << "Average absolute diff: " << avg_diff
-    //           << ", Max absolute diff: " << max_abs_diff << std::endl;
-    // if (avg_diff > eps) pass_unittest = false;
+    double avg_diff = total_diff / numel;
+    LOG(INFO) << "Average absolute diff: " << avg_diff
+              << ", Max absolute diff: " << max_abs_diff << std::endl;
+    if (avg_diff > eps) pass_unittest = false;
 
     return pass_unittest;
 }
@@ -184,8 +183,8 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
     LoadSharedA loaderA;
     loaderA(gA, sA);
 
-    // LoadSharedB loaderB;
-    // loaderB(gB, sB);
+    LoadSharedB loaderB;
+    loaderB(gB, sB);
     __copy_async();
     __syncthreads();
 
@@ -229,25 +228,25 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
     RegC acc;
 
     for (int k = 0; k < TileIteratorA::sc1; ++k) {
-        // load_rA(sAs(k), rA);
+        load_rA(sAs(k), rA);
         load_rB(sBs(k), rB);
 
-        if (thread(32)) {
-            printf("\nk = %d\n", k);
+        // if (thread(32)) {
+        //     printf("\nk = %d\n", k);
 
-            // printf("sA(%d):\n", k);
-            // sAs(k).dump_value();
+        //     printf("sA(%d):\n", k);
+        //     sAs(k).dump_value();
 
-            // printf("\nsB(%d):\n", k);
-            // sBs(k).dump_value();
+        //     printf("\nsB(%d):\n", k);
+        //     sBs(k).dump_value();
 
-            // printf("\nrA:\n");
-            // rA.dump_value();
+        //     printf("\nrA:\n");
+        //     rA.dump_value();
 
-            printf("\nrB:\n");
-            rB.dump_value();
-            printf("\n");
-        }
+        //     printf("\nrB:\n");
+        //     rB.dump_value();
+        //     printf("\n");
+        // }
 
         compute::gemm(rA, rB, acc);
     }
@@ -271,14 +270,14 @@ void run_test() {
     // initialize data
     thrust::host_vector<Element> h_a(kM * kK);
     for (int i = 0; i < h_a.size(); ++i) {
-        h_a[i] = static_cast<Element>(i % 2048);
-        // h_a[i] = static_cast<Element>(rand_float());
+        // h_a[i] = static_cast<Element>(i % 2048);
+        h_a[i] = static_cast<Element>(rand_float());
     }
 
     thrust::host_vector<Element> h_b(kK * kN);
     for (int i = 0; i < h_b.size(); ++i) {
-        h_b[i] = static_cast<Element>(i % 2048);
-        // h_b[i] = static_cast<Element>(rand_float());
+        // h_b[i] = static_cast<Element>(i % 2048);
+        h_b[i] = static_cast<Element>(rand_float());
     }
 
     thrust::host_vector<ElementAcc> h_c(kM * kN);
@@ -348,16 +347,23 @@ void run_test() {
 
 TEST(TestGemm, test) {
     // minimal shape for 1 warp
-    // run_test<16, 16, 16, tl::RowMajor<1, 1>, 16>();
-    // run_test<32, 16, 16, tl::RowMajor<1, 1>, 16>();
-    // run_test<16, 32, 16, tl::RowMajor<1, 1>, 16>();
-    // run_test<16, 16, 32, tl::RowMajor<1, 1>, 16>();
-    // run_test<16, 16, 32, tl::RowMajor<1, 1>, 32>();
-    // run_test<16, 32, 32, tl::RowMajor<1, 1>, 16>();
+    run_test<16, 16, 16, tl::RowMajor<1, 1>, 16>();
+    run_test<32, 16, 16, tl::RowMajor<1, 1>, 16>();
+    run_test<16, 32, 16, tl::RowMajor<1, 1>, 16>();
+    run_test<16, 16, 32, tl::RowMajor<1, 1>, 16>();
+    run_test<16, 16, 32, tl::RowMajor<1, 1>, 32>();
+    run_test<16, 32, 32, tl::RowMajor<1, 1>, 16>();
 
-    // minimal shape for 2 warps
+    // minimal shape for 1x2 warps
+    run_test<16, 32, 32, tl::RowMajor<1, 2>, 16>();
     run_test<32, 32, 32, tl::RowMajor<1, 2>, 16>();
-    // run_test<32, 32, 64, tl::RowMajor<1, 2>, 32>();
+    run_test<32, 32, 32, tl::RowMajor<1, 2>, 16>();
+
+    // minimal shape for 2x1 warps
+    run_test<32, 16, 32, tl::RowMajor<2, 1>, 16>();
+    run_test<32, 32, 32, tl::RowMajor<2, 1>, 16>();
+    run_test<32, 32, 32, tl::RowMajor<2, 1>, 32>();
+    // run_test<64, 32, 32, tl::RowMajor<2, 1>, 16>();
     // run_test<64, 32, 128, tl::RowMajor<2, 1>, 32>();
 
     // // minimal shape for 2 x 2 warps
