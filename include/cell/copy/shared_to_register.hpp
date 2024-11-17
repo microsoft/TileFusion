@@ -240,7 +240,7 @@ struct SharedToRegLoader : public Base {
                       "be divisible by tl::num_cols<WarpLayout>");
 
         // if (thread(32)) {
-        //     printf("warp-offset:\n");
+        //     printf("\nwarp-offset:\n");
         //     printf("Shared::kRows = %d, Shared::kCols = %d\n", Shared::kRows,
         //            Shared::kCols);
         //     printf("Shared::kRowStride = %d, Shared::kColStride = %d\n",

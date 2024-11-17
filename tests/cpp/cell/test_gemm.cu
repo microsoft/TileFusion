@@ -28,7 +28,7 @@ bool check_correctness(const half* hc1, const float* hc2, int row, int col) {
     bool pass_unittest = true;
     static const float eps = 5e-2;
 
-    // #if defined(DEBUG)
+#if defined(DEBUG)
     int cut_off = 128;
     std::stringstream ss;
     ss << std::setprecision(3) << std::endl
@@ -49,7 +49,7 @@ bool check_correctness(const half* hc1, const float* hc2, int row, int col) {
         }
     }
     LOG(INFO) << ss.str();
-    // #endif
+#endif
 
     double total_diff = 0.;
     double max_abs_diff = FLT_MIN;
@@ -61,12 +61,14 @@ bool check_correctness(const half* hc1, const float* hc2, int row, int col) {
         max_abs_diff = max_abs_diff < diff ? diff : max_abs_diff;
         total_diff += diff;
 
+#if defined(DEBUG)
         if (diff > eps) {
             LOG(INFO) << i
                       << "-th value has large numeric absolute diff: " << diff
                       << ", Expected: " << __half2float(hc1[i])
                       << "; Got: " << hc2[i] << std::endl;
         }
+#endif
     }
 
     double avg_diff = total_diff / numel;
@@ -232,16 +234,16 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
         load_rB(sBs(k), rB);
 
         // if (thread(32)) {
-        //     printf("\nk = %d\n", k);
+        //     // printf("\nk = %d\n", k);
 
-        //     printf("sA(%d):\n", k);
-        //     sAs(k).dump_value();
+        //     // printf("sA(%d):\n", k);
+        //     // sAs(k).dump_value();
 
-        //     printf("\nsB(%d):\n", k);
-        //     sBs(k).dump_value();
+        //     // printf("\nsB(%d):\n", k);
+        //     // sBs(k).dump_value();
 
-        //     printf("\nrA:\n");
-        //     rA.dump_value();
+        //     // printf("\nrA:\n");
+        //     // rA.dump_value();
 
         //     printf("\nrB:\n");
         //     rB.dump_value();
@@ -259,7 +261,7 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
 }
 }  // namespace
 
-#define DEBUG
+// #define DEBUG
 template <const int kM, const int kN, const int kK, typename WarpLayout,
           const int kChunkK>
 void run_test() {
@@ -291,10 +293,12 @@ void run_test() {
     using config =
         TestTraits<Element, ElementAcc, kM, kN, kK, WarpLayout, kChunkK>;
 
+#if defined(DEBUG)
     LOG(INFO) << "[" << kM << ", " << kN << ", " << kK << "], warps: ["
               << config::kWarpPerRow << ", " << config::kWarpPerCol
               << "], k_chunk_size: " << kChunkK
               << ", kThreads: " << config::kThreads << std::endl;
+#endif
 
     using RegA = typename config::RegA;
     using RegB = typename config::RegB;
@@ -346,23 +350,27 @@ void run_test() {
 }
 
 TEST(TestGemm, test) {
-    // minimal shape for 1 warp
-    run_test<16, 16, 16, tl::RowMajor<1, 1>, 16>();
+    // 1 warp
+    run_test<16, 16, 16, tl::RowMajor<1, 1>, 16>();  // minimal shape
     run_test<32, 16, 16, tl::RowMajor<1, 1>, 16>();
     run_test<16, 32, 16, tl::RowMajor<1, 1>, 16>();
     run_test<16, 16, 32, tl::RowMajor<1, 1>, 16>();
     run_test<16, 16, 32, tl::RowMajor<1, 1>, 32>();
     run_test<16, 32, 32, tl::RowMajor<1, 1>, 16>();
 
-    // minimal shape for 1x2 warps
-    run_test<16, 32, 32, tl::RowMajor<1, 2>, 16>();
+    // 1x2 warps
+    run_test<16, 32, 32, tl::RowMajor<1, 2>, 16>();  // minimal shape
+    run_test<16, 32, 32, tl::RowMajor<1, 2>, 32>();
     run_test<32, 32, 32, tl::RowMajor<1, 2>, 16>();
-    run_test<32, 32, 32, tl::RowMajor<1, 2>, 16>();
+    run_test<32, 32, 32, tl::RowMajor<1, 2>, 32>();
 
-    // minimal shape for 2x1 warps
-    run_test<32, 16, 32, tl::RowMajor<2, 1>, 16>();
-    run_test<32, 32, 32, tl::RowMajor<2, 1>, 16>();
-    run_test<32, 32, 32, tl::RowMajor<2, 1>, 32>();
+    // run_test<32, 64, 32, tl::RowMajor<1, 2>, 16>();
+
+    // // minimal shape for 2x1 warps
+    // run_test<32, 16, 32, tl::RowMajor<2, 1>, 16>();
+    // run_test<32, 32, 32, tl::RowMajor<2, 1>, 16>();
+    // run_test<32, 32, 32, tl::RowMajor<2, 1>, 32>();
+
     // run_test<64, 32, 32, tl::RowMajor<2, 1>, 16>();
     // run_test<64, 32, 128, tl::RowMajor<2, 1>, 32>();
 

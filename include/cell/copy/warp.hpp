@@ -336,6 +336,12 @@ struct SharedOffsetHelperImpl<WarpLayout_, kMode_, Shared_, true> {
         int warp_row = warp_row_id();
         int warp_col = warp_col_id();
 
+        // if (thread(32)) {
+        //     printf("warp_row = %d, warp_col = %d\n", warp_row, warp_col);
+        //     printf("Shared::kRowStride = %d, Shared::kColStride = %d\n",
+        //            Shared::kRowStride, Shared::kColStride);
+        // }
+
         int offset = 0;
         switch (kMode) {
             case WarpReuse::kCont:
@@ -349,7 +355,6 @@ struct SharedOffsetHelperImpl<WarpLayout_, kMode_, Shared_, true> {
                 break;
             case WarpReuse::kRowReuseCont:
             case WarpReuse::kRowReuseCir:
-
                 offset = warp_row * Shared::kRowStride;
                 break;
             default:
