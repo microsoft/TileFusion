@@ -336,71 +336,59 @@ struct SharedOffsetHelperImpl<WarpLayout_, kMode_, Shared_, true> {
         int warp_row = warp_row_id();
         int warp_col = warp_col_id();
 
-        // if (thread(32)) {
-        //     printf("warp_row = %d, warp_col = %d\n", warp_row, warp_col);
-        //     printf("Shared::kRowStride = %d, Shared::kColStride = %d\n",
-        //            Shared::kRowStride, Shared::kColStride);
-        // }
-
         int offset = 0;
         switch (kMode) {
             case WarpReuse::kCont:
             case WarpReuse::kCir:
-                offset = warp_row * Shared::kRowStride +
-                         warp_col * Shared::kColStride;
+                offset = warp_row * Shared::kRowStride * kTilePerWarpCol +
+                         warp_col * Shared::kColStride * kTilePerWarpRow;
                 break;
             case WarpReuse::kColReuseCont:
             case WarpReuse::kColReuseCir:
-                offset = warp_col * Shared::kColStride;
+                offset = warp_col * Shared::kColStride * kTilePerWarpRow;
                 break;
             case WarpReuse::kRowReuseCont:
             case WarpReuse::kRowReuseCir:
-                offset = warp_row * Shared::kRowStride;
+                offset = warp_row * Shared::kRowStride * kTilePerWarpCol;
                 break;
             default:
                 assert(false && "Not implemented yet.");
         }
-
-        // if (thread(32)) {
-        //     printf("Shared::kRowStride = %d, Shared::kColStride = %d\n",
-        //            Shared::kRowStride, Shared::kColStride);
-        //     printf("warp_row = %d, warp_col = %d, offset = %d\n", warp_row,
-        //            warp_col, offset);
-        // }
-
         return offset;
     }
 
   private:
     using Shared = Shared_;
     using WarpLayout = WarpLayout_;
+    static constexpr WarpReuse kMode = kMode_;
     // data type __half here is to instantiate the templated class `BaseShape`.
     // It does not affect shape-related information.
     using BaseShape = traits::BaseTileShape<__half>;
 
-    static constexpr WarpReuse kMode = kMode_;
+    constexpr static int kTilePerRow = Shared::kCols / BaseShape::kCols;
+    constexpr static int kTilePerCol = Shared::kRows / BaseShape::kRows;
 
-    constexpr static int kBaseTilePerRow = Shared::kRows / BaseShape::kRows;
-    constexpr static int kBaseTilePerCol = Shared::kCols / BaseShape::kCols;
+    constexpr static int kTilePerWarpRow =
+        kTilePerRow / tl::num_cols<WarpLayout>;
+    constexpr static int kTilePerWarpCol =
+        kTilePerCol / tl::num_rows<WarpLayout>;
 
     // for row-major shared memory tile
     constexpr static int kRowStride1 =
-        kBaseTilePerRow / tl::num_rows<WarpLayout> * kBaseTilePerCol;
-    constexpr static int kColStride1 =
-        kBaseTilePerCol / tl::num_cols<WarpLayout>;
+        kTilePerCol / tl::num_rows<WarpLayout> * kTilePerRow;
+    constexpr static int kColStride1 = kTilePerRow / tl::num_cols<WarpLayout>;
 
     using BaseTilesRowMajorLayout =
-        cute::Layout<Shape<Int<kBaseTilePerRow>, Int<kBaseTilePerCol>>,
+        cute::Layout<Shape<Int<kTilePerCol>, Int<kTilePerRow>>,
                      Stride<Int<kRowStride1>, Int<kColStride1>>>;
     BaseTilesRowMajorLayout base_tiles_row_major_;
 
     // for column-major shared memory tile
-    constexpr static int kRowStride2 =
-        kBaseTilePerRow / tl::num_rows<WarpLayout>;
+    constexpr static int kRowStride2 = kTilePerCol / tl::num_rows<WarpLayout>;
     constexpr static int kColStride2 =
-        kBaseTilePerCol / tl::num_cols<WarpLayout> * kBaseTilePerRow;
+        kTilePerRow / tl::num_cols<WarpLayout> * kTilePerCol;
     using BaseTilesColMajorLayout =
-        cute::Layout<Shape<Int<kBaseTilePerRow>, Int<kBaseTilePerCol>>,
+        cute::Layout<Shape<Int<kTilePerCol>, Int<kTilePerRow>>,
                      Stride<Int<kRowStride2>, Int<kColStride2>>>;
     BaseTilesColMajorLayout base_tiles_col_major_;
 };

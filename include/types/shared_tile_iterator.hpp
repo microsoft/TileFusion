@@ -24,7 +24,6 @@ struct STileIteratorPrettyPrinter {
             << TileIterator::sc0 << ", sc1 = " << TileIterator::sc1;
     }
 };
-
 }  // namespace detail
 
 /// @brief `SharedTileIterator` chunks a shared memory tile into smaller tiles
@@ -84,12 +83,6 @@ class STileIterator {
         int offset2 = x * kTilePerChunkRow * BaseShape::kNumel +
                       y * (Tile::kColStride * kChunkCol);
         int offset = Tile::kType == tl::Layout::kRowMajor ? offset1 : offset2;
-
-        // if (thread(0)) {
-        //     printf("%d-offset:%d\nTileLayout: %d %d %d %d %s\n", i, offset,
-        //            kStride0, kStride1, kRowStride, kColStride,
-        //            layout_type_to_str(Tile::kType));
-        // }
 
         NewTile tile(data_ + offset);
         return tile;

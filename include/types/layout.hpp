@@ -72,8 +72,6 @@ struct SharedLayout {
     static constexpr int kNumel = kRows * kCols;
 
     static constexpr Layout kType = kType_;
-    // static constexpr Layout kType =
-    //     kColStride == 1 ? Layout::kRowMajor : Layout::kColMajor;
 
     DEVICE int operator()(int i, int j) const {
         int tile_x = i / BaseShape::kRows;
@@ -85,18 +83,7 @@ struct SharedLayout {
         int tile_offset = tile_x * kRowStride + tile_y * kColStride;
         int in_tile_offset = in_tile_(in_tile_x, in_tile_y);
 
-        // if (thread(0) && i == 16 && j == 0) {
-        //     printf("kRowStride = %d, kColStride = %d\n", kRowStride,
-        //            kColStride);
-        //     printf(
-        //         "tile_x = %d, tile_y = %d, in_tile_x = %d, in_tile_y = %d, "
-        //         "tile_offset = %d, in_tile_offset = %d\n",
-        //         tile_x, tile_y, in_tile_x, in_tile_y, tile_offset,
-        //         in_tile_offset);
-        // }
-
         return tile_offset + in_tile_offset;
-        // return layout_(i, j);
     }
 
   private:
@@ -315,10 +302,6 @@ template <const int kShape1, const int kShape2, const int kStride1,
           const int kStride2>
 HOST_DEVICE auto make_tile_layout() {
     using Layout = MatrixLayout<kShape1, kShape2, kStride1, kStride2>;
-    // using SharedLayout_ =
-    //     detail::SharedLayout<kShape1, kShape2, kStride1, kStride2>;
-
-    // using Layout = std::conditional_t<kIsShared, SharedLayout_, Layout_>;
     return Layout{};
 }
 

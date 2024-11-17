@@ -50,7 +50,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
             for (int j = 0; j < kColExec; ++j) {
                 // advance pointer to the 16x16 `BaseTile` indexed by(i, j).
                 offset = base_tiles_(i, j) + lane_offset;
-
                 // issue the hardware-backed memory access instruction.
                 this->ldmatrix(src + offset, dst(i, j).mutable_data());
             }
@@ -58,14 +57,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     }
 
   private:
-    // using BaseTilesLayout =
-    //     tl::MatrixLayout<kRowExec, kColExec,
-    //                      BaseShape::kRows * Shared::kRowStride,
-    //                      BaseShape::kNumel>;
-
-    // using BaseTilesLayout = tl::MatrixLayout<kRowExec, kColExec, kColExec,
-    // 1>;
-
     using BaseTilesLayout =
         tl::MatrixLayout<kRowExec, kColExec, Shared::kRowStride,
                          Shared::kColStride>;
@@ -109,18 +100,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
 #pragma unroll
             for (int j = 0; j < kRowExec; ++j) {
                 offset = base_tiles_(j, i) + lane_offset;
-
-                // if (thread(32)) {
-                //     printf("kSharedRowStride = %d, kSharedColStride = %d\n",
-                //            kSharedRowStride, kSharedColStride);
-
-                //     printf(
-                //         "\ni = %d, j = %d, "
-                //         "tile_index = %d, lane_offset = %d\n"
-                //         "offset = %d\n",
-                //         i, j, base_tiles_(j, i), lane_offset, offset);
-                // }
-
                 // issue the hardware-backed memory access instruction
                 this->ldmatrix(src + offset, dst(j, i).mutable_data());
             }
@@ -128,10 +107,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     }
 
   private:
-    // using BaseTilesLayout =
-    //     tl::MatrixLayout<kRowExec, kColExec, BaseShape::kNumel,
-    //                      BaseShape::kCols * Shared::kColStride>;
-
     static constexpr int kSharedRowStride = Shared::kRowStride;
     static constexpr int kSharedColStride = Shared::kColStride;
 
@@ -239,14 +214,6 @@ struct SharedToRegLoader : public Base {
                       "The current implementation requires Shared::kCols must "
                       "be divisible by tl::num_cols<WarpLayout>");
 
-        // if (thread(32)) {
-        //     printf("\nwarp-offset:\n");
-        //     printf("Shared::kRows = %d, Shared::kCols = %d\n", Shared::kRows,
-        //            Shared::kCols);
-        //     printf("Shared::kRowStride = %d, Shared::kColStride = %d\n",
-        //            Shared::kRowStride, Shared::kColStride);
-        // }
-
         // how many times a `BaseTile` is executed along the row and column
         // direction.
         static constexpr int kRowExec =
@@ -268,23 +235,6 @@ struct SharedToRegLoader : public Base {
             detail::SharedToRegLoaderImpl<Shared, Reg, kRowExec, kColExec,
                                           Shared::kType, CopyInst::kLoadMat>;
         Loader loader;
-
-        // if (thread(32)) {
-        //     printf("warp offset = %d\n", offset);
-
-        //     printf("warp0\n");
-        //     const __half* ptr1 = reinterpret_cast<const __half*>(src);
-        //     for (int k = 0; k < 16; ++k) {
-        //         printf("%.0f, ", __half2float(ptr1[k]));
-        //     }
-
-        //     printf("\nwarp1\n");
-        //     const __half* ptr2 = reinterpret_cast<const __half*>(src +
-        //     offset); for (int k = 0; k < 16; ++k) {
-        //         printf("%.0f, ", __half2float(ptr2[k]));
-        //     }
-        //     printf("\n");
-        // }
 
         loader(src + offset, dst);
     }

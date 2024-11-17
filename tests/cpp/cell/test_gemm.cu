@@ -55,7 +55,6 @@ bool check_correctness(const half* hc1, const float* hc2, int row, int col) {
     double max_abs_diff = FLT_MIN;
     double diff = 0.;
 
-    LOG(INFO) << std::endl;
     for (int i = 0; i < numel; ++i) {
         diff = abs(__half2float(hc1[i]) - hc2[i]);
         max_abs_diff = max_abs_diff < diff ? diff : max_abs_diff;
@@ -73,7 +72,7 @@ bool check_correctness(const half* hc1, const float* hc2, int row, int col) {
 
     double avg_diff = total_diff / numel;
     LOG(INFO) << "Average absolute diff: " << avg_diff
-              << ", Max absolute diff: " << max_abs_diff << std::endl;
+              << ", Max absolute diff: " << max_abs_diff;
     if (avg_diff > eps) pass_unittest = false;
 
     return pass_unittest;
@@ -119,7 +118,7 @@ struct TestTraits {
 
     /// == 2. configurate tile transfer between global and shared using CuTe ==
     using GlobalA = GlobalTile<Element, tl::RowMajor<kM, kK>>;
-    static const bool kSwizzled = false;
+    static const bool kSwizzled = true;
     using SharedA = SharedTile<Element, tl::RowMajor<kM, kK>, kSwizzled>;
     using LoadSharedA = GlobalToSharedLoader<SharedA, WarpLayout>;
 
@@ -190,34 +189,6 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
     __copy_async();
     __syncthreads();
 
-    // if (thread(32)) {
-    //     printf("gA:\n");
-    //     gA.dump_value();
-
-    //     printf("\ngB:\n");
-    //     gB.dump_value();
-
-    //     printf("\nshared_a:\n");
-    //     sA.dump_value();
-
-    //     printf("\nshared_b:\n");
-    //     sB.dump_value();
-    //     printf("\n");
-
-    //     printf("direct print shared_b:\n");
-    //     const __half* ptr = reinterpret_cast<const __half*>(shared_b);
-    //     int count = 0;
-    //     for (int i = 0; i < SharedB::kRows; ++i) {
-    //         for (int j = 0; j < SharedB::kCols; ++j) {
-    //             printf("%.0f, ", __half2float(ptr[count++]));
-    //         }
-    //         printf("\n");
-
-    //         if (i && (i + 1) % 16 == 0) printf("\n");
-    //     }
-    //     printf("\n");
-    // }
-
     TileIteratorA sAs(shared_a);
     TileIteratorB sBs(shared_b);
 
@@ -233,23 +204,6 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
         load_rA(sAs(k), rA);
         load_rB(sBs(k), rB);
 
-        // if (thread(32)) {
-        //     // printf("\nk = %d\n", k);
-
-        //     // printf("sA(%d):\n", k);
-        //     // sAs(k).dump_value();
-
-        //     // printf("\nsB(%d):\n", k);
-        //     // sBs(k).dump_value();
-
-        //     // printf("\nrA:\n");
-        //     // rA.dump_value();
-
-        //     printf("\nrB:\n");
-        //     rB.dump_value();
-        //     printf("\n");
-        // }
-
         compute::gemm(rA, rB, acc);
     }
     __syncthreads();
@@ -261,25 +215,30 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
 }
 }  // namespace
 
-// #define DEBUG
 template <const int kM, const int kN, const int kK, typename WarpLayout,
           const int kChunkK>
 void run_test() {
-    /// unittest for register-level gemm by calling into wmma PTX
+    // unittest for register-level gemm by calling into wmma PTX
     using Element = __half;
     using ElementAcc = float;
 
     // initialize data
     thrust::host_vector<Element> h_a(kM * kK);
     for (int i = 0; i < h_a.size(); ++i) {
-        // h_a[i] = static_cast<Element>(i % 2048);
+#if defined(DEBUG)
+        h_a[i] = static_cast<Element>(i % 2048);
+#else
         h_a[i] = static_cast<Element>(rand_float());
+#endif
     }
 
     thrust::host_vector<Element> h_b(kK * kN);
     for (int i = 0; i < h_b.size(); ++i) {
-        // h_b[i] = static_cast<Element>(i % 2048);
+#if defined(DEBUG)
+        h_b[i] = static_cast<Element>(i % 2048);
+#else
         h_b[i] = static_cast<Element>(rand_float());
+#endif
     }
 
     thrust::host_vector<ElementAcc> h_c(kM * kN);
@@ -289,16 +248,14 @@ void run_test() {
     thrust::device_vector<Element> d_b = h_b;
     thrust::device_vector<ElementAcc> d_c = h_c;
 
-    /// define the configuration of the test
+    // define the configuration of the test
     using config =
         TestTraits<Element, ElementAcc, kM, kN, kK, WarpLayout, kChunkK>;
 
-#if defined(DEBUG)
     LOG(INFO) << "[" << kM << ", " << kN << ", " << kK << "], warps: ["
               << config::kWarpPerRow << ", " << config::kWarpPerCol
               << "], k_chunk_size: " << kChunkK
-              << ", kThreads: " << config::kThreads << std::endl;
-#endif
+              << ", kThreads: " << config::kThreads;
 
     using RegA = typename config::RegA;
     using RegB = typename config::RegB;
@@ -332,7 +289,7 @@ void run_test() {
     cudaDeviceSynchronize();
     h_c = d_c;
 
-    /// unittest for correctness, take cublas as the ground-truth
+    // unittest for correctness, take cublas as the ground-truth
     thrust::device_vector<__half> d_cublas(kM * kN);
     thrust::fill(d_cublas.begin(), d_cublas.end(), 0.);
 
@@ -350,6 +307,10 @@ void run_test() {
 }
 
 TEST(TestGemm, test) {
+    // This unit test loads the entire matrices A and B into shared memory.
+    // For example, on A100, do not test GEMM larger than [128, 128, 128],
+    // as this will cause a shared memory overflow.
+
     // 1 warp
     run_test<16, 16, 16, tl::RowMajor<1, 1>, 16>();  // minimal shape
     run_test<32, 16, 16, tl::RowMajor<1, 1>, 16>();
@@ -358,30 +319,38 @@ TEST(TestGemm, test) {
     run_test<16, 16, 32, tl::RowMajor<1, 1>, 32>();
     run_test<16, 32, 32, tl::RowMajor<1, 1>, 16>();
 
-    // 1x2 warps
+    // 1 x 2 warps
     run_test<16, 32, 32, tl::RowMajor<1, 2>, 16>();  // minimal shape
     run_test<16, 32, 32, tl::RowMajor<1, 2>, 32>();
     run_test<32, 32, 32, tl::RowMajor<1, 2>, 16>();
     run_test<32, 32, 32, tl::RowMajor<1, 2>, 32>();
+    run_test<32, 64, 32, tl::RowMajor<1, 2>, 16>();
+    run_test<32, 64, 32, tl::RowMajor<1, 2>, 32>();
+    run_test<32, 64, 64, tl::RowMajor<1, 2>, 16>();
+    run_test<32, 64, 64, tl::RowMajor<1, 2>, 32>();
 
-    // run_test<32, 64, 32, tl::RowMajor<1, 2>, 16>();
+    // 2 x 1 warps
+    run_test<32, 16, 32, tl::RowMajor<2, 1>, 16>();  // minimal shape
+    run_test<32, 32, 32, tl::RowMajor<2, 1>, 16>();
+    run_test<32, 32, 32, tl::RowMajor<2, 1>, 32>();
+    run_test<64, 32, 32, tl::RowMajor<2, 1>, 16>();
+    run_test<64, 32, 128, tl::RowMajor<2, 1>, 32>();
 
-    // // minimal shape for 2x1 warps
-    // run_test<32, 16, 32, tl::RowMajor<2, 1>, 16>();
-    // run_test<32, 32, 32, tl::RowMajor<2, 1>, 16>();
-    // run_test<32, 32, 32, tl::RowMajor<2, 1>, 32>();
+    // 2 x 2 warps
+    run_test<32, 32, 64, tl::RowMajor<2, 2>, 32>();  // minimal shape
+    run_test<32, 32, 64, tl::RowMajor<2, 2>, 32>();
+    run_test<64, 32, 64, tl::RowMajor<2, 2>, 32>();
+    run_test<32, 32, 128, tl::RowMajor<2, 2>, 64>();
+    run_test<64, 64, 64, tl::RowMajor<2, 2>, 32>();
+    run_test<64, 64, 128, tl::RowMajor<2, 2>, 32>();
+    run_test<64, 64, 128, tl::RowMajor<2, 2>, 128>();
+    run_test<128, 128, 64, tl::RowMajor<2, 2>, 32>();
 
-    // run_test<64, 32, 32, tl::RowMajor<2, 1>, 16>();
-    // run_test<64, 32, 128, tl::RowMajor<2, 1>, 32>();
+    // 1 x 4  warps
+    run_test<64, 128, 128, tl::RowMajor<1, 4>, 64>();
 
-    // // minimal shape for 2 x 2 warps
-    // run_test<32, 32, 64, tl::RowMajor<2, 2>, 32>();
-    // run_test<32, 32, 64, tl::RowMajor<2, 2>, 32>();
-    // run_test<64, 32, 64, tl::RowMajor<2, 2>, 32>();
-    // run_test<32, 32, 128, tl::RowMajor<2, 2>, 64>();
-
-    // run_test<64, 64, 64, tl::RowMajor<2, 2>, 32>();
-    // run_test<64, 32, 128, tl::RowMajor<2, 2>, 32>();
+    // 2 x 4  warps
+    run_test<64, 128, 128, tl::RowMajor<2, 4>, 64>();
 }
 
 }  // namespace tilefusion::testing

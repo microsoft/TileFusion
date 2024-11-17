@@ -69,7 +69,6 @@ __global__ void swizzled_copy(const Element* data, G2S1& g2s,
             s2r(s_tiles(i), r_tile);
             s2r(s_swizzled_tiles(i), r_tile_swizzled);
             __syncthreads();
-
 #ifdef DEBUG
             if (thread(0)) {
                 printf("\niteration [%d, %d]\n", k, i);
