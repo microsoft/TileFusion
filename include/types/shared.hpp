@@ -48,9 +48,4 @@ class SharedTile {
     Layout layout_;
 };
 
-template <typename Element, typename Layout>
-using NonSwizzledSharedTile = SharedTile<Element, Layout, false>;
-template <typename Element, typename Layout>
-using SwizzledSharedTile = SharedTile<Element, Layout, true>;
-
 }  // namespace tilefusion::cell
