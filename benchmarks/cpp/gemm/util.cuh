@@ -1,0 +1,106 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+#pragma once
+
+#include "cutlass_gemm.cuh"
+#include "tilefusion_gemm.cuh"
+#include "util/cuda_timer.hpp"
+
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
+
+#include <cfloat>
+
+using namespace benchmarks;
+using namespace tilefusion;
+
+float rand_float(float a = 1e-4, float b = 5e-3) {
+    float random = ((float)rand()) / (float)RAND_MAX;
+    float diff = b - a;
+    float r = random * diff;
+    return a + r;
+}
+
+bool check_results(const cutlass::half_t* values1_, const float* values2,
+                   int numel) {
+    const __half* values1 = reinterpret_cast<const __half*>(values1_);
+
+    bool passed = true;
+    const float epsilon = 1e-3;
+
+    double total_diff = 0.;
+    double max_abs_diff = FLT_MIN;
+    double diff = 0.;
+
+#ifdef DEBUG
+    int cut_off = 128;
+    printf("ground truth:\n");
+    for (int i = 0; i < cut_off; ++i) {
+        printf("%.5f, ", __half2float(values1[i]));
+        if (i && (i + 1) % 16 == 0) printf("\n");
+    }
+    printf("\ncomputed values:\n");
+    for (int i = 0; i < cut_off; ++i) {
+        printf("%.5f, ", values2[i]);
+        if (i && (i + 1) % 16 == 0) printf("\n");
+    }
+#endif
+
+    for (int i = 0; i < numel; ++i) {
+        float v1 = __half2float(values1[i]);
+        float v2 = values2[i];
+
+        diff = fabs(v1 - v2);
+        max_abs_diff = max_abs_diff < diff ? diff : max_abs_diff;
+        total_diff += diff;
+
+#ifdef DEBUG
+        if (diff > epsilon) {
+            printf("the %d-th value differs (%.4f): %.4f vs. %.4f\n", i, diff,
+                   v1, v2);
+        }
+#endif
+    }
+
+    double avg_diff = total_diff / numel;
+    if (avg_diff > epsilon) passed = false;
+
+    return passed;
+}
+
+float cublas_hgemm(int64_t kM, int64_t kN, int64_t kK, const __half* A,
+                   const __half* B, __half* C, bool timeit = false,
+                   int warm_up = 5, int iters = 20) {
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+
+    __half alf = static_cast<__half>(1.);
+    __half bet = static_cast<__half>(0.);
+
+    float elapsed = 0.;
+
+    if (timeit) {
+        for (int i = 0; i < warm_up; ++i) {
+            cublasHgemm(handle, CUBLAS_OP_T /* transb*/, CUBLAS_OP_N, kN, kM,
+                        kK, &alf, B, kK, A, kK, &bet, C, kN);
+        }
+        cudaDeviceSynchronize();
+
+        CudaTimer timer;
+        timer.start();
+        for (int i = 0; i < iters; ++i) {
+            cublasHgemm(handle, CUBLAS_OP_T /* transb*/, CUBLAS_OP_N, kN, kM,
+                        kK, &alf, B, kK, A, kK, &bet, C, kN);
+        }
+        cudaDeviceSynchronize();
+        elapsed = timer.stop() / iters;
+    } else {
+        cublasHgemm(handle, CUBLAS_OP_T /* transb*/, CUBLAS_OP_N, kN, kM, kK,
+                    &alf, B, kK, A, kK, &bet, C, kN);
+    }
+    cudaDeviceSynchronize();
+
+    cublasDestroy(handle);
+    return elapsed;
+}

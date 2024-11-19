@@ -2,13 +2,12 @@
 // Licensed under the MIT License.
 
 #pragma once
-
 #include "cell/mod.hpp"
 #include "types/mod.hpp"
 
-using namespace tiledcuda;
-using namespace tiledcuda::cell;
-using namespace tiledcuda::cell::copy;
+using namespace tilefusion;
+using namespace tilefusion::cell;
+using namespace tilefusion::cell::copy;
 
 namespace tl = tile_layout;
 
@@ -37,12 +36,12 @@ struct KeGemmTraits {
     // Total data access for operand A in global memory
     using GlobalA = GlobalTile<InType, tl::RowMajor<kTM, kK, kK>>;
     // Access a single global tile for operand A
-    using GIteratorA = TileIterator<GlobalA, TileShape<kTM, kTK>>;
+    using GIteratorA = GTileIterator<GlobalA, TileShape<kTM, kTK>>;
 
     // Shared Tile for operand A
     using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kSwizzled>;
     // Access a single register tile for operand A
-    using SIteratorA = TileIterator<SharedA, TileShape<kTM, kRK>>;
+    using SIteratorA = STileIterator<SharedA, TileShape<kTM, kRK>>;
 
     // Register tile for a single thread of operand A
     static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kTileSize;
@@ -57,12 +56,12 @@ struct KeGemmTraits {
     // Total data access for operand B in global memory
     using GlobalB = GlobalTile<InType, tl::ColMajor<kK, kTN, kK>>;
     // Access a single global tile for operand B
-    using GIteratorB = TileIterator<GlobalB, TileShape<kTK, kTN>>;
+    using GIteratorB = GTileIterator<GlobalB, TileShape<kTK, kTN>>;
 
     // Shared Tile for operand B
     using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, kSwizzled>;
     // Access a single register tile for operand B
-    using SIteratorB = TileIterator<SharedB, TileShape<kRK, kTN>>;
+    using SIteratorB = STileIterator<SharedB, TileShape<kRK, kTN>>;
 
     static_assert(GIteratorA::sc1 == GIteratorB::sc0,
                   "mismatched K dimension!");
@@ -79,20 +78,16 @@ struct KeGemmTraits {
         SharedToRegLoader<RegB, WarpLayout, WarpReuse::kColReuseCont>;
 
     // Global Tile for output C
-    using GlobalC = GlobalTile<InType, tl::RowMajor<kTM, kTN, kN>>;
+    using GlobalC = GlobalTile<AccType, tl::RowMajor<kTM, kTN, kN>>;
     // Shared Tile for output C
-    using SharedC = SharedTile<InType, tl::RowMajor<kTM, kTN>, false>;
+    using SharedC = SharedTile<AccType, tl::RowMajor<kTM, kTN>, kSwizzled>;
 
     // Register Tile for output C
     static constexpr int kCMs = kTM / kWarpPerRow / BaseShape::kTileSize;
     static constexpr int kCNs = kTN / kWarpPerCol / BaseShape::kTileSize;
     using RegC = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kCMs, kCNs>>;
 
-    using RegCHalf =
-        RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kCMs, kCNs>>;
-    using ConvertHalf = compute::RegTileConvert<RegC, RegCHalf>;
-
-    using R2SStorerC = RegToSharedStorer<RegCHalf, WarpLayout>;
+    using R2SStorerC = RegToSharedStorer<RegC, WarpLayout>;
     using S2GStorerC = SharedToGlobalStorer<SharedC, WarpLayout>;
 };
 
@@ -106,9 +101,8 @@ template <typename InType, typename AccType,                  //
           typename SharedB, typename RegB,                    //
           typename G2SLoaderB, typename S2RLoaderB,           //
           typename GlobalC, typename SharedC, typename RegC,  //
-          typename RegCHalf, typename ConvertHalf,            //
           typename R2SStorerC, typename S2GStorerC>
-__global__ void gemm(const InType* dA, const InType* dB, InType* dC) {
+__global__ void gemm(const InType* dA, const InType* dB, AccType* dC) {
     int offset_a = blockIdx.x * kTM * kK;
     int offset_b = blockIdx.y * kTN * kK;
     int offset_c = blockIdx.x * kTM * kN + blockIdx.y * kTN;
@@ -116,7 +110,7 @@ __global__ void gemm(const InType* dA, const InType* dB, InType* dC) {
     extern __shared__ __align__(sizeof(double)) unsigned char buf[];
     InType* sA_ptr = reinterpret_cast<InType*>(buf);
     InType* sB_ptr = sA_ptr + SIteratorA::Tile::kNumel;
-    InType* sC_ptr = reinterpret_cast<InType*>(buf);
+    AccType* sC_ptr = reinterpret_cast<AccType*>(buf);
 
     // declare tiles, iterators and loaders
     GIteratorA gAs(dA + offset_a);
@@ -132,7 +126,6 @@ __global__ void gemm(const InType* dA, const InType* dB, InType* dC) {
     RegB rB;
 
     RegC acc;
-    RegCHalf acc_half;
     SharedC sC(sC_ptr);
     GlobalC gC(dC + offset_c);
 
@@ -145,8 +138,6 @@ __global__ void gemm(const InType* dA, const InType* dB, InType* dC) {
     R2SStorerC r2s_c;
     S2GStorerC s2g_c;
 
-    ConvertHalf cast;
-
     for (int k1 = 0; k1 < GIteratorA::sc1; ++k1) {
         g2s_a(gAs(k1), sA);
         g2s_b(gBs(k1), sB);
@@ -157,12 +148,10 @@ __global__ void gemm(const InType* dA, const InType* dB, InType* dC) {
             s2r_a(sAs(k2), rA);
             s2r_b(sBs(k2), rB);
 
-            compute::gemm_(rA, rB, acc);
+            compute::gemm(rA, rB, acc);
         }
     }
-    cast(acc, acc_half);
-    r2s_c(acc_half, sC);
+    r2s_c(acc, sC);
     __syncthreads();
-
     s2g_c(sC, gC);
 }
