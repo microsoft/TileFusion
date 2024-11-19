@@ -22,10 +22,9 @@ float rand_float(float a = 1e-4, float b = 5e-3) {
     return a + r;
 }
 
-bool check_results(const cutlass::half_t* values1_, const float* values2,
-                   int numel) {
-    const __half* values1 = reinterpret_cast<const __half*>(values1_);
-
+namespace {
+bool check_results_impl(const __half* values1, const float* values2,
+                        int numel) {
     bool passed = true;
     const float epsilon = 1e-3;
 
@@ -67,6 +66,22 @@ bool check_results(const cutlass::half_t* values1_, const float* values2,
     if (avg_diff > epsilon) passed = false;
 
     return passed;
+}
+}  // namespace
+
+template <typename T>
+bool check_results(const T* values1_, const float* values2, int numel);
+
+template <>
+bool check_results(const cutlass::half_t* values1_, const float* values2,
+                   int numel) {
+    const __half* values1 = reinterpret_cast<const __half*>(values1_);
+    return check_results_impl(values1, values2, numel);
+}
+
+template <>
+bool check_results(const __half* values1, const float* values2, int numel) {
+    return check_results_impl(values1, values2, numel);
 }
 
 float cublas_hgemm(int64_t kM, int64_t kN, int64_t kK, const __half* A,
