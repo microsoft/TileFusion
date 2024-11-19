@@ -79,15 +79,13 @@ void run_test(std::ofstream& fout) {
     const InType* dB = thrust::raw_pointer_cast(d_b.data());
 
     // output matrix C for cutlass GEMM kernel
-    thrust::host_vector<InType> h_c(kM * kN);
-    thrust::fill(h_c.begin(), h_c.end(), static_cast<InType>(0.));
-
-    thrust::device_vector<InType> d_c = h_c;
+    thrust::device_vector<InType> d_c(kM * kN);
+    thrust::fill(d_c.begin(), d_c.end(), static_cast<InType>(0.));
     InType* dC = thrust::raw_pointer_cast(d_c.data());
 
     cutlass_gemm(dA, dB, dC);
     cudaDeviceSynchronize();
-    h_c = d_c;
+    thrust::host_vector<InType> h_c = d_c;
 
     // tiled cuda gemm kernel
     thrust::device_vector<AccType> d_c2(kM * kN);
@@ -98,26 +96,38 @@ void run_test(std::ofstream& fout) {
     cudaDeviceSynchronize();
     thrust::host_vector<AccType> h_c2 = d_c2;
 
-    bool passed = check_results(
-        thrust::raw_pointer_cast(h_c.data()) /*cutlass*/,
-        thrust::raw_pointer_cast(h_c2.data()) /*tiled cuda*/, kM * kN);
-
-    if (!passed) {
-        std::cerr << "Test failed" << std::endl;
-        return;
-    }
-
-    //// =============== Timing =============== ////
     // cublas
     const __half* dA2 = reinterpret_cast<const __half*>(dA);
     const __half* dB2 = reinterpret_cast<const __half*>(dB);
     thrust::device_vector<__half> d_c3(kM * kN);
     thrust::fill(d_c3.begin(), d_c3.end(), static_cast<__half>(0.));
 
+    cublas_hgemm(kM, kN, kK, dA2, dB2, thrust::raw_pointer_cast(d_c3.data()),
+                 false /*timeit*/);
+    thrust::host_vector<__half> h_c3 = d_c3;
+
+    bool passed1 = check_results(
+        thrust::raw_pointer_cast(h_c.data()) /*cutlass*/,
+        thrust::raw_pointer_cast(h_c2.data()) /*tiled cuda*/, kM * kN);
+
+    bool passed2 = check_results(
+        thrust::raw_pointer_cast(h_c3.data()) /*cutlass*/,
+        thrust::raw_pointer_cast(h_c2.data()) /*tiled cuda*/, kM * kN);
+
+    if (!(passed1 && passed2)) {
+        std::cerr << "Test failed" << std::endl;
+        return;
+    }
+
+    //// =============== Timing =============== ////
+    thrust::fill(d_c.begin(), d_c.end(), static_cast<InType>(0.));
+    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<AccType>(0.));
+    thrust::fill(d_c3.begin(), d_c3.end(), static_cast<__half>(0.));
+
     float cublas_time =
         cublas_hgemm(kM, kN, kK, dA2, dB2,
                      thrust::raw_pointer_cast(d_c3.data()), true /*timeit*/);
-    thrust::host_vector<__half> h_c3 = d_c3;
+    h_c3 = d_c3;
 
     const int warm_up = 5;
     const int iters = 20;
