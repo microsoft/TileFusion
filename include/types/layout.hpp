@@ -325,6 +325,5 @@ HOST_DEVICE auto make_col_major_layout(const int row, const int col,
     return cute::make_layout(cute::make_shape(row, col),
                              cute::make_stride(cute::_1{}, stride));
 }
-
 }  // namespace tile_layout
 }  // namespace tilefusion::cell

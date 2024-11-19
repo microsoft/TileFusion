@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 #pragma once
+#include "cell/copy/global_to_shared_2.hpp"
 #include "cell/mod.hpp"
 #include "types/mod.hpp"
 
@@ -49,7 +50,7 @@ struct KeGemmTraits {
     using RegA = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kAMs, kAKs>>;
 
     // Loaders for operand A
-    using G2SLoaderA = GlobalToSharedLoader<SharedA, WarpLayout>;
+    using G2SLoaderA = GlobalToSharedLoader2<SharedA, WarpLayout>;
     using S2RLoaderA =
         SharedToRegLoader<RegA, WarpLayout, WarpReuse::kRowReuseCont>;
 
@@ -73,7 +74,7 @@ struct KeGemmTraits {
     static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kTileSize;
     using RegB = RegTile<BaseTileColMajor<InType>, tl::ColMajor<kBKs, kBNs>>;
 
-    using G2SLoaderB = GlobalToSharedLoader<SharedB, WarpLayout>;
+    using G2SLoaderB = GlobalToSharedLoader2<SharedB, WarpLayout>;
     using S2RLoaderB =
         SharedToRegLoader<RegB, WarpLayout, WarpReuse::kColReuseCont>;
 
