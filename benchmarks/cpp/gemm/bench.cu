@@ -32,8 +32,12 @@ void run_test(std::ofstream& fout) {
 
     using Config = KeGemmTraits<InType, AccType, WholeShape, CtaTileShape, kRK,
                                 WarpLayout>;
+
+    using GTileA = GlobalTile<InType, tl::RowMajor<kTM, kTK, kK>>;
+    using GTileB = GlobalTile<InType, tl::ColMajor<kTK, kTN, kK>>;
+
     auto tilefusion_gemm =
-        &gemm<InType, AccType, kM, kN, kK, kTM, kTN, kTK,
+        &gemm<GTileA, GTileB, InType, AccType, kM, kN, kK, kTM, kTN, kTK,
               typename Config::GIteratorA, typename Config::SIteratorA,
               typename Config::SharedA, typename Config::RegA,
               typename Config::G2SLoaderA, typename Config::S2RLoaderA,
@@ -43,6 +47,13 @@ void run_test(std::ofstream& fout) {
               typename Config::GlobalC, typename Config::SharedC,
               typename Config::RegC, typename Config::R2SStorerC,
               typename Config::S2GStorerC>;
+
+    std::cout << "GTileA: [" << kTM << ", " << kTK << ", " << kK << "]"
+              << std::endl
+              << "GTileB: [" << kTK << ", " << kTN << ", " << kK << "]"
+              << std::endl
+              << "GIteratorA: " << typename Config::GIteratorA{} << std::endl
+              << "GIteratorB: " << typename Config::GIteratorB{} << std::endl;
 
     static constexpr int inputs = kTK * (kTN + kTM) * sizeof(InType);
     static constexpr int accumulators = kTM * kTN * sizeof(AccType);
@@ -118,6 +129,7 @@ void run_test(std::ofstream& fout) {
         std::cerr << "Test failed" << std::endl;
         return;
     }
+    std::cout << "Test passed" << std::endl;
 
     //// =============== Timing =============== ////
     thrust::fill(d_c.begin(), d_c.end(), static_cast<InType>(0.));
@@ -154,8 +166,8 @@ void run_test(std::ofstream& fout) {
     float tilefusion_time = timer.stop() / iters;
 
     fout << "[" << kM << ", " << kN << ", " << kK << "]\t[" << kTM << ", "
-         << kTN << ", " << kTK << "]\t" << kRK << "\t[" << kWarpPerRow << ", "
-         << kWarpPerCol << "]\t" << cublas_time << "\t" << cutlass_time << " ("
+         << kTN << ", " << kTK << "]\t" << kRK << "\t[" << kWarpPerRow << ","
+         << kWarpPerCol << "]\t" << cublas_time << "\t" << cutlass_time << "("
          << std::setprecision(2) << cutlass_time / cublas_time << ")"
          << "\t" << std::setprecision(4) << tilefusion_time << " ("
          << std::setprecision(2) << tilefusion_time / cublas_time << ")"

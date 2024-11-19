@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 #pragma once
+#include "cell/copy/global_to_shared_2.hpp"
 #include "cell/mod.hpp"
 #include "types/mod.hpp"
 
@@ -91,7 +92,8 @@ struct KeGemmTraits {
     using S2GStorerC = SharedToGlobalStorer<SharedC, WarpLayout>;
 };
 
-template <typename InType, typename AccType,                  //
+template <typename GTileA, typename GTileB,                   //
+          typename InType, typename AccType,                  //
           const int kM, const int kN, const int kK,           //
           const int kTM, const int kTN, const int kTK,        //
           typename GIteratorA, typename SIteratorA,           //
@@ -114,15 +116,14 @@ __global__ void gemm(const InType* dA, const InType* dB, AccType* dC) {
 
     // declare tiles, iterators and loaders
     GIteratorA gAs(dA + offset_a);
-    SIteratorA sAs(sA_ptr);
-
     GIteratorB gBs(dB + offset_b);
-    SIteratorB sBs(sB_ptr);
 
     SharedA sA(sA_ptr);
+    SIteratorA sAs(sA_ptr);
     RegA rA;
 
     SharedB sB(sB_ptr);
+    SIteratorB sBs(sB_ptr);
     RegB rB;
 
     RegC acc;
@@ -138,7 +139,15 @@ __global__ void gemm(const InType* dA, const InType* dB, AccType* dC) {
     R2SStorerC r2s_c;
     S2GStorerC s2g_c;
 
+    // auto gA = gAs(0);
+    // auto gB = gBs(0);
+
+    // GTileA gA(dA + offset_a);
+    // GTileB gB(dB + offset_b);
     for (int k1 = 0; k1 < GIteratorA::sc1; ++k1) {
+        // g2s_a(gA, sA);
+        // g2s_b(gB, sB);
+
         g2s_a(gAs(k1), sA);
         g2s_b(gBs(k1), sB);
         __copy_async();
@@ -147,6 +156,9 @@ __global__ void gemm(const InType* dA, const InType* dB, AccType* dC) {
         for (int k2 = 0; k2 < SIteratorA::sc1; ++k2) {
             s2r_a(sAs(k2), rA);
             s2r_b(sBs(k2), rB);
+
+            // s2r_a(sA, rA);
+            // s2r_b(sB, rB);
 
             compute::gemm(rA, rB, acc);
         }
