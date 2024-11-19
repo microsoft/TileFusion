@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "utils/cpp/cuda_utils.cuh"
-#include "utils/cpp/cutlass/copy.cuh"
-#include "utils/cpp/cutlass/traits_base.cuh"
+#include "cuda_utils.cuh"
+#include "cutlass/copy.cuh"
+#include "cutlass/traits_base.cuh"
 
 #include <cute/tensor.hpp>
 
