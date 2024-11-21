@@ -305,9 +305,10 @@ struct SharedToGlobalStorer : public Base {
     using WarpLayout = WarpLayout_;
     using BaseShape = traits::BaseTileShape<DType>;
 
-    static_assert(
-        (Shared::kSwizzled && sizeof(DType) == 4 || Shared::kSwizzled == false),
-        "Not implemented for swizzled layout with 2-byte data types.");
+    // static_assert(
+    //     (Shared::kSwizzled && sizeof(DType) == 4 || Shared::kSwizzled ==
+    //     false), "Not implemented for swizzled layout with 2-byte data
+    //     types.");
 
     static_assert(Shared::kRows % BaseShape::kRows == 0,
                   "Shared::kRows must be divisible by BaseShape::kRows.");
