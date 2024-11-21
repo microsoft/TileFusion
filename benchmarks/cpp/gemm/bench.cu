@@ -33,32 +33,24 @@ void run_test(std::ofstream& fout) {
     using Config = KeGemmTraits<InType, AccType, WholeShape, CtaTileShape, kRK,
                                 WarpLayout>;
 
-    using GTileA = GlobalTile<InType, tl::RowMajor<kTM, kTK, kK>>;
-    using GTileB = GlobalTile<InType, tl::ColMajor<kTK, kTN, kK>>;
-
     auto tilefusion_gemm =
-        &gemm<GTileA, GTileB, InType, AccType, kM, kN, kK, kTM, kTN, kTK,
-              typename Config::GIteratorA, typename Config::SIteratorA,
-              typename Config::SharedA, typename Config::RegA,
-              typename Config::G2SLoaderA, typename Config::S2RLoaderA,
-              typename Config::GIteratorB, typename Config::SIteratorB,
-              typename Config::SharedB, typename Config::RegB,
-              typename Config::G2SLoaderB, typename Config::S2RLoaderB,
-              typename Config::GlobalC, typename Config::SharedC,
-              typename Config::RegC, typename Config::R2SStorerC,
-              typename Config::S2GStorerC>;
+        &gemm<InType, kM, kN, kK, kTM, kTN, kTK, typename Config::GIteratorA,
+              typename Config::SIteratorA, typename Config::SharedA,
+              typename Config::RegA, typename Config::G2SLoaderA,
+              typename Config::S2RLoaderA, typename Config::GIteratorB,
+              typename Config::SIteratorB, typename Config::SharedB,
+              typename Config::RegB, typename Config::G2SLoaderB,
+              typename Config::S2RLoaderB, typename Config::GlobalC,
+              typename Config::SharedC, typename Config::Acc,
+              typename Config::AccHalf, typename Config::CastAcc,
+              typename Config::R2SStorerC, typename Config::S2GStorerC>;
 
-    std::cout << "GTileA: [" << kTM << ", " << kTK << ", " << kK << "]"
-              << std::endl
-              << "GTileB: [" << kTK << ", " << kTN << ", " << kK << "]"
-              << std::endl
-              << "GIteratorA: " << typename Config::GIteratorA{} << std::endl
+    std::cout << "GIteratorA: " << typename Config::GIteratorA{} << std::endl
               << "GIteratorB: " << typename Config::GIteratorB{} << std::endl;
 
     static constexpr int inputs = kTK * (kTN + kTM) * sizeof(InType);
-    static constexpr int accumulators = kTM * kTN * sizeof(AccType);
-    static constexpr int smem_size =
-        inputs > accumulators ? inputs : accumulators;
+    static constexpr int acc = kTM * kTN * sizeof(InType);
+    static constexpr int smem_size = inputs > acc ? inputs : acc;
 
     const int kMaxSmemPerBlock = 48 * 1024;
     if (smem_size > kMaxSmemPerBlock) {
@@ -98,14 +90,14 @@ void run_test(std::ofstream& fout) {
     cudaDeviceSynchronize();
     thrust::host_vector<InType> h_c = d_c;
 
-    // tiled cuda gemm kernel
-    thrust::device_vector<AccType> d_c2(kM * kN);
-    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<AccType>(0.));
-    AccType* dC2 = thrust::raw_pointer_cast(d_c2.data());
+    // tilefusion gemm kernel
+    thrust::device_vector<InType> d_c2(kM * kN);
+    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<InType>(0.));
+    InType* dC2 = thrust::raw_pointer_cast(d_c2.data());
 
     tilefusion_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC2);
     cudaDeviceSynchronize();
-    thrust::host_vector<AccType> h_c2 = d_c2;
+    thrust::host_vector<InType> h_c2 = d_c2;
 
     // cublas
     const __half* dA2 = reinterpret_cast<const __half*>(dA);
@@ -133,7 +125,7 @@ void run_test(std::ofstream& fout) {
 
     //// =============== Timing =============== ////
     thrust::fill(d_c.begin(), d_c.end(), static_cast<InType>(0.));
-    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<AccType>(0.));
+    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<InType>(0.));
     thrust::fill(d_c3.begin(), d_c3.end(), static_cast<__half>(0.));
 
     float cublas_time =

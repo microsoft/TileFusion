@@ -23,7 +23,7 @@ float rand_float(float a = 1e-4, float b = 5e-3) {
 }
 
 namespace {
-bool check_results_impl(const __half* values1, const float* values2,
+bool check_results_impl(const __half* values1, const __half* values2,
                         int numel) {
     bool passed = true;
     const float epsilon = 1e-3;
@@ -41,14 +41,14 @@ bool check_results_impl(const __half* values1, const float* values2,
     }
     printf("\ncomputed values:\n");
     for (int i = 0; i < cut_off; ++i) {
-        printf("%.5f, ", values2[i]);
+        printf("%.5f, ", __half2float(values2[i]));
         if (i && (i + 1) % 16 == 0) printf("\n");
     }
 #endif
 
     for (int i = 0; i < numel; ++i) {
         float v1 = __half2float(values1[i]);
-        float v2 = values2[i];
+        float v2 = __half2float(values2[i]);
 
         diff = fabs(v1 - v2);
         max_abs_diff = max_abs_diff < diff ? diff : max_abs_diff;
@@ -70,17 +70,21 @@ bool check_results_impl(const __half* values1, const float* values2,
 }  // namespace
 
 template <typename T>
-bool check_results(const T* values1_, const float* values2, int numel);
+bool check_results(const T* values1_, const cutlass::half_t* values2,
+                   int numel);
 
 template <>
-bool check_results(const cutlass::half_t* values1_, const float* values2,
-                   int numel) {
+bool check_results(const cutlass::half_t* values1_,
+                   const cutlass::half_t* values2_, int numel) {
     const __half* values1 = reinterpret_cast<const __half*>(values1_);
+    const __half* values2 = reinterpret_cast<const __half*>(values2_);
     return check_results_impl(values1, values2, numel);
 }
 
 template <>
-bool check_results(const __half* values1, const float* values2, int numel) {
+bool check_results(const __half* values1, const cutlass::half_t* values2_,
+                   int numel) {
+    const __half* values2 = reinterpret_cast<const __half*>(values2_);
     return check_results_impl(values1, values2, numel);
 }
 

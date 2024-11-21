@@ -41,6 +41,44 @@ DEVICE void copy_2d_tile_g2s(const Element* src_data, Element* dst_data,
             cute::copy(tiled_copy, src(_, i, j), dst(_, i, j));
 }
 
+// Copy a tensor from shared memory to global memory
+template <typename Element, typename SrcLayout, typename DstLayout,
+          typename TiledCopy>
+DEVICE void copy_2d_tile_s2g(const Element* src_data, Element* dst_data,
+                             SrcLayout src_layout, DstLayout dst_layout,
+                             TiledCopy tiled_copy) {
+    int tid = threadIdx.x;
+
+    auto stile = make_tensor(make_smem_ptr(src_data), src_layout);
+    auto gtile = make_tensor(make_gmem_ptr(dst_data), dst_layout);
+
+    auto loader = tiled_copy.get_thread_slice(tid);
+
+    auto src = loader.partition_S(stile);
+    auto dst = loader.partition_D(gtile);
+
+    // if (blockIdx.x == 0 && blockIdx.y == 0 && thread(0)) {
+    //     printf("\nsrc_layout:\n");
+    //     print(src_layout);
+    //     printf("\ndst_layout:\n");
+    //     print(dst_layout);
+    //     printf("\n\n");
+
+    //     print(src);
+    //     printf("\n\n");
+
+    //     print(dst);
+    //     printf("\n\n");
+    // }
+
+#pragma unroll
+    for (int i = 0; i < int(size<1>(src)); ++i)
+#pragma unroll
+        for (int j = 0; j < int(size<2>(src)); ++j) {
+            cute::copy(tiled_copy, src(_, i, j), dst(_, i, j));
+        }
+}
+
 template <typename Element>
 requires std::is_same_v<Element, __half> ||
     std::is_same_v<Element, cutlass::half_t>
