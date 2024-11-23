@@ -51,11 +51,11 @@ __global__ void copy_g2s(const Element* src, Loader1& loader1,
     __syncthreads();
 
     if (thread(0)) {
-        // printf("self-implemented\n");
-        // s_tile1.dump_value();
+        printf("self-implemented\n");
+        s_tile1.dump_value();
 
-        // printf("cute\n");
-        // s_tile2.dump_value();
+        printf("cute\n");
+        s_tile2.dump_value();
 
         assert(is_equal(buf1, buf2, SharedTile::kNumel));
     }
@@ -215,26 +215,24 @@ void test_row_major_store() {
 
     LOG(INFO) << "[" << kRows << ", " << kCols << "] test passed!" << std::endl;
 };
-
 }  // namespace
 
-// TEST(G2S_Copy, load_row_major) {
-//     test_row_major_load<__half, 128, 64, tl::RowMajor<2, 2>, false>();
-//     test_row_major_load<__half, 128, 64, tl::RowMajor<2, 2>, true>();
-// }
+TEST(G2S_Copy, load_row_major) {
+    test_row_major_load<__half, 128, 64, tl::RowMajor<2, 2>, false>();
+    test_row_major_load<__half, 128, 64, tl::RowMajor<2, 2>, true>();
+}
 
-// TEST(G2S_Copy, load_col_major) {
-//     test_col_major_load<__half, 128, 64, tl::RowMajor<2, 2>, false>();
-//     test_col_major_load<__half, 128, 64, tl::RowMajor<2, 2>, true>();
-// }
+TEST(G2S_Copy, load_col_major) {
+    test_col_major_load<__half, 128, 64, tl::RowMajor<2, 2>, false>();
+    test_col_major_load<__half, 128, 64, tl::RowMajor<2, 2>, true>();
+}
 
 TEST(S2G_Copy, store_row_major) {
     test_row_major_store<__half, 128, 256, tl::RowMajor<2, 2>, false>();
     test_row_major_store<__half, 128, 256, tl::RowMajor<2, 2>, true>();
 
-    // test_row_major_store<cutlass::half_t, 128, 256, tl::RowMajor<2, 2>,
-    //                      false>();
-    // test_row_major_store<cutlass::half_t, 128, 256, tl::RowMajor<2, 2>,
-    // true>();
+    test_row_major_store<cutlass::half_t, 128, 256, tl::RowMajor<2, 2>,
+                         false>();
+    test_row_major_store<cutlass::half_t, 128, 256, tl::RowMajor<2, 2>, true>();
 }
 }  // namespace tilefusion::testing
