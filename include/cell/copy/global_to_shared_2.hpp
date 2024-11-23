@@ -63,31 +63,28 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, SharedLayoutSwizzled,
                            SharedLayoutNonSwizzled>;
-
     using ThreadLayout =
         cute::Layout<Shape<Int<kThreadsRows>, Int<kThreadsCols>>,
                      Stride<Int<kThreadsCols>, _1>>;
     using ValueLayout = cute::Layout<Shape<_1, Int<kNumPerAccess>>>;
 
-#ifdef CP_ASYNC_SM80_ENABLED
+    // #ifdef CP_ASYNC_SM80_ENABLED
     using CopyInst =
         Copy_Atom<SM80_CP_ASYNC_CACHEGLOBAL<cute::uint128_t>, DType>;
-#else
-    using CopyInst = Copy_Atom<DefaultCopy, DType>;
-#endif
+    // #else
+    //     using CopyInst = Copy_Atom<DefaultCopy, DType>;
+    // #endif
 
     using TiledCopy =
         decltype(make_tiled_copy(CopyInst{}, ThreadLayout{}, ValueLayout{}));
 
     DEVICE void operator()(const DType* src_data, DType* dst_data) {
-        TiledCopy tiled_copy;
-
         int tid = threadIdx.x;
 
-        auto gtile = make_tensor(make_gmem_ptr(src_data), GlobalLayout{});
-        auto stile = make_tensor(make_smem_ptr(dst_data), SharedLayout{});
+        auto gtile = make_tensor(make_gmem_ptr(src_data), global_layout_);
+        auto stile = make_tensor(make_smem_ptr(dst_data), shared_layout_);
 
-        auto loader = tiled_copy.get_thread_slice(tid);
+        auto loader = tiled_copy_.get_thread_slice(tid);
 
         auto src = loader.partition_S(gtile);
         auto dst = loader.partition_D(stile);
@@ -96,8 +93,13 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
         for (int i = 0; i < int(size<1>(src)); ++i)
 #pragma unroll
             for (int j = 0; j < int(size<2>(src)); ++j)
-                cute::copy(tiled_copy, src(cute::_, i, j), dst(cute::_, i, j));
+                cute::copy(tiled_copy_, src(cute::_, i, j), dst(cute::_, i, j));
     }
+
+  private:
+    TiledCopy tiled_copy_;
+    GlobalLayout global_layout_;
+    SharedLayout shared_layout_;
 };
 
 template <typename Global_, typename Shared_, typename WarpLayout_>
@@ -166,13 +168,12 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
         decltype(make_tiled_copy(CopyInst{}, ThreadLayout{}, ValueLayout{}));
 
     DEVICE void operator()(const DType* src_data, DType* dst_data) {
-        TiledCopy tiled_copy;
         int tid = threadIdx.x;
 
-        auto gtile = make_tensor(make_gmem_ptr(src_data), GlobalLayout{});
-        auto stile = make_tensor(make_smem_ptr(dst_data), SharedLayout{});
+        auto gtile = make_tensor(make_gmem_ptr(src_data), global_layout_);
+        auto stile = make_tensor(make_smem_ptr(dst_data), shared_layout_);
 
-        auto loader = tiled_copy.get_thread_slice(tid);
+        auto loader = tiled_copy_.get_thread_slice(tid);
 
         auto src = loader.partition_S(gtile);
         auto dst = loader.partition_D(stile);
@@ -181,8 +182,13 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
         for (int i = 0; i < int(size<1>(src)); ++i)
 #pragma unroll
             for (int j = 0; j < int(size<2>(src)); ++j)
-                cute::copy(tiled_copy, src(cute::_, i, j), dst(cute::_, i, j));
+                cute::copy(tiled_copy_, src(cute::_, i, j), dst(cute::_, i, j));
     }
+
+  private:
+    TiledCopy tiled_copy_;
+    GlobalLayout global_layout_;
+    SharedLayout shared_layout_;
 };
 
 template <typename Shared_, typename Global_, typename WarpLayout_,

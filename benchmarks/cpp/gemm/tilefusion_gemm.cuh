@@ -7,6 +7,8 @@
 #include "cell/mod.hpp"
 #include "types/mod.hpp"
 
+#include <cute/tensor.hpp>
+
 using namespace tilefusion;
 using namespace tilefusion::cell;
 using namespace tilefusion::cell::copy;
@@ -16,6 +18,8 @@ namespace tl = tile_layout;
 
 template <const int kM, const int kN, const int kK>
 using GemmShape = TileShape<kM, kN, kK>;
+
+using namespace cute;
 
 template <typename InType, typename AccType, typename WholeShape,
           typename CtaTileShape, const int kRK, typename WarpLayout>
@@ -52,7 +56,15 @@ struct KeGemmTraits {
     using RegA = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kAMs, kAKs>>;
 
     // Loaders for operand A
-    using G2SLoaderA = GlobalToSharedLoader<SharedA, WarpLayout>;
+    // using G2SLoaderA = GlobalToSharedLoader2<SharedA, WarpLayout>;
+
+    ///
+    using GlobalA_ = GlobalTile<InType, tl::RowMajor<kTM, kTK, kK>>;
+    using G2SLoaderA =
+        tilefusion::cell::copy::detail::GlobalToSharedLoaderImpl2<
+            GlobalA_, SharedA, WarpLayout, SharedA::kType>;
+    ///
+
     using S2RLoaderA =
         SharedToRegLoader<RegA, WarpLayout, WarpReuse::kRowReuseCont>;
 
@@ -76,7 +88,15 @@ struct KeGemmTraits {
     static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kTileSize;
     using RegB = RegTile<BaseTileColMajor<InType>, tl::ColMajor<kBKs, kBNs>>;
 
-    using G2SLoaderB = GlobalToSharedLoader<SharedB, WarpLayout>;
+    // using G2SLoaderB = GlobalToSharedLoader2<SharedB, WarpLayout>;
+
+    ///
+    using GlobalB_ = GlobalTile<InType, tl::ColMajor<kTK, kTN, kK>>;
+    using G2SLoaderB =
+        tilefusion::cell::copy::detail::GlobalToSharedLoaderImpl2<
+            GlobalB_, SharedB, WarpLayout, SharedB::kType>;
+    ///
+
     using S2RLoaderB =
         SharedToRegLoader<RegB, WarpLayout, WarpReuse::kColReuseCont>;
 
@@ -112,12 +132,12 @@ template <typename InType,                                   //
 __global__ void gemm(const InType* dA, const InType* dB, InType* dC) {
     int offset_a = blockIdx.x * kTM * kK;
     int offset_b = blockIdx.y * kTN * kK;
-    int offset_c = blockIdx.x * kTM * kN + blockIdx.y * kTN;
+    // int offset_c = blockIdx.x * kTM * kN + blockIdx.y * kTN;
 
     extern __shared__ __align__(sizeof(double)) unsigned char buf[];
     InType* sA_ptr = reinterpret_cast<InType*>(buf);
     InType* sB_ptr = sA_ptr + SIteratorA::Tile::kNumel;
-    InType* sC_ptr = reinterpret_cast<InType*>(buf);
+    // InType* sC_ptr = reinterpret_cast<InType*>(buf);
 
     // declare tiles, iterators and loaders
     GIteratorA gAs(dA + offset_a);
@@ -125,43 +145,48 @@ __global__ void gemm(const InType* dA, const InType* dB, InType* dC) {
 
     SharedA sA(sA_ptr);
     SIteratorA sAs(sA_ptr);
-    RegA rA;
+    // RegA rA;
 
     SharedB sB(sB_ptr);
     SIteratorB sBs(sB_ptr);
-    RegB rB;
+    // RegB rB;
 
-    Acc acc;
-    AccHalf acc_h;
-    CastAcc cast;
+    // Acc acc;
+    // AccHalf acc_h;
+    // CastAcc cast;
 
-    SharedC sC(sC_ptr);
-    GlobalC gC(dC + offset_c);
+    // SharedC sC(sC_ptr);
+    // GlobalC gC(dC + offset_c);
 
     G2SLoaderA g2s_a;
-    S2RLoaderA s2r_a;
+    // S2RLoaderA s2r_a;
 
-    G2SLoaderB g2s_b;
-    S2RLoaderB s2r_b;
+    // G2SLoaderB g2s_b;
+    // S2RLoaderB s2r_b;
 
-    R2SStorerC r2s_c;
-    S2GStorerC s2g_c;
+    // R2SStorerC r2s_c;
+    // S2GStorerC s2g_c;
 
+    InType* gA_ptr = const_cast<InType*>(dA) + offset_a;
     for (int k1 = 0; k1 < GIteratorA::sc1; ++k1) {
-        g2s_a(gAs(k1), sA);
-        g2s_b(gBs(k1), sB);
+        g2s_a(gA_ptr, sA_ptr);
+
+        // g2s_a(gAs(k1), sA);
+        // g2s_b(gBs(k1), sB);
         __copy_async();
         __syncthreads();
 
-        for (int k2 = 0; k2 < SIteratorA::sc1; ++k2) {
-            s2r_a(sAs(k2), rA);
-            s2r_b(sBs(k2), rB);
+        // for (int k2 = 0; k2 < SIteratorA::sc1; ++k2) {
+        //     s2r_a(sAs(k2), rA);
+        //     s2r_b(sBs(k2), rB);
 
-            gemm(rA, rB, acc);
-        }
+        //     gemm(rA, rB, acc);
+        // }
+        gA_ptr += kTK;
+        break;
     }
-    cast(acc, acc_h);
-    r2s_c(acc_h, sC);
-    __syncthreads();
-    s2g_c(sC, gC);
+    // cast(acc, acc_h);
+    // r2s_c(acc_h, sC);
+    // __syncthreads();
+    // s2g_c(sC, gC);
 }

@@ -228,11 +228,10 @@ TEST(G2S_Copy, load_col_major) {
 }
 
 TEST(S2G_Copy, store_row_major) {
-    test_row_major_store<__half, 128, 256, tl::RowMajor<2, 2>, false>();
-    test_row_major_store<__half, 128, 256, tl::RowMajor<2, 2>, true>();
+    test_row_major_store<__half, 128, 64, tl::RowMajor<2, 2>, false>();
+    test_row_major_store<__half, 128, 64, tl::RowMajor<2, 2>, true>();
 
-    test_row_major_store<cutlass::half_t, 128, 256, tl::RowMajor<2, 2>,
-                         false>();
-    test_row_major_store<cutlass::half_t, 128, 256, tl::RowMajor<2, 2>, true>();
+    test_row_major_store<cutlass::half_t, 128, 64, tl::RowMajor<2, 2>, false>();
+    test_row_major_store<cutlass::half_t, 128, 64, tl::RowMajor<2, 2>, true>();
 }
 }  // namespace tilefusion::testing

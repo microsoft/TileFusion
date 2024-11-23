@@ -91,41 +91,43 @@ __global__ void gemm_kernel(const Element* dA, const Element* dB, Element* dC) {
     // pointers to shared memory tiles
     Element* sA_ptr = buf;
     Element* sB_ptr = buf + kTM * kTK;
-    Element* sC_ptr = buf;
+    // Element* sC_ptr = buf;
 
-    typename KeTraits::TiledMma mma;
+    // typename KeTraits::TiledMma mma;
     typename KeTraits::TiledCopyG2S tiled_copy;
 
-    auto rA = make_s2rA(sA_ptr, typename KeTraits::SmemLayoutA{}, mma);
-    auto rB = make_s2rB(sB_ptr, typename KeTraits::SmemLayoutB{}, mma);
-    auto acc = get_acc<kTM, kTN>(mma);
+    // auto rA = make_s2rA(sA_ptr, typename KeTraits::SmemLayoutA{}, mma);
+    // auto rB = make_s2rB(sB_ptr, typename KeTraits::SmemLayoutB{}, mma);
+    // auto acc = get_acc<kTM, kTN>(mma);
 
     for (int k = 0; k < kK; k += kTK) {
         copy_tile_g2s(gA_ptr, sA_ptr, typename KeTraits::GmemLayoutA{},
                       typename KeTraits::SmemLayoutA{}, tiled_copy);
-        copy_tile_g2s(gB_ptr, sB_ptr, typename KeTraits::GmemLayoutB{},
-                      typename KeTraits::SmemLayoutB{}, tiled_copy);
+        // copy_tile_g2s(gB_ptr, sB_ptr, typename KeTraits::GmemLayoutB{},
+        //               typename KeTraits::SmemLayoutB{}, tiled_copy);
         __copy_async();
         __syncthreads();
 
-        for (int i = 0; i < rA.get_iters(); ++i) {
-            rA.copy(i);  // load A register tile from shared memory
-            rB.copy(i);  // load B register tile from shared memory
+        // for (int i = 0; i < rA.get_iters(); ++i) {
+        //     rA.copy(i);  // load A register tile from shared memory
+        //     rB.copy(i);  // load B register tile from shared memory
 
-            gemm(mma, rA[i], rB[i], acc);
-        }
+        //     gemm(mma, rA[i], rB[i], acc);
+        // }
         gA_ptr += kTK;
         gB_ptr += kTK;
+        break;
     }
 
-    typename KeTraits::StoreC_R2S sC;  // declare register to shared store plan
-    sC.copy(acc, buf);                 // store register tile to shared memory
-    __syncthreads();
+    // typename KeTraits::StoreC_R2S sC;  // declare register to shared store
+    // plan sC.copy(acc, buf);                 // store register tile to shared
+    // memory
+    // __syncthreads();
 
-    // store shared memory tile to global memory
-    copy_tile_s2g(sC_ptr, gC_ptr, typename KeTraits::SmemLayoutC{},
-                  typename KeTraits::GmemLayoutC{},
-                  typename KeTraits::TiledCopyS2G{});
+    // // store shared memory tile to global memory
+    // copy_tile_s2g(sC_ptr, gC_ptr, typename KeTraits::SmemLayoutC{},
+    //               typename KeTraits::GmemLayoutC{},
+    //               typename KeTraits::TiledCopyS2G{});
 }
 }  // namespace cutlass_wrapper
 }  // namespace benchmarks
