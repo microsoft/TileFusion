@@ -2,12 +2,15 @@
 // Licensed under the MIT License.
 
 #pragma once
+#include "cell/compute/mod.hpp"
+#include "cell/copy/global_to_shared_2.hpp"
 #include "cell/mod.hpp"
 #include "types/mod.hpp"
 
 using namespace tilefusion;
 using namespace tilefusion::cell;
 using namespace tilefusion::cell::copy;
+using namespace tilefusion::cell::compute;
 
 namespace tl = tile_layout;
 
@@ -78,31 +81,35 @@ struct KeGemmTraits {
         SharedToRegLoader<RegB, WarpLayout, WarpReuse::kColReuseCont>;
 
     // Global Tile for output C
-    using GlobalC = GlobalTile<AccType, tl::RowMajor<kTM, kTN, kN>>;
+    using GlobalC = GlobalTile<InType, tl::RowMajor<kTM, kTN, kN>>;
     // Shared Tile for output C
-    using SharedC = SharedTile<AccType, tl::RowMajor<kTM, kTN>, kSwizzled>;
+    using SharedC = SharedTile<InType, tl::RowMajor<kTM, kTN>, kSwizzled>;
 
     // Register Tile for output C
     static constexpr int kCMs = kTM / kWarpPerRow / BaseShape::kTileSize;
     static constexpr int kCNs = kTN / kWarpPerCol / BaseShape::kTileSize;
-    using RegC = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kCMs, kCNs>>;
+    using Acc = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kCMs, kCNs>>;
+    using AccHalf = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kCMs, kCNs>>;
 
-    using R2SStorerC = RegToSharedStorer<RegC, WarpLayout>;
+    using CastAcc = compute::RegTileConvert<Acc, AccHalf>;
+
+    using R2SStorerC = RegToSharedStorer<AccHalf, WarpLayout>;
     using S2GStorerC = SharedToGlobalStorer<SharedC, WarpLayout>;
 };
 
-template <typename InType, typename AccType,                  //
-          const int kM, const int kN, const int kK,           //
-          const int kTM, const int kTN, const int kTK,        //
-          typename GIteratorA, typename SIteratorA,           //
-          typename SharedA, typename RegA,                    //
-          typename G2SLoaderA, typename S2RLoaderA,           //
-          typename GIteratorB, typename SIteratorB,           //
-          typename SharedB, typename RegB,                    //
-          typename G2SLoaderB, typename S2RLoaderB,           //
-          typename GlobalC, typename SharedC, typename RegC,  //
+template <typename InType,                                   //
+          const int kM, const int kN, const int kK,          //
+          const int kTM, const int kTN, const int kTK,       //
+          typename GIteratorA, typename SIteratorA,          //
+          typename SharedA, typename RegA,                   //
+          typename G2SLoaderA, typename S2RLoaderA,          //
+          typename GIteratorB, typename SIteratorB,          //
+          typename SharedB, typename RegB,                   //
+          typename G2SLoaderB, typename S2RLoaderB,          //
+          typename GlobalC, typename SharedC,                //
+          typename Acc, typename AccHalf, typename CastAcc,  //
           typename R2SStorerC, typename S2GStorerC>
-__global__ void gemm(const InType* dA, const InType* dB, AccType* dC) {
+__global__ void gemm(const InType* dA, const InType* dB, InType* dC) {
     int offset_a = blockIdx.x * kTM * kK;
     int offset_b = blockIdx.y * kTN * kK;
     int offset_c = blockIdx.x * kTM * kN + blockIdx.y * kTN;
@@ -110,22 +117,24 @@ __global__ void gemm(const InType* dA, const InType* dB, AccType* dC) {
     extern __shared__ __align__(sizeof(double)) unsigned char buf[];
     InType* sA_ptr = reinterpret_cast<InType*>(buf);
     InType* sB_ptr = sA_ptr + SIteratorA::Tile::kNumel;
-    AccType* sC_ptr = reinterpret_cast<AccType*>(buf);
+    InType* sC_ptr = reinterpret_cast<InType*>(buf);
 
     // declare tiles, iterators and loaders
     GIteratorA gAs(dA + offset_a);
-    SIteratorA sAs(sA_ptr);
-
     GIteratorB gBs(dB + offset_b);
-    SIteratorB sBs(sB_ptr);
 
     SharedA sA(sA_ptr);
+    SIteratorA sAs(sA_ptr);
     RegA rA;
 
     SharedB sB(sB_ptr);
+    SIteratorB sBs(sB_ptr);
     RegB rB;
 
-    RegC acc;
+    Acc acc;
+    AccHalf acc_h;
+    CastAcc cast;
+
     SharedC sC(sC_ptr);
     GlobalC gC(dC + offset_c);
 
@@ -148,10 +157,11 @@ __global__ void gemm(const InType* dA, const InType* dB, AccType* dC) {
             s2r_a(sAs(k2), rA);
             s2r_b(sBs(k2), rB);
 
-            compute::gemm(rA, rB, acc);
+            gemm(rA, rB, acc);
         }
     }
-    r2s_c(acc, sC);
+    cast(acc, acc_h);
+    r2s_c(acc_h, sC);
     __syncthreads();
     s2g_c(sC, gC);
 }

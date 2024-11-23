@@ -11,7 +11,6 @@
 
 namespace benchmarks {
 namespace cutlass_wrapper {
-
 using namespace cute;
 
 template <typename Element_,                             //
@@ -115,7 +114,6 @@ __global__ void gemm_kernel(const Element* dA, const Element* dB, Element* dC) {
 
             gemm(mma, rA[i], rB[i], acc);
         }
-
         gA_ptr += kTK;
         gB_ptr += kTK;
     }
@@ -131,36 +129,3 @@ __global__ void gemm_kernel(const Element* dA, const Element* dB, Element* dC) {
 }
 }  // namespace cutlass_wrapper
 }  // namespace benchmarks
-
-template <typename Element,                              //
-          const int kWarpPerRow, const int kWarpPerCol,  //
-          const int kM, const int kN, const int kK,      //
-          const int kTM, const int kTN, const int kTK>
-void cute_gemm(const Element* dA, const Element* dB, Element* dC) {
-    using namespace benchmarks::cutlass_wrapper;
-
-    using KeTraits = GemmTraits<Element, kWarpPerRow, kWarpPerCol, kM, kN, kK,
-                                kTM, kTN, kTK>;
-
-    static constexpr int smem_size =
-        std::max(kTK * (kTN + kTM), kTM * kTN) * sizeof(Element);
-
-    auto kernel = &gemm_kernel<Element, kM, kN, kK, kTM, kTN, kTK, KeTraits>;
-
-    // maximal statically allocated smem per block
-    const int kMaxSmemPerBlock = 48 * 1024;
-    if (smem_size > kMaxSmemPerBlock) {
-        cudaFuncSetAttribute(
-            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
-    }
-
-    const int block_m = (kM + kTM - 1) / kTM;
-    const int block_n = (kN + kTN - 1) / kTN;
-
-    const int kThreads = KeTraits::kThreads;
-
-    dim3 gridDim(block_m, block_n);
-    dim3 blockDim(kThreads, 1, 1);
-
-    kernel<<<gridDim, blockDim, smem_size>>>(dA, dB, dC);
-}

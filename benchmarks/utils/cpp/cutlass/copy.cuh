@@ -8,7 +8,6 @@
 
 namespace benchmarks {
 namespace cutlass_wrapper {
-
 using namespace cute;
 
 #if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 800))
