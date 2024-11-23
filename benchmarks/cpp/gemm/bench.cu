@@ -32,7 +32,6 @@ void run_test(std::ofstream& fout) {
 
     using Config = KeGemmTraits<InType, AccType, WholeShape, CtaTileShape, kRK,
                                 WarpLayout>;
-
     auto tilefusion_gemm =
         &gemm<InType, kM, kN, kK, kTM, kTN, kTK, typename Config::GIteratorA,
               typename Config::SIteratorA, typename Config::SharedA,
@@ -45,8 +44,11 @@ void run_test(std::ofstream& fout) {
               typename Config::AccHalf, typename Config::CastAcc,
               typename Config::R2SStorerC, typename Config::S2GStorerC>;
 
-    std::cout << "GIteratorA: " << typename Config::GIteratorA{} << std::endl
-              << "GIteratorB: " << typename Config::GIteratorB{} << std::endl;
+    using KeTraits = benchmarks::cutlass_wrapper::GemmTraits<
+        InType, kWarpPerRow, kWarpPerCol, kM, kN, kK, kTM, kTN, kTK>;
+    auto cutlass_gemm =
+        &benchmarks::cutlass_wrapper::gemm_kernel<InType, kM, kN, kK, kTM, kTN,
+                                                  kTK, KeTraits>;
 
     static constexpr int inputs = kTK * (kTN + kTM) * sizeof(InType);
     static constexpr int acc = kTM * kTN * sizeof(InType);
@@ -57,14 +59,15 @@ void run_test(std::ofstream& fout) {
         cudaFuncSetAttribute(tilefusion_gemm,
                              cudaFuncAttributeMaxDynamicSharedMemorySize,
                              smem_size);
+        cudaFuncSetAttribute(cutlass_gemm,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize,
+                             smem_size);
     }
+
     int block_x = benchmarks::CeilDiv<kM, kTM>;
     int block_y = benchmarks::CeilDiv<kN, kTN>;
     dim3 dim_grid(block_x, block_y, 1);
     dim3 dim_block(Config::kThreads, 1, 1);
-
-    auto cutlass_gemm =
-        &cute_gemm<InType, kWarpPerRow, kWarpPerCol, kM, kN, kK, kTM, kTN, kTK>;
 
     //// =============== Prepare data =============== ////
     // input matrix A
@@ -86,7 +89,7 @@ void run_test(std::ofstream& fout) {
     thrust::fill(d_c.begin(), d_c.end(), static_cast<InType>(0.));
     InType* dC = thrust::raw_pointer_cast(d_c.data());
 
-    cutlass_gemm(dA, dB, dC);
+    cutlass_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC);
     cudaDeviceSynchronize();
     thrust::host_vector<InType> h_c = d_c;
 
@@ -137,7 +140,7 @@ void run_test(std::ofstream& fout) {
     const int iters = 20;
 
     for (int i = 0; i < warm_up; ++i) {
-        cutlass_gemm(dA, dB, dC);
+        cutlass_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC);
         tilefusion_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC2);
     }
     cudaDeviceSynchronize();
@@ -145,7 +148,7 @@ void run_test(std::ofstream& fout) {
     CudaTimer timer;
     timer.start();
     for (int i = 0; i < iters; ++i) {
-        cutlass_gemm(dA, dB, dC);
+        cutlass_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC);
     }
     cudaDeviceSynchronize();
     float cutlass_time = timer.stop() / iters;
