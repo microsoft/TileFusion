@@ -91,7 +91,7 @@ __global__ void gemm_kernel(const Element* dA, const Element* dB, Element* dC) {
     // pointers to shared memory tiles
     Element* sA_ptr = buf;
     Element* sB_ptr = buf + kTM * kTK;
-    Element* sC_ptr = buf;
+    // Element* sC_ptr = buf;
 
     typename KeTraits::TiledMma mma;
     typename KeTraits::TiledCopyG2S tiled_copy;
@@ -118,14 +118,15 @@ __global__ void gemm_kernel(const Element* dA, const Element* dB, Element* dC) {
         gB_ptr += kTK;
     }
 
-    typename KeTraits::StoreC_R2S sC;  // declare register to shared store plan
-    sC.copy(acc, buf);                 // store register tile to shared memory
+    // typename KeTraits::StoreC_R2S sC;  // declare register to shared store
+    // plan sC.copy(acc, buf);                 // store register tile to shared
+    // memory
     __syncthreads();
 
-    // store shared memory tile to global memory
-    copy_tile_s2g(sC_ptr, gC_ptr, typename KeTraits::SmemLayoutC{},
-                  typename KeTraits::GmemLayoutC{},
-                  typename KeTraits::TiledCopyS2G{});
+    // // store shared memory tile to global memory
+    // copy_tile_s2g(sC_ptr, gC_ptr, typename KeTraits::SmemLayoutC{},
+    //               typename KeTraits::GmemLayoutC{},
+    //               typename KeTraits::TiledCopyS2G{});
 }
 }  // namespace cutlass_wrapper
 }  // namespace benchmarks

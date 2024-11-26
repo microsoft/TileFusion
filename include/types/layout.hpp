@@ -167,10 +167,11 @@ struct SwizzledRowMajor<128> {
         "Swizzling is performed based on the BaseTile, and the number of "
         "elements in a BaseTile should be equal to 2^B x 2^S x 2^M.");
 
-    using SwizzledBaseTile = decltype(composition(
-        cute::Swizzle<kB, kM, kS>{},
+    using LayoutAtom =
         cute::Layout<Shape<Int<BaseShape::kRows>, Int<BaseShape::kCols>>,
-                     Stride<Int<BaseShape::kCols>, _1>>{}));
+                     Stride<Int<BaseShape::kCols>, _1>>;
+    using SwizzledBaseTile =
+        decltype(composition(cute::Swizzle<kB, kM, kS>{}, LayoutAtom{}));
 
     DEVICE SwizzledRowMajor() : swizzled_(SwizzledBaseTile{}){};
 

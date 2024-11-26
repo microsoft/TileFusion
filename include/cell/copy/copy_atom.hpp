@@ -15,6 +15,7 @@
 
 namespace tilefusion::cell::copy::atom {
 namespace tl = tile_layout;
+using namespace cute;
 
 template <typename Element>
 requires std::is_same_v<Element, __half> ||

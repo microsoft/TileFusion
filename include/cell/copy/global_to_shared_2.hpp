@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "cute/tensor.hpp"
 #include "types/mod.hpp"
 
 namespace tilefusion::cell::copy {
@@ -49,16 +50,17 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
     using GlobalLayout = cute::Layout<Shape<Int<kRows>, Int<kCols>>,
                                       Stride<Int<Global::kRowStride>, _1>>;
 
-    using LayoutAtom = cute::Layout<Shape<_8, _32>, Stride<_32, _1>>;
+    using SharedTileShape = Shape<Int<kRows>, Int<kCols>>;
+    using LayoutAtom1 = cute::Layout<Shape<_16, _16>, Stride<_16, _1>>;
     using SharedLayoutNonSwizzled = decltype(tile_to_shape(
-        LayoutAtom{}, Shape<Int<kRows>, Int<kCols>>{}, cute::Step<_2, _1>{}));
+        LayoutAtom1{}, SharedTileShape{}, cute::Step<_2, _1>{}));
 
-    // this swizzle function works only for 4-byte data types
+    // NOTE: this swizzle function works only for 4-byte data types
+    using LayoutAtom2 = cute::Layout<Shape<_8, _32>, Stride<_32, _1>>;
     using LayoutAtomSwizzled =
-        decltype(composition(Swizzle<2, 3, 3>{}, LayoutAtom{}));
+        decltype(composition(Swizzle<2, 3, 3>{}, LayoutAtom2{}));
     using SharedLayoutSwizzled = decltype(tile_to_shape(
-        LayoutAtomSwizzled{}, Shape<Int<kRows>, Int<kCols>>{},
-        cute::Step<_2, _1>{}));
+        LayoutAtomSwizzled{}, SharedTileShape{}, cute::Step<_2, _1>{}));
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, SharedLayoutSwizzled,
@@ -143,16 +145,17 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
     using GlobalLayout = cute::Layout<Shape<Int<kRows>, Int<kCols>>,
                                       Stride<_1, Int<Global::kColStride>>>;
 
-    using LayoutAtom = cute::Layout<Shape<_32, _8>, Stride<_1, _32>>;
-    // this swizzle function works only for 4-byte data types
-    using LayoutAtomSwizzled =
-        decltype(composition(Swizzle<2, 3, 3>{}, LayoutAtom{}));
-
+    using SharedTileShape = Shape<Int<kRows>, Int<kCols>>;
+    using LayoutAtom1 = cute::Layout<Shape<_16, _16>, Stride<_1, _16>>;
     using SharedLayoutNonSwizzled =
-        decltype(tile_to_shape(LayoutAtom{}, Shape<Int<kRows>, Int<kCols>>{}));
+        decltype(tile_to_shape(LayoutAtom1{}, SharedTileShape{}));
 
-    using SharedLayoutSwizzled = decltype(tile_to_shape(
-        LayoutAtomSwizzled{}, Shape<Int<kRows>, Int<kCols>>{}));
+    // NOTE: this swizzle function works only for 4-byte data types
+    using LayoutAtom2 = cute::Layout<Shape<_32, _8>, Stride<_1, _32>>;
+    using LayoutAtomSwizzled =
+        decltype(composition(Swizzle<2, 3, 3>{}, LayoutAtom2{}));
+    using SharedLayoutSwizzled =
+        decltype(tile_to_shape(LayoutAtomSwizzled{}, SharedTileShape{}));
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, SharedLayoutSwizzled,
