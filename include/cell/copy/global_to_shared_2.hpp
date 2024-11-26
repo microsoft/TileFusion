@@ -46,10 +46,10 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
     static constexpr int kRows = Global::kRows;
     static constexpr int kCols = Global::kCols;
 
-    using GlobalLayout =
-        cute::Layout<Shape<Int<kRows>, Int<kCols>>, Stride<Int<kCols>, _1>>;
+    using GlobalLayout = cute::Layout<Shape<Int<kRows>, Int<kCols>>,
+                                      Stride<Int<Global::kRowStride>, _1>>;
 
-    using LayoutAtom = cute::Layout<Shape<_16, _16>, Stride<_16, _1>>;
+    using LayoutAtom = cute::Layout<Shape<_8, _32>, Stride<_32, _1>>;
     using SharedLayoutNonSwizzled = decltype(tile_to_shape(
         LayoutAtom{}, Shape<Int<kRows>, Int<kCols>>{}, cute::Step<_2, _1>{}));
 
@@ -68,17 +68,24 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
                      Stride<Int<kThreadsCols>, _1>>;
     using ValueLayout = cute::Layout<Shape<_1, Int<kNumPerAccess>>>;
 
-    // #ifdef CP_ASYNC_SM80_ENABLED
+#ifdef CP_ASYNC_SM80_ENABLED
     using CopyInst =
         Copy_Atom<SM80_CP_ASYNC_CACHEGLOBAL<cute::uint128_t>, DType>;
-    // #else
-    //     using CopyInst = Copy_Atom<DefaultCopy, DType>;
-    // #endif
-
+#else
+    using CopyInst = Copy_Atom<DefaultCopy, DType>;
+#endif
     using TiledCopy =
         decltype(make_tiled_copy(CopyInst{}, ThreadLayout{}, ValueLayout{}));
 
     DEVICE void operator()(const DType* src_data, DType* dst_data) {
+        // if (thread(0)) {
+        //     printf("\nRow Major\n");
+        //     printf("Global Layout:\n");
+        //     print(global_layout_);
+
+        //     printf("\nShared Layout:\n");
+        //     print(shared_layout_);
+        // }
         int tid = threadIdx.x;
 
         auto gtile = make_tensor(make_gmem_ptr(src_data), global_layout_);
@@ -133,10 +140,10 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
     static constexpr int kRows = Global::kRows;
     static constexpr int kCols = Global::kCols;
 
-    using GlobalLayout =
-        cute::Layout<Shape<Int<kRows>, Int<kCols>>, Stride<_1, Int<kRows>>>;
+    using GlobalLayout = cute::Layout<Shape<Int<kRows>, Int<kCols>>,
+                                      Stride<_1, Int<Global::kColStride>>>;
 
-    using LayoutAtom = cute::Layout<Shape<_16, _16>, Stride<_1, _16>>;
+    using LayoutAtom = cute::Layout<Shape<_32, _8>, Stride<_1, _32>>;
     // this swizzle function works only for 4-byte data types
     using LayoutAtomSwizzled =
         decltype(composition(Swizzle<2, 3, 3>{}, LayoutAtom{}));
@@ -150,7 +157,6 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, SharedLayoutSwizzled,
                            SharedLayoutNonSwizzled>;
-
     using ThreadLayout =
         cute::Layout<Shape<Int<kThreadsRows>, Int<kThreadsCols>>,
                      Stride<Int<kThreadsCols>, _1>>;
@@ -168,6 +174,16 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
         decltype(make_tiled_copy(CopyInst{}, ThreadLayout{}, ValueLayout{}));
 
     DEVICE void operator()(const DType* src_data, DType* dst_data) {
+        // if (thread(0)) {
+        //     printf("\n\nColumn Major\n");
+        //     printf("Global Layout:\n");
+        //     print(global_layout_);
+
+        //     printf("\nShared Layout:\n");
+        //     print(shared_layout_);
+        //     printf("\n");
+        // }
+
         int tid = threadIdx.x;
 
         auto gtile = make_tensor(make_gmem_ptr(src_data), global_layout_);
@@ -181,8 +197,9 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
 #pragma unroll
         for (int i = 0; i < int(size<1>(src)); ++i)
 #pragma unroll
-            for (int j = 0; j < int(size<2>(src)); ++j)
+            for (int j = 0; j < int(size<2>(src)); ++j) {
                 cute::copy(tiled_copy_, src(cute::_, i, j), dst(cute::_, i, j));
+            }
     }
 
   private:
@@ -227,7 +244,7 @@ struct SharedToGlobalStorerImpl2<Shared_, Global_, WarpLayout_,
     static constexpr int kThreadsCols =
         tl::num_cols<WarpLayout> * tl::num_cols<WarpThreadLayout>;
 
-    using BaseTileLayout = cute::Layout<Shape<_16, _16>, Stride<_16, _1>>;
+    using BaseTileLayout = cute::Layout<Shape<_8, _32>, Stride<_32, _1>>;
     using SharedLayoutNonSwizzled = decltype(tile_to_shape(
         BaseTileLayout{}, Shape<Int<kRows>, Int<kCols>>{},
         cute::Step<_2, _1>{}));

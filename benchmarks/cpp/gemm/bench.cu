@@ -35,10 +35,9 @@ void run_test(std::ofstream& fout) {
     using Config = KeGemmTraits<InType, AccType, WholeShape, CtaTileShape, kRK,
                                 WarpLayout>;
     auto tilefusion_gemm =
-        &gemm<InType, kM, kN, kK, kTM, kTN, kTK, typename Config::GIteratorA,
-              typename Config::SIteratorA, typename Config::SharedA,
-              typename Config::RegA, typename Config::G2SLoaderA,
-              typename Config::S2RLoaderA, typename Config::GIteratorB,
+        &gemm<InType, kM, kN, kK, kTM, kTN, kTK, typename Config::SIteratorA,
+              typename Config::SharedA, typename Config::RegA,
+              typename Config::G2SLoaderA, typename Config::S2RLoaderA,
               typename Config::SIteratorB, typename Config::SharedB,
               typename Config::RegB, typename Config::G2SLoaderB,
               typename Config::S2RLoaderB, typename Config::GlobalC,
@@ -176,8 +175,8 @@ void run_test(std::ofstream& fout) {
     cudaDeviceSynchronize();
     float tilefusion_time = timer.stop() / iters;
 
-    // float base = cublass_time;
-    float base = cutlass_time;
+    float base = cublas_time;
+    // float base = cutlass_time;
 
     fout << "[" << kM << ", " << kN << ", " << kK << "]\t[" << kTM << ", "
          << kTN << ", " << kTK << "]\t" << kRK << "\t[" << kWarpPerRow << ", "
