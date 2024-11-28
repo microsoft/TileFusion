@@ -15,8 +15,8 @@ using namespace tilefusion;
 using namespace tilefusion::cell;
 using namespace tilefusion::cell::copy;
 
-template <typename Element, typename Global, typename Shared,
-          typename GIterator, typename Loader>
+template <typename Element, typename Shared, typename GIterator,
+          typename Loader>
 __global__ void copy_g2s(const Element* data, Loader& loader) {
     extern __shared__ __align__(sizeof(double)) unsigned char buf_[];
     auto* buf = reinterpret_cast<Element*>(buf_);
@@ -31,23 +31,25 @@ __global__ void copy_g2s(const Element* data, Loader& loader) {
     }
 }
 
-template <typename Element, typename Global, typename Shared,
-          typename GTileIterator, typename WarpLayout, typename Loader>
+template <typename Element, typename Shared, typename GTileIterator,
+          typename WarpLayout, typename Loader>
 float test_load(const Element* data) {
     static const int kThreads = tl::get_numel<WarpLayout> * 32;
     int shm_size = Shared::kRows * Shared::kCols * sizeof(Element);
 
     dim3 grids(1, 1, 1);
     dim3 blocks(kThreads);
-    auto kernel = &copy_g2s<Element, Global, Shared, GTileIterator, Loader>;
+    auto kernel = &copy_g2s<Element, Shared, GTileIterator, Loader>;
 
     Loader loader;
 
-    for (int i = 0; i < 5; ++i)  // warm up
+    int warmup = 10;
+    int iters = 50;
+
+    for (int i = 0; i < warmup; ++i)  // warm up
         kernel<<<grids, blocks, shm_size>>>(data, loader);
     cudaDeviceSynchronize();
 
-    int iters = 50;
     CudaTimer timer;
     timer.start();
     for (int i = 0; i < iters; ++i)
@@ -64,15 +66,18 @@ float test_cutlass(const Element* data) {
 
     int shm_size = kRows * kChunk * sizeof(Element);
     int kThreads = tl::get_numel<WarpLayout> * 32;
+
     dim3 grids(1, 1, 1);
     dim3 blocks(kThreads);
 
-    for (int i = 0; i < 5; ++i) {
+    int warmup = 10;
+    int iters = 50;
+
+    for (int i = 0; i < warmup; ++i) {
         test<<<grids, blocks, shm_size>>>(data);
     }
     cudaDeviceSynchronize();
 
-    int iters = 50;
     CudaTimer timer;
     timer.start();
     for (int i = 0; i < iters; ++i) {
@@ -82,7 +87,8 @@ float test_cutlass(const Element* data) {
     return timer.stop() / iters;
 }
 
-template <typename Element, const int kRows, const int kCols, const int kChunk>
+template <typename Element, const int kRows, const int kCols, const int kChunk,
+          typename WarpLayout>
 void run_test() {
     // initialize data
     static const bool kSwizzled = true;
@@ -99,30 +105,29 @@ void run_test() {
     using GIterator = GTileIterator<Global, TileShape<kRows, kChunk>>;
     using Shared = SharedTile<Element, tl::RowMajor<kRows, kChunk>, kSwizzled>;
 
-    using GlobalFake = GlobalTile<Element, tl::RowMajor<kRows, kChunk>>;
-    using WarpLayout = tl::RowMajor<2, 2>;
-
-    std::cout << "GIterator: " << GIterator{} << std::endl;
-
     using Loader1 = copy::GlobalToSharedLoader<Shared, WarpLayout>;
     using Loader2 = copy::GlobalToSharedLoader2<Shared, WarpLayout>;
 
-    auto test1 =
-        &test_load<Element, GlobalFake, Shared, GIterator, WarpLayout, Loader1>;
-    auto test2 =
-        &test_load<Element, GlobalFake, Shared, GIterator, WarpLayout, Loader2>;
-    float time1 = test1(data);
-    float time2 = test2(data);
-    float time3 = test_cutlass<Element, kRows, kCols, kChunk, WarpLayout>(data);
+    float time1 = 0., time2 = 0., time3 = 0.;
+    auto test1 = &test_load<Element, Shared, GIterator, WarpLayout, Loader1>;
+    auto test2 = &test_load<Element, Shared, GIterator, WarpLayout, Loader2>;
+    time1 = test1(data);
+    time2 = test2(data);
+    time3 = test_cutlass<Element, kRows, kCols, kChunk, WarpLayout>(data);
 
-    std::cout << std::setprecision(4) << "|ours(ms)|cute(ms)|cutlass(ms)|"
+    std::cout << std::setprecision(4) << "|v1(ms)|v2(ms)|cutlass(ms)|"
               << std::endl
               << "|:---:|:---:|:---:|" << std::endl
               << "|" << time1 << "|" << time2 << "|" << time3 << "|"
+              << std::endl
               << std::endl;
 }
 
 int main() {
-    run_test<__half, 128, 128 * 64, 128 /*chunk shape*/>();
+    run_test<__half, 128, 128 * 1000, 128, tl::RowMajor<1, 1>>();
+    run_test<__half, 128, 128 * 1000, 128, tl::RowMajor<2, 1>>();
+    run_test<__half, 128, 128 * 1000, 128, tl::RowMajor<1, 2>>();
+    run_test<__half, 128, 128 * 1000, 128, tl::RowMajor<2, 2>>();
+
     return 0;
 }

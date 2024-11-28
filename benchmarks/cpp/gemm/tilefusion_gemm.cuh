@@ -161,7 +161,7 @@ __global__ void gemm(const InType* dA_, const InType* dB_, InType* dC_) {
     }
 
     cast(acc, acc_h);
-    // r2s_c(acc_h, sC);
+    r2s_c(acc_h, sC);
     __syncthreads();
-    // s2g_c(sC, gC);
+    s2g_c(sC, gC);
 }

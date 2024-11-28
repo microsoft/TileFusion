@@ -51,21 +51,21 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
                                       Stride<Int<Global::kRowStride>, _1>>;
 
     using SharedTileShape = Shape<Int<kRows>, Int<kCols>>;
-    using LayoutAtom1 = cute::Layout<Shape<_16, _16>, Stride<_16, _1>>;
+    using LayoutAtom = cute::Layout<Shape<_16, _16>, Stride<_16, _1>>;
     using SharedLayoutNonSwizzled = decltype(tile_to_shape(
-        LayoutAtom1{}, SharedTileShape{}, cute::Step<_2, _1>{}));
+        LayoutAtom{}, SharedTileShape{}, cute::Step<_2, _1>{}));
 
     // NOTE: this swizzle function works only for 4-byte data types
-    using LayoutAtom2 = cute::Layout<Shape<_8, _32>, Stride<_32, _1>>;
     using LayoutAtomSwizzled =
-        decltype(composition(Swizzle<2, 3, 3>{}, LayoutAtom2{}));
+        decltype(composition(Swizzle<2, 3, 3>{}, LayoutAtom{}));
     using SharedLayoutSwizzled = decltype(tile_to_shape(
         LayoutAtomSwizzled{}, SharedTileShape{}, cute::Step<_2, _1>{}));
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, SharedLayoutSwizzled,
                            SharedLayoutNonSwizzled>;
-    using ThreadLayout =
+
+    using ThreadLayout =  // row major
         cute::Layout<Shape<Int<kThreadsRows>, Int<kThreadsCols>>,
                      Stride<Int<kThreadsCols>, _1>>;
     using ValueLayout = cute::Layout<Shape<_1, Int<kNumPerAccess>>>;
@@ -80,14 +80,6 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
         decltype(make_tiled_copy(CopyInst{}, ThreadLayout{}, ValueLayout{}));
 
     DEVICE void operator()(const DType* src_data, DType* dst_data) {
-        // if (thread(0)) {
-        //     printf("\nRow Major\n");
-        //     printf("Global Layout:\n");
-        //     print(global_layout_);
-
-        //     printf("\nShared Layout:\n");
-        //     print(shared_layout_);
-        // }
         int tid = threadIdx.x;
 
         auto gtile = make_tensor(make_gmem_ptr(src_data), global_layout_);
@@ -146,14 +138,13 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
                                       Stride<_1, Int<Global::kColStride>>>;
 
     using SharedTileShape = Shape<Int<kRows>, Int<kCols>>;
-    using LayoutAtom1 = cute::Layout<Shape<_16, _16>, Stride<_1, _16>>;
+    using LayoutAtom = cute::Layout<Shape<_16, _16>, Stride<_1, _16>>;
     using SharedLayoutNonSwizzled =
-        decltype(tile_to_shape(LayoutAtom1{}, SharedTileShape{}));
+        decltype(tile_to_shape(LayoutAtom{}, SharedTileShape{}));
 
     // NOTE: this swizzle function works only for 4-byte data types
-    using LayoutAtom2 = cute::Layout<Shape<_32, _8>, Stride<_1, _32>>;
     using LayoutAtomSwizzled =
-        decltype(composition(Swizzle<2, 3, 3>{}, LayoutAtom2{}));
+        decltype(composition(Swizzle<2, 3, 3>{}, LayoutAtom{}));
     using SharedLayoutSwizzled =
         decltype(tile_to_shape(LayoutAtomSwizzled{}, SharedTileShape{}));
 
@@ -177,16 +168,6 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
         decltype(make_tiled_copy(CopyInst{}, ThreadLayout{}, ValueLayout{}));
 
     DEVICE void operator()(const DType* src_data, DType* dst_data) {
-        // if (thread(0)) {
-        //     printf("\n\nColumn Major\n");
-        //     printf("Global Layout:\n");
-        //     print(global_layout_);
-
-        //     printf("\nShared Layout:\n");
-        //     print(shared_layout_);
-        //     printf("\n");
-        // }
-
         int tid = threadIdx.x;
 
         auto gtile = make_tensor(make_gmem_ptr(src_data), global_layout_);
@@ -247,7 +228,7 @@ struct SharedToGlobalStorerImpl2<Shared_, Global_, WarpLayout_,
     static constexpr int kThreadsCols =
         tl::num_cols<WarpLayout> * tl::num_cols<WarpThreadLayout>;
 
-    using BaseTileLayout = cute::Layout<Shape<_8, _32>, Stride<_32, _1>>;
+    using BaseTileLayout = cute::Layout<Shape<_16, _16>, Stride<_16, _1>>;
     using SharedLayoutNonSwizzled = decltype(tile_to_shape(
         BaseTileLayout{}, Shape<Int<kRows>, Int<kCols>>{},
         cute::Step<_2, _1>{}));

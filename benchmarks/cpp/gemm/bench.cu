@@ -9,7 +9,7 @@
 #include <fstream>
 #include <iomanip>
 
-// #define CHECK_CORRECTNESS true
+#define CHECK_CORRECTNESS true
 
 //// =============== Test Config=============== ////
 static const int kWarpPerRow = 2;
@@ -176,7 +176,6 @@ void run_test(std::ofstream& fout) {
     float tilefusion_time = timer.stop() / iters;
 
     float base = cublas_time;
-    // float base = cutlass_time;
 
     fout << "[" << kM << ", " << kN << ", " << kK << "]\t[" << kTM << ", "
          << kTN << ", " << kTK << "]\t" << kRK << "\t[" << kWarpPerRow << ", "
