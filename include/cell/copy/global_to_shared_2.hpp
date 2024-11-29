@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "cute/tensor.hpp"
 #include "types/mod.hpp"
 
 namespace tilefusion::cell::copy {
@@ -46,25 +47,25 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
     static constexpr int kRows = Global::kRows;
     static constexpr int kCols = Global::kCols;
 
-    using GlobalLayout =
-        cute::Layout<Shape<Int<kRows>, Int<kCols>>, Stride<Int<kCols>, _1>>;
+    using GlobalLayout = cute::Layout<Shape<Int<kRows>, Int<kCols>>,
+                                      Stride<Int<Global::kRowStride>, _1>>;
 
+    using SharedTileShape = Shape<Int<kRows>, Int<kCols>>;
     using LayoutAtom = cute::Layout<Shape<_16, _16>, Stride<_16, _1>>;
     using SharedLayoutNonSwizzled = decltype(tile_to_shape(
-        LayoutAtom{}, Shape<Int<kRows>, Int<kCols>>{}, cute::Step<_2, _1>{}));
+        LayoutAtom{}, SharedTileShape{}, cute::Step<_2, _1>{}));
 
-    // this swizzle function works only for 4-byte data types
+    // NOTE: this swizzle function works only for 4-byte data types
     using LayoutAtomSwizzled =
         decltype(composition(Swizzle<2, 3, 3>{}, LayoutAtom{}));
     using SharedLayoutSwizzled = decltype(tile_to_shape(
-        LayoutAtomSwizzled{}, Shape<Int<kRows>, Int<kCols>>{},
-        cute::Step<_2, _1>{}));
+        LayoutAtomSwizzled{}, SharedTileShape{}, cute::Step<_2, _1>{}));
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, SharedLayoutSwizzled,
                            SharedLayoutNonSwizzled>;
 
-    using ThreadLayout =
+    using ThreadLayout =  // row major
         cute::Layout<Shape<Int<kThreadsRows>, Int<kThreadsCols>>,
                      Stride<Int<kThreadsCols>, _1>>;
     using ValueLayout = cute::Layout<Shape<_1, Int<kNumPerAccess>>>;
@@ -75,19 +76,16 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
 #else
     using CopyInst = Copy_Atom<DefaultCopy, DType>;
 #endif
-
     using TiledCopy =
         decltype(make_tiled_copy(CopyInst{}, ThreadLayout{}, ValueLayout{}));
 
     DEVICE void operator()(const DType* src_data, DType* dst_data) {
-        TiledCopy tiled_copy;
-
         int tid = threadIdx.x;
 
-        auto gtile = make_tensor(make_gmem_ptr(src_data), GlobalLayout{});
-        auto stile = make_tensor(make_smem_ptr(dst_data), SharedLayout{});
+        auto gtile = make_tensor(make_gmem_ptr(src_data), global_layout_);
+        auto stile = make_tensor(make_smem_ptr(dst_data), shared_layout_);
 
-        auto loader = tiled_copy.get_thread_slice(tid);
+        auto loader = tiled_copy_.get_thread_slice(tid);
 
         auto src = loader.partition_S(gtile);
         auto dst = loader.partition_D(stile);
@@ -96,8 +94,13 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
         for (int i = 0; i < int(size<1>(src)); ++i)
 #pragma unroll
             for (int j = 0; j < int(size<2>(src)); ++j)
-                cute::copy(tiled_copy, src(cute::_, i, j), dst(cute::_, i, j));
+                cute::copy(tiled_copy_, src(cute::_, i, j), dst(cute::_, i, j));
     }
+
+  private:
+    TiledCopy tiled_copy_;
+    GlobalLayout global_layout_;
+    SharedLayout shared_layout_;
 };
 
 template <typename Global_, typename Shared_, typename WarpLayout_>
@@ -131,24 +134,23 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
     static constexpr int kRows = Global::kRows;
     static constexpr int kCols = Global::kCols;
 
-    using GlobalLayout =
-        cute::Layout<Shape<Int<kRows>, Int<kCols>>, Stride<_1, Int<kRows>>>;
+    using GlobalLayout = cute::Layout<Shape<Int<kRows>, Int<kCols>>,
+                                      Stride<_1, Int<Global::kColStride>>>;
 
+    using SharedTileShape = Shape<Int<kRows>, Int<kCols>>;
     using LayoutAtom = cute::Layout<Shape<_16, _16>, Stride<_1, _16>>;
-    // this swizzle function works only for 4-byte data types
+    using SharedLayoutNonSwizzled =
+        decltype(tile_to_shape(LayoutAtom{}, SharedTileShape{}));
+
+    // NOTE: this swizzle function works only for 4-byte data types
     using LayoutAtomSwizzled =
         decltype(composition(Swizzle<2, 3, 3>{}, LayoutAtom{}));
-
-    using SharedLayoutNonSwizzled =
-        decltype(tile_to_shape(LayoutAtom{}, Shape<Int<kRows>, Int<kCols>>{}));
-
-    using SharedLayoutSwizzled = decltype(tile_to_shape(
-        LayoutAtomSwizzled{}, Shape<Int<kRows>, Int<kCols>>{}));
+    using SharedLayoutSwizzled =
+        decltype(tile_to_shape(LayoutAtomSwizzled{}, SharedTileShape{}));
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, SharedLayoutSwizzled,
                            SharedLayoutNonSwizzled>;
-
     using ThreadLayout =
         cute::Layout<Shape<Int<kThreadsRows>, Int<kThreadsCols>>,
                      Stride<Int<kThreadsCols>, _1>>;
@@ -166,13 +168,12 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
         decltype(make_tiled_copy(CopyInst{}, ThreadLayout{}, ValueLayout{}));
 
     DEVICE void operator()(const DType* src_data, DType* dst_data) {
-        TiledCopy tiled_copy;
         int tid = threadIdx.x;
 
-        auto gtile = make_tensor(make_gmem_ptr(src_data), GlobalLayout{});
-        auto stile = make_tensor(make_smem_ptr(dst_data), SharedLayout{});
+        auto gtile = make_tensor(make_gmem_ptr(src_data), global_layout_);
+        auto stile = make_tensor(make_smem_ptr(dst_data), shared_layout_);
 
-        auto loader = tiled_copy.get_thread_slice(tid);
+        auto loader = tiled_copy_.get_thread_slice(tid);
 
         auto src = loader.partition_S(gtile);
         auto dst = loader.partition_D(stile);
@@ -180,9 +181,15 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
 #pragma unroll
         for (int i = 0; i < int(size<1>(src)); ++i)
 #pragma unroll
-            for (int j = 0; j < int(size<2>(src)); ++j)
-                cute::copy(tiled_copy, src(cute::_, i, j), dst(cute::_, i, j));
+            for (int j = 0; j < int(size<2>(src)); ++j) {
+                cute::copy(tiled_copy_, src(cute::_, i, j), dst(cute::_, i, j));
+            }
     }
+
+  private:
+    TiledCopy tiled_copy_;
+    GlobalLayout global_layout_;
+    SharedLayout shared_layout_;
 };
 
 template <typename Shared_, typename Global_, typename WarpLayout_,

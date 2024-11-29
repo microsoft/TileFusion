@@ -34,7 +34,7 @@ bool check_results_impl(const __half* values1, const __half* values2,
 
 #ifdef DEBUG
     int cut_off = 128;
-    printf("ground truth:\n");
+    printf("\nground truth:\n");
     for (int i = 0; i < cut_off; ++i) {
         printf("%.5f, ", __half2float(values1[i]));
         if (i && (i + 1) % 16 == 0) printf("\n");
