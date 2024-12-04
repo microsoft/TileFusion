@@ -8,12 +8,10 @@
 #pragma once
 
 #include "cell/copy/constants.hpp"
-#include "cell/traits/base.hpp"
-#include "types/mod.hpp"
+#include "types/layout.hpp"
 
 namespace tilefusion::cell::copy::warp {
-
-using namespace tilefusion::cell::traits;
+namespace tl = tile_layout;
 
 namespace detail {
 template <const WarpReuse kMode>
@@ -46,6 +44,94 @@ DEVICE int warp_offset_impl<WarpReuse::kRowReuseCont>(int warp_row,
     return warp_row * warp_rstride;
 }
 }  // namespace detail
+
+/// @brief Determine the automic shape of a single warp based on the shape of
+///        the entire tile. The final warp tile shape is multiple of this atomic
+///        shape.
+template <typename DType, typename TileLayout, const tl::Layout kType>
+struct WarpTileShape;
+
+template <typename DType, typename TileLayout>
+struct WarpTileShape<DType, TileLayout, tl::Layout::kRowMajor> {
+    static constexpr int kWarpSize = 32;
+    using AccessInfo = traits::AccessBase<DType>;
+
+    // In a row-major layout, columns are the contiguous dimension in memory. We
+    // enforce the use of 128-bit vectorized instructions for data loading by a
+    // single thread. This implies that the minimum number of columns should be
+    // at least 128 bits.
+    static constexpr int kMinCols =
+        AccessInfo::kAccessInBits / (sizeof(DType) * 8);
+
+    static_assert(TileLayout::kCols >= kMinCols,
+                  "The number of columns is too small.");
+
+    static_assert(TileLayout::kCols < AccessInfo::kExpectedSize ||
+                      (TileLayout::kCols >= AccessInfo::kExpectedSize &&
+                       TileLayout::kCols % AccessInfo::kExpectedSize == 0),
+                  "The current implementation requires that the number of "
+                  "columns of the tile be divisible by the cache line width.");
+
+    static constexpr int kCols = TileLayout::kCols >= AccessInfo::kExpectedSize
+                                     ? AccessInfo::kExpectedSize
+                                     : TileLayout::kCols;
+
+    // number of columns in a warp
+    static constexpr int kThreadPerRow = kCols / AccessInfo::kNumPerAccess;
+    static_assert(kWarpSize % kThreadPerRow == 0,
+                  "Fail to infer warp thread layout.");
+    static constexpr int kThreadPerCol = kWarpSize / kThreadPerRow;
+
+    static constexpr int kRows = kThreadPerCol;
+    static_assert(TileLayout::kRows % kThreadPerCol == 0,
+                  "The number of rows of the tile isn't evenly divisible by "
+                  "the number of threads in a column.");
+
+    static constexpr int kNumel = kRows * kCols;
+
+    using WarpThreadLayout = tl::RowMajor<kThreadPerCol, kThreadPerRow>;
+};
+
+template <typename DType, typename TileLayout>
+struct WarpTileShape<DType, TileLayout, tl::Layout::kColMajor> {
+    static constexpr int kWarpSize = 32;
+    using AccessInfo = traits::AccessBase<DType>;
+
+    // In a column-major layout, columns are the contiguous dimension in memory.
+    // We enforce the use of 128-bit vectorized instructions for data loading by
+    // a single thread. This implies that the minimum number of columns should
+    // be at least 128 bits.
+    static constexpr int kMinRows =
+        AccessInfo::kAccessInBits / (sizeof(DType) * 8);
+
+    static_assert(TileLayout::kRows >= kMinRows,
+                  "The number of rows is too small.");
+
+    static_assert(TileLayout::kRows < AccessInfo::kExpectedSize ||
+                      (TileLayout::kRows >= AccessInfo::kExpectedSize &&
+                       TileLayout::kRows % AccessInfo::kExpectedSize == 0),
+                  "The current implementation requires that the number of "
+                  "rows of the tile be divisible by the cache line width.");
+
+    static constexpr int kRows = TileLayout::kRows >= AccessInfo::kExpectedSize
+                                     ? AccessInfo::kExpectedSize
+                                     : TileLayout::kRows;
+
+    // number of rows in a warp
+    static constexpr int kThreadPerCol = kRows / AccessInfo::kNumPerAccess;
+    static_assert(kWarpSize % kThreadPerCol == 0,
+                  "Fail to infer warp thread layout.");
+    static constexpr int kThreadPerRow = kWarpSize / kThreadPerCol;
+
+    static constexpr int kCols = kThreadPerRow;
+    static_assert(TileLayout::kCols % kThreadPerRow == 0,
+                  "The number of columns of the tile isn't evenly divisible by "
+                  "the number of threads in a row.");
+
+    static constexpr int kNumel = kRows * kCols;
+
+    using WarpThreadLayout = tl::ColMajor<kThreadPerCol, kThreadPerRow>;
+};
 
 template <typename WarpLayout_, const WarpReuse kMode_>
 struct CopyBase {
@@ -207,6 +293,8 @@ struct CopyBase {
 };
 
 namespace {
+using namespace cute;
+
 // This is a hotfix for the current implementation, that is not intended to be
 // exposed outside this header file. Thus, it is placed in an anonymous
 // namespace. Fix this when the implementation is improved.

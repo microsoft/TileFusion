@@ -2,13 +2,13 @@
 // Licensed under the MIT License.
 
 #pragma once
-#include "cell/traits/base.hpp"
 #include "config.hpp"
+#include "cuda_utils.hpp"
+#include "traits/base.hpp"
 
 #include <cute/layout.hpp>
 
-namespace tilefusion::cell {
-
+namespace tilefusion::tile_layout {
 /**
  * @namespace tile_layout
  *
@@ -17,8 +17,6 @@ namespace tilefusion::cell {
  * tile_layout to avoid potential name conflicts.
  */
 
-namespace tile_layout {
-
 enum class Layout {
     kRowMajor = 0,  // Tile layout for shared memory.
     kColMajor = 1,
@@ -26,34 +24,20 @@ enum class Layout {
     kSwizzledColMajor = 3
 };
 
-template <const int kRows_, const int kCols_, const int kRowStride_,
-          const int kColStride_>
-struct MatrixLayout {
-    static constexpr int kRows = kRows_;
-    static constexpr int kCols = kCols_;
-
-    static constexpr int kRowStride = kRowStride_;
-    static constexpr int kColStride = kColStride_;
-
-    static constexpr int kNumel = kRows * kCols;
-
-    static constexpr Layout kType =
-        kColStride == 1 ? Layout::kRowMajor : Layout::kColMajor;
-
-    DEVICE int operator()(int i, int j) const {
-        return i * kRowStride + j * kColStride;
+HOST_DEVICE
+const char* layout_type_to_str(Layout type) {
+    switch (type) {
+        case Layout::kRowMajor:
+            return "RowMajor";
+        case Layout::kColMajor:
+            return "ColMajor";
+        case Layout::kSwizzledRowMajor:
+            return "SwizzledRowMajor";
+        case Layout::kSwizzledColMajor:
+            return "SwizzledColMajor";
     }
-};
-
-// In the row major layout, the contiguous dimension in memory is the
-// last dimension.
-template <const int kRow, const int kCol, const int kStride = kCol>
-using RowMajor = MatrixLayout<kRow, kCol, kStride, 1>;
-
-// In the column major layout, the contiguous dimension in memory is the
-// first dimension.
-template <const int kRow, const int kCol, const int kStride = kRow>
-using ColMajor = MatrixLayout<kRow, kCol, 1, kStride>;
+    return "UnsupportedLayout";
+}
 
 namespace detail {
 using namespace cute;
@@ -117,7 +101,7 @@ struct SwizzledRowMajor<32> {
         cute::Layout<Shape<Int<BaseShape::kRows>, Int<BaseShape::kCols>>,
                      Stride<Int<BaseShape::kCols>, _1>>{}));
 
-    DEVICE SwizzledRowMajor() : swizzled_(SwizzledBaseTile{}){};
+    DEVICE SwizzledRowMajor() : swizzled_(SwizzledBaseTile{}) {};
 
     DEVICE int operator()(int i, int j) const { return swizzled_(i, j); }
 
@@ -141,7 +125,7 @@ struct SwizzledRowMajor<64> {
         cute::Layout<Shape<Int<BaseShape::kRows>, Int<BaseShape::kCols>>,
                      Stride<Int<BaseShape::kCols>, _1>>{}));
 
-    DEVICE SwizzledRowMajor() : swizzled_(SwizzledBaseTile{}){};
+    DEVICE SwizzledRowMajor() : swizzled_(SwizzledBaseTile{}) {};
 
     DEVICE int operator()(int i, int j) const { return swizzled_(i, j); }
 
@@ -173,7 +157,7 @@ struct SwizzledRowMajor<128> {
     using SwizzledBaseTile =
         decltype(composition(cute::Swizzle<kB, kM, kS>{}, LayoutAtom{}));
 
-    DEVICE SwizzledRowMajor() : swizzled_(SwizzledBaseTile{}){};
+    DEVICE SwizzledRowMajor() : swizzled_(SwizzledBaseTile{}) {};
 
     DEVICE int operator()(int i, int j) const { return swizzled_(i, j); }
 
@@ -202,7 +186,7 @@ struct SwizzledColMajor<64> {
         cute::Layout<Shape<Int<BaseShape::kRows>, Int<BaseShape::kCols>>,
                      Stride<_1, Int<BaseShape::kRows>>>{}));
 
-    DEVICE SwizzledColMajor() : swizzled_(SwizzledBaseTile{}){};
+    DEVICE SwizzledColMajor() : swizzled_(SwizzledBaseTile{}) {};
 
     DEVICE int operator()(int i, int j) const { return swizzled_(i, j); }
 
@@ -228,7 +212,7 @@ struct SwizzledColMajor<128> {
         cute::Layout<Shape<Int<BaseShape::kRows>, Int<BaseShape::kCols>>,
                      Stride<_1, Int<BaseShape::kRows>>>{}));
 
-    DEVICE SwizzledColMajor() : swizzled_(SwizzledBaseTile{}){};
+    DEVICE SwizzledColMajor() : swizzled_(SwizzledBaseTile{}) {};
 
     DEVICE int operator()(int i, int j) const { return swizzled_(i, j); }
 
@@ -302,7 +286,58 @@ struct SharedLayoutWrapperImpl<true, Layout::kColMajor, 128> {
 
     using Layout = SwizzledColMajor<128>;
 };
+
+/// @brief Helper for pretty printing a matrix layout's static shape-related
+///        information. This printer works ONLY on the host.
+struct MatrixLayoutPrettyPrinter {
+    template <typename Layout>
+    static HOST void print(std::ostream& out, const Layout& layout) {
+        out << layout_type_to_str(Layout::kType) << "<" << Layout::kRows << ", "
+            << Layout::kCols << ">, Strides<" << Layout::kRowStride << ", "
+            << Layout::kColStride << ">, Numel = " << Layout::kNumel;
+    }
+};
 }  // namespace detail
+
+template <const int kRows_, const int kCols_, const int kRowStride_,
+          const int kColStride_>
+struct MatrixLayout {
+    static constexpr int kRows = kRows_;
+    static constexpr int kCols = kCols_;
+
+    static constexpr int kRowStride = kRowStride_;
+    static constexpr int kColStride = kColStride_;
+
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr Layout kType =
+        kColStride == 1 ? Layout::kRowMajor : Layout::kColMajor;
+
+    DEVICE int operator()(int i, int j) const {
+        return i * kRowStride + j * kColStride;
+    }
+};
+
+/// @brief Pretty printer for the static shape information of a MatrixLayout.
+///        Note: This printer function works ONLY on the host.
+template <const int kRows, const int kCols, const int kRowStride,
+          const int kColStride>
+static HOST std::ostream& operator<<(
+    std::ostream& out,
+    const MatrixLayout<kRows, kCols, kRowStride, kColStride>& layout) {
+    detail::MatrixLayoutPrettyPrinter::print(out, layout);
+    return out;
+}
+
+// In the row major layout, the contiguous dimension in memory is the
+// last dimension.
+template <const int kRow, const int kCol, const int kStride = kCol>
+using RowMajor = MatrixLayout<kRow, kCol, kStride, 1>;
+
+// In the column major layout, the contiguous dimension in memory is the
+// first dimension.
+template <const int kRow, const int kCol, const int kStride = kRow>
+using ColMajor = MatrixLayout<kRow, kCol, 1, kStride>;
 
 /// @brief: Wapper for creating non-swizzled or swizzled shared memory layout.
 template <typename Shared, const int kBitsPerAccess>
@@ -362,5 +397,4 @@ HOST_DEVICE auto make_col_major_layout(const int row, const int col,
     return cute::make_layout(cute::make_shape(row, col),
                              cute::make_stride(cute::_1{}, stride));
 }
-}  // namespace tile_layout
-}  // namespace tilefusion::cell
+}  // namespace tilefusion::tile_layout

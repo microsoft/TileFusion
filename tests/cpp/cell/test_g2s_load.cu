@@ -1,19 +1,18 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#include "cell/copy/mod.hpp"
-#include "cell/sync.hpp"
+#include "cell/mod.hpp"
 #include "common/test_utils.hpp"
-#include "types/mod.hpp"
 
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 
 namespace tilefusion::testing {
 using namespace cell;
+using namespace copy::warp;
+namespace tl = tile_layout;
 
 namespace {
-
 template <typename Element, typename SrcTile, typename DstTile, typename Loader,
           typename Storer>
 __global__ void copy_g2s(const Element* src_ptr, Element* dst_ptr,
@@ -146,5 +145,4 @@ TEST(GlobalToSharedLoad, test_col_major_load) {
     run_test_col_major<float, tl::RowMajor<2, 2>, 64, 128>();
     run_test_col_major<float, tl::RowMajor<2, 4>, 96, 128>();
 }
-
 }  // namespace tilefusion::testing

@@ -17,7 +17,7 @@ template <typename Element_,                             //
           const int kWarpPerRow, const int kWarpPerCol,  //
           const int kM, const int kN, const int kK,      //
           const int kTM, const int kTN, const int kTK,   //
-          typename Base = TraitsBase<Element_>>
+          typename Base = AccessBase<Element_>>
 struct GemmTraits : public Base {
     using Element = Element_;
 

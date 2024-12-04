@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include "cell/traits/base.hpp"
+#include "traits/base.hpp"
 #include "types/layout.hpp"
 
 #include <cute/tensor.hpp>
@@ -311,7 +311,7 @@ struct GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kRowMajor> {
     static constexpr int kWarpSize = 32;
 
     static constexpr int kNumPerAccess =
-        traits::TraitsBase<DType>::kNumPerAccess;
+        traits::AccessBase<DType>::kNumPerAccess;
 
     using BaseShape = traits::BaseTileShape<DType>;
 
@@ -323,7 +323,7 @@ struct GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kRowMajor> {
                      Stride<Int<Global::kRowStride>, _1>>;
 
     using BaseTileSharedLayout = tl::SharedLayoutWrapper<
-        Shared, traits::TraitsBase<DType>::kAccessInBits>::Layout;
+        Shared, traits::AccessBase<DType>::kAccessInBits>::Layout;
 
 #ifdef CP_ASYNC_SM80_ENABLED
     using CopyInst =
@@ -390,7 +390,7 @@ struct GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kColMajor> {
     static constexpr int kWarpSize = 32;
 
     static constexpr int kNumPerAccess =
-        traits::TraitsBase<DType>::kNumPerAccess;
+        traits::AccessBase<DType>::kNumPerAccess;
 
     using BaseShape = traits::BaseTileShape<DType>;
 
@@ -403,7 +403,7 @@ struct GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kColMajor> {
                      Stride<_1, Int<Global::kColStride>>>;
 
     using BaseTileSharedLayout = tl::SharedLayoutWrapper<
-        Shared, traits::TraitsBase<DType>::kAccessInBits>::Layout;
+        Shared, traits::AccessBase<DType>::kAccessInBits>::Layout;
 
 #ifdef CP_ASYNC_SM80_ENABLED
     using CopyInst =
@@ -467,7 +467,7 @@ struct SharedToGlobalBaseTileStorer<Shared, Global, tl::Layout::kRowMajor> {
     static constexpr int kWarpSize = 32;
 
     static constexpr int kNumPerAccess =
-        traits::TraitsBase<DType>::kNumPerAccess;
+        traits::AccessBase<DType>::kNumPerAccess;
 
     using BaseShape = traits::BaseTileShape<DType>;
 
@@ -544,7 +544,7 @@ struct SharedToGlobalBaseTileStorer<Shared, Global, tl::Layout::kColMajor> {
     static constexpr int kWarpSize = 32;
 
     static constexpr int kNumPerAccess =
-        traits::TraitsBase<DType>::kNumPerAccess;
+        traits::AccessBase<DType>::kNumPerAccess;
 
     using BaseShape = traits::BaseTileShape<DType>;
 

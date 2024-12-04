@@ -7,7 +7,7 @@ namespace benchmarks {
 namespace cutlass_wrapper {
 
 template <typename Element>
-struct TraitsBase {
+struct AccessBase {
     // the maximal width of vectorized access.
     static constexpr int kAccessInBits = 128;
     static constexpr int kElmentBits = cutlass::sizeof_bits<Element>::value;

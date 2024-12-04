@@ -5,11 +5,11 @@
 
 #include "cell/copy/constants.hpp"
 #include "cell/copy/warp.hpp"
-#include "cell/traits/base.hpp"
+#include "traits/base.hpp"
 #include "types/mod.hpp"
 
 namespace tilefusion::cell::copy {
-using namespace traits;
+using namespace tilefusion::traits;
 
 /**
  * @brief Load a BastTile Matrix from Global memory to Register.
