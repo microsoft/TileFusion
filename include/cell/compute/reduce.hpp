@@ -4,9 +4,9 @@
 #pragma once
 
 #include "cell/compute/math_functor.hpp"
-#include "cell/traits/base.hpp"
 #include "cell/warp.hpp"
 #include "cuda_utils.hpp"
+#include "traits/base.hpp"
 #include "types/layout.hpp"
 #include "types/tile_shape.hpp"
 

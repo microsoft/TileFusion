@@ -176,5 +176,4 @@ struct RegTilePrinter<RegTile, tl::Layout::kRowMajor> {
         if (lane_id == 0) printf("\n");
     }
 };
-
 }  // namespace tilefusion::cell

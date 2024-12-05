@@ -4,12 +4,12 @@
 #pragma once
 
 #include "cell/copy/mod.hpp"
-#include "cell/traits/base.hpp"
+#include "traits/base.hpp"
 #include "types/mod.hpp"
 
 namespace tilefusion::cell::copy {
 
-using namespace traits;
+using namespace tilefusion::traits;
 using namespace atom;
 namespace tl = tile_layout;
 

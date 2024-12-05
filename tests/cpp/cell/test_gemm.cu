@@ -13,7 +13,7 @@
 namespace tilefusion::testing {
 using namespace cell;
 using namespace cell::copy;
-namespace tl = cell::tile_layout;
+namespace tl = tile_layout;
 
 namespace {
 float rand_float(float a = 1e-3, float b = 1) {

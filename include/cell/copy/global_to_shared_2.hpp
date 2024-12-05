@@ -7,7 +7,7 @@
 #include "types/mod.hpp"
 
 namespace tilefusion::cell::copy {
-using namespace traits;
+using namespace tilefusion::traits;
 namespace tl = tile_layout;
 using namespace cute;
 
@@ -37,7 +37,7 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
                   "The data type of Shared and Global must be the same.");
 
     using WarpThreadLayout = tl::ColMajor<16, 2>;
-    static constexpr int kNumPerAccess = TraitsBase<DType>::kNumPerAccess;
+    static constexpr int kNumPerAccess = AccessBase<DType>::kNumPerAccess;
 
     static constexpr int kThreadsRows =
         tl::num_rows<WarpLayout> * tl::num_rows<WarpThreadLayout>;
@@ -124,7 +124,7 @@ struct GlobalToSharedLoaderImpl2<Global_, Shared_, WarpLayout_,
                   "The data type of Shared and Global must be the same.");
 
     using WarpThreadLayout = tl::RowMajor<2, 16>;
-    static constexpr int kNumPerAccess = TraitsBase<DType>::kNumPerAccess;
+    static constexpr int kNumPerAccess = AccessBase<DType>::kNumPerAccess;
 
     static constexpr int kThreadsRows =
         tl::num_rows<WarpLayout> * tl::num_rows<WarpThreadLayout>;
@@ -219,7 +219,7 @@ struct SharedToGlobalStorerImpl2<Shared_, Global_, WarpLayout_,
     static constexpr int kRows = Global::kRows;
     static constexpr int kCols = Global::kCols;
 
-    static constexpr int kNumPerAccess = TraitsBase<DType>::kNumPerAccess;
+    static constexpr int kNumPerAccess = AccessBase<DType>::kNumPerAccess;
     using WarpThreadLayout = tl::ColMajor<16, 2>;
 
     // thread layout for the entire thread block

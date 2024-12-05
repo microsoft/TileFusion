@@ -4,7 +4,7 @@
 #pragma once
 
 #include "cell/copy/mod.hpp"
-#include "cell/traits/base.hpp"
+#include "traits/base.hpp"
 #include "types/mod.hpp"
 
 namespace tilefusion::cell::copy {
@@ -250,17 +250,25 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, kRowExec_, kColExec_,
     }
 };
 
+/// @brief The thread-block level API that cooperatively transfers a data tile
+///        from global memory to shared memory by all the threads within a
+///        thread block.
 template <typename Shared_, typename WarpLayout_,
           typename Base = warp::CopyBase<WarpLayout_, WarpReuse::kCont>>
 struct GlobalToSharedLoader : public Base {
     using Shared = Shared_;
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
+
+    // TODO(ying): The atomic tile shape that a single warp loads. The atomic
+    // tile shape should be automatically determined to choose the best
+    // performance.
     using BaseShape = traits::BaseTileShape<DType>;
 
-    static_assert(
-        (Shared::kSwizzled && sizeof(DType) == 2 || Shared::kSwizzled == false),
-        "Not implemented for swizzled layout with 4-byte data types.");
+    static_assert((Shared::kSwizzled && sizeof(DType) == 2 ||
+                   Shared::kSwizzled == false),
+                  "Not implemented for swizzled layout with 4-byte data types "
+                  "(single precision floating point).");
 
     static constexpr int kRowExec =
         Base::template row_exec_count<BaseShape, Shared::kRows>();

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "cell/traits/base.hpp"
+#include "traits/base.hpp"
 #include "types/shared.hpp"
 #include "types/tile_shape.hpp"
 
