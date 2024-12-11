@@ -32,6 +32,13 @@ DEVICE void __copy_async() {
     wait_group<0>();
 }
 
+template <int N>
+DEVICE void cp_async_wait_flash() {
+#if defined(CP_ASYNC_SM80_ENABLED)
+    asm volatile("cp.async.wait_group %0;\n" ::"n"(N));
+#endif
+}
+
 // Copy a 2d data tile from global memory to shared memory
 template <typename Element, typename SrcLayout, typename DstLayout,
           typename TiledCopy>
@@ -47,12 +54,6 @@ DEVICE void copy_tile_g2s(const Element* src_data, Element* dst_data,
 
     auto src = loader.partition_S(gtile);
     auto dst = loader.partition_D(stile);
-
-#pragma unroll
-    for (int i = 0; i < int(size<1>(src)); ++i)
-#pragma unroll
-        for (int j = 0; j < int(size<2>(src)); ++j)
-            cute::copy(tiled_copy, src(_, i, j), dst(_, i, j));
 }
 
 // Copy a tensor from shared memory to global memory
