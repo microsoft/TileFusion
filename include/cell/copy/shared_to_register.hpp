@@ -193,9 +193,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 
 /// @brief partial specialization for loading data from shared memory to
 ///        register file using `ldmatrix`.
-template <typename Reg_, typename WarpLayout_, const WarpReuse kMode_,
-          typename Base = warp::CopyBase<WarpLayout_, kMode_>>
-struct SharedToRegLoader : public Base {
+template <typename Reg_, typename WarpLayout_, const WarpReuse kMode_>
+struct SharedToRegLoader {
     using Reg = Reg_;
     using DType = typename Reg::DType::DType;  // the element data type
     using BaseShape = BaseTileShape<DType>;
@@ -204,7 +203,7 @@ struct SharedToRegLoader : public Base {
     static constexpr WarpReuse kMode = kMode_;
 
     template <typename Shared>
-    DEVICE void operator()(const Shared& src_, Reg& dst) {
+    DEVICE void operator()(const Shared& src, Reg& dst) {
         static_assert(std::is_same_v<typename Shared::DType, DType>,
                       "The data type of Shared and Reg must be the same.");
         static_assert(Shared::kRows % tl::num_rows<WarpLayout> == 0,
@@ -216,27 +215,24 @@ struct SharedToRegLoader : public Base {
 
         // how many times a `BaseTile` is executed along the row and column
         // direction.
-        static constexpr int kRowExec =
-            Base::template row_exec_count<BaseShape, Shared::kRows>();
-        static constexpr int kColExec =
-            Base::template col_exec_count<BaseShape, Shared::kCols>();
+        using ExecCounter =
+            warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
+        static constexpr int kRowExec = ExecCounter::kRowExec;
+        static constexpr int kColExec = ExecCounter::kColExec;
+
+        using SharedOffset =
+            warp::SharedOffsetHelper<WarpLayout, kMode, Shared>;
+        SharedOffset shared_offset_;
 
         // advance the pointer to input data to the current warp according to
         // warp reuse mode.
-        const DType* src = src_.data();
-
-        using OffsetHelper =
-            warp::SharedOffsetHelper<WarpLayout, kMode, Shared>;
-
-        OffsetHelper offset_helper_;
-        int offset = offset_helper_.get_warp_offset();
+        int offset = shared_offset_.get_warp_offset();
 
         using Loader =
             detail::SharedToRegLoaderImpl<Shared, Reg, kRowExec, kColExec,
                                           Shared::kType, CopyInst::kLoadMat>;
         Loader loader;
-
-        loader(src + offset, dst);
+        loader(src.data() + offset, dst);
     }
 };
 

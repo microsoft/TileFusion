@@ -45,6 +45,59 @@ DEVICE int warp_offset_impl<WarpReuse::kRowReuseCont>(int warp_row,
 }
 }  // namespace detail
 
+template <typename BaseTile_, typename Tile_, typename WarpLayout,
+          const WarpReuse kMode_>
+struct ExecCounter {
+    static constexpr WarpReuse kMode = kMode_;
+    using BaseTile = BaseTile_;
+    using Tile = Tile_;
+
+    // @brief This function returns the number of times a `BaseTile` is executed
+    //        along the direction of the shared memory row.
+    DEVICE static constexpr int row_exec_count() {
+        const int kWarpsPerRow = tl::num_rows<WarpLayout>;
+
+        static_assert(
+            Tile::kRows % BaseTile::kRows == 0,
+            "The current implementation requires that the number of shared "
+            "memory rows be divisible by the base tile row.\n");
+
+        switch (kMode) {
+            // Warps in the same columns (`warps_per_row` in total) repeatedly
+            // load the shared memory rows. Therefore, `row_exec` is not divided
+            // by warps_per_row.
+            case WarpReuse::kColReuseCont:
+            case WarpReuse::kColReuseCir:
+                return Tile::kRows / BaseTile::kRows;
+            default:  // Cont, Cir, RowReuseCont, RowReuseCir hit this case.
+                return Tile::kRows / BaseTile::kRows / kWarpsPerRow;
+        }
+    }
+
+    DEVICE static constexpr int col_exec_count() {
+        const int kWarpsPerCol = tl::num_cols<WarpLayout>;
+
+        static_assert(
+            Tile::kCols % BaseTile::kCols == 0,
+            "The number of shared memory columns must be divisible by the base "
+            "tile column.\n");
+
+        switch (kMode) {
+            // Warps in the same rows (`warps_per_col` in total) repeatedly load
+            // the shared memory columns. Therefore, `col_exec` is not divided
+            // by `warps_per_col`.
+            case WarpReuse::kRowReuseCont:
+            case WarpReuse::kRowReuseCir:
+                return Tile::kCols / BaseTile::kCols;
+            default:  // Cont, Cir, ColReuseCont, ColReuseCir hit this case.
+                return Tile::kCols / BaseTile::kCols / kWarpsPerCol;
+        }
+    }
+
+    static constexpr int kRowExec = row_exec_count();
+    static constexpr int kColExec = col_exec_count();
+};
+
 /// @brief Determine the automic shape of a single warp based on the shape of
 ///        the entire tile. The final warp tile shape is multiple of this atomic
 ///        shape.
@@ -134,97 +187,11 @@ struct WarpTileShape<DType, TileLayout, tl::Layout::kColMajor> {
 };
 
 template <typename WarpLayout_, const WarpReuse kMode_>
-struct CopyBase {
+struct GlobalOffsetHelper {
     static constexpr WarpReuse kMode = kMode_;
     using WarpLayout = WarpLayout_;
+    static constexpr int kWarpSize = 32;
 
-    // @brief This function returns the offset to the start position of the
-    //        current warp in the shared memory according to the warp reuse
-    //        mode.
-    template <typename Tile>
-    DEVICE int get_warp_offset() {
-        // Tile shape for a single warp
-        constexpr static int kWarpShapeRow =
-            Tile::kRows / tl::num_rows<WarpLayout>;
-        constexpr static int kWarpShapeCol =
-            Tile::kCols / tl::num_cols<WarpLayout>;
-
-        constexpr static int kWarpRstride =
-            Tile::kType == tl::Layout::kRowMajor
-                ? Tile::kRowStride * kWarpShapeRow
-                : kWarpShapeRow;
-        constexpr static int kWarpCstride =
-            Tile::kType == tl::Layout::kRowMajor
-                ? kWarpShapeCol
-                : Tile::kColStride * kWarpShapeCol;
-
-        return detail::warp_offset_impl<kMode>(warp_row_id(), warp_col_id(),
-                                               kWarpRstride, kWarpCstride);
-    }
-
-    // @brief This function returns the number of times a `BaseTile` is executed
-    //        along the direction of the shared memory row.
-    template <typename BaseTile, const int kRows>
-    DEVICE static constexpr int row_exec_count() {
-        const int kWarpsPerRow = tl::num_rows<WarpLayout>;
-
-        static_assert(
-            kRows % BaseTile::kRows == 0,
-            "The current implementation requires that the number of shared "
-            "memory rows be divisible by the base tile row.\n");
-
-        int count = 0;
-        switch (kMode) {
-            // Warps in the same columns (`warps_per_row` in total) repeatedly
-            // load the shared memory rows. Therefore, `row_exec` is not divided
-            // by warps_per_row.
-            case WarpReuse::kColReuseCont:
-            case WarpReuse::kColReuseCir:
-                count = kRows / BaseTile::kRows;
-                break;
-            default:  // Cont, Cir, RowReuseCont, RowReuseCir hit this case.
-                count = kRows / BaseTile::kRows / kWarpsPerRow;
-                break;
-        }
-
-        // Check to ensure that the count is not zero, which could be caused by
-        // an incorrect combination of shared memory tile shape and warp layout.
-        // TODO: This should actually be a static assert, but we're currently
-        // using a runtime assert for implementation issues.
-        assert(count);
-        return count;
-    }
-
-    template <typename BaseTile, const int kCols>
-    DEVICE static constexpr int col_exec_count() {
-        const int kWarpsPerCol = tl::num_cols<WarpLayout>;
-
-        static_assert(
-            kCols % BaseTile::kCols == 0,
-            "The number of shared memory columns must be divisible by the base "
-            "tile column.\n");
-
-        int count = 0;
-        switch (kMode) {
-            // Warps in the same rows (`warps_per_col` in total) repeatedly load
-            // the shared memory columns. Therefore, `col_exec` is not divided
-            // by `warps_per_col`.
-            case WarpReuse::kRowReuseCont:
-            case WarpReuse::kRowReuseCir:
-                count = kCols / BaseTile::kCols;
-                break;
-            default:  // Cont, Cir, ColReuseCont, ColReuseCir hit this case.
-                count = kCols / BaseTile::kCols / kWarpsPerCol;
-                break;
-        }
-
-        // Check to ensure that the count is not zero, which could be caused by
-        // an incorrect combination of shared memory tile shape and warp layout.
-        assert(count);
-        return count;
-    }
-
-  private:
     // @brief the warp row that the current thread belongs to, based on the warp
     //        layout.
     DEVICE int warp_row_id() {
@@ -243,7 +210,7 @@ struct CopyBase {
          * |1|warp1|warp3|
          * |-|-----|-----|, and the threadIdx is 67, then the warp row is 0.
          */
-        int wid = threadIdx.x / warpSize;
+        int wid = threadIdx.x / kWarpSize;
 
         switch (tl::layout_type<WarpLayout>) {
             case tl::Layout::kRowMajor:
@@ -278,7 +245,7 @@ struct CopyBase {
          * |warp1|warp3|
          * |-----|-----|, and the threadIdx is 67, then the warp row is 1.
          */
-        int wid = threadIdx.x / warpSize;
+        int wid = threadIdx.x / kWarpSize;
 
         switch (tl::layout_type<WarpLayout>) {
             case tl::Layout::kRowMajor:
@@ -289,6 +256,30 @@ struct CopyBase {
                 assert(false && "Not implemented yet.");
                 return -1;
         }
+    }
+
+    // @brief This function returns the offset to the start position of the
+    //        current warp in the shared memory according to the warp reuse
+    //        mode.
+    template <typename Tile>
+    DEVICE int get_warp_offset() {
+        // Tile shape for a single warp
+        constexpr static int kWarpShapeRow =
+            Tile::kRows / tl::num_rows<WarpLayout>;
+        constexpr static int kWarpShapeCol =
+            Tile::kCols / tl::num_cols<WarpLayout>;
+
+        constexpr static int kWarpRstride =
+            Tile::kType == tl::Layout::kRowMajor
+                ? Tile::kRowStride * kWarpShapeRow
+                : kWarpShapeRow;
+        constexpr static int kWarpCstride =
+            Tile::kType == tl::Layout::kRowMajor
+                ? kWarpShapeCol
+                : Tile::kColStride * kWarpShapeCol;
+
+        return detail::warp_offset_impl<kMode>(warp_row_id(), warp_col_id(),
+                                               kWarpRstride, kWarpCstride);
     }
 };
 
