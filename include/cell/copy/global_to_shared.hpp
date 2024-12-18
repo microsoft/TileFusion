@@ -263,7 +263,8 @@ struct GlobalToSharedLoader {
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
     using SharedOffset = warp::SharedOffsetHelper<WarpLayout, kMode, Shared>;
 
-    // FIXME(ying): automatically infer the shape of the warp-level tile
+    // FIXME(ying): automatically infer the warp-level tile shape instead
+    // of using a fixed `BaseShape`.
     // using WarpShape =
     //     warp::WarpTileShape<DType, typename Shared::Layout, Shared::kType>;
     // using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout,
@@ -274,10 +275,6 @@ struct GlobalToSharedLoader {
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
-
-    // FIXME(ying): Temporarily disable this check because it is causing
-    // some unit tests to fail. Re-enable it once the re-implementation is
-    // complete.
 
     static_assert(kRowExec && kColExec,
                   "Ensure that the execution count for all "
@@ -312,17 +309,22 @@ struct SharedToGlobalStorer {
     using Shared = Shared_;
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
-    using BaseShape = traits::BaseTileShape<DType>;
 
+    // FIXME(ying): automatically infer the warp-level tile shape instead
+    // of using a fixed `BaseShape`.
+    using BaseShape = traits::BaseTileShape<DType>;
     static_assert(Shared::kRows % BaseShape::kRows == 0,
                   "Shared::kRows must be divisible by BaseShape::kRows.");
     static_assert(Shared::kCols % BaseShape::kCols == 0,
                   "Shared::kCols must be divisible by BaseShape::kCols.");
 
-    static constexpr int kRowExec =
-        Shared::kRows / BaseShape::kRows / tl::num_rows<WarpLayout>;
-    static constexpr int kColExec =
-        Shared::kCols / BaseShape::kCols / tl::num_cols<WarpLayout>;
+    static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
+    using SharedOffset = warp::SharedOffsetHelper<WarpLayout, kMode, Shared>;
+    using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
+    using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
+
+    static constexpr int kRowExec = ExecCounter::kRowExec;
+    static constexpr int kColExec = ExecCounter::kColExec;
 
     static_assert(kRowExec && kColExec,
                   "Execution count should be greater than 0.");
@@ -343,11 +345,7 @@ struct SharedToGlobalStorer {
     }
 
   private:
-    using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, WarpReuse::kCont>;
-    using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont, Shared>;
-
-    GlobalOffset global_offset_;
     SharedOffset shared_offset_;
+    GlobalOffset global_offset_;
 };
 }  // namespace tilefusion::cell::copy

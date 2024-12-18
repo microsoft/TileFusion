@@ -45,23 +45,28 @@ DEVICE int warp_offset_impl<WarpReuse::kRowReuseCont>(int warp_row,
 }
 }  // namespace detail
 
-template <typename BaseTile_, typename Tile_, typename WarpLayout,
+template <typename BaseTile_, typename Tile_, typename WarpLayout_,
           const WarpReuse kMode_>
 struct ExecCounter {
-    static constexpr WarpReuse kMode = kMode_;
     using BaseTile = BaseTile_;
     using Tile = Tile_;
+
+    static_assert(
+        Tile::kCols % BaseTile::kCols == 0,
+        "The number of shared memory columns must be divisible by the base "
+        "tile column.\n");
+    static_assert(
+        Tile::kRows % BaseTile::kRows == 0,
+        "The current implementation requires that the number of shared "
+        "memory rows be divisible by the base tile row.\n");
+
+    static constexpr int kWarpsPerRow = tl::num_rows<WarpLayout_>;
+    static constexpr int kWarpsPerCol = tl::num_cols<WarpLayout_>;
+    static constexpr WarpReuse kMode = kMode_;
 
     // @brief This function returns the number of times a `BaseTile` is executed
     //        along the direction of the shared memory row.
     DEVICE static constexpr int row_exec_count() {
-        const int kWarpsPerRow = tl::num_rows<WarpLayout>;
-
-        static_assert(
-            Tile::kRows % BaseTile::kRows == 0,
-            "The current implementation requires that the number of shared "
-            "memory rows be divisible by the base tile row.\n");
-
         switch (kMode) {
             // Warps in the same columns (`warps_per_row` in total) repeatedly
             // load the shared memory rows. Therefore, `row_exec` is not divided
@@ -75,13 +80,6 @@ struct ExecCounter {
     }
 
     DEVICE static constexpr int col_exec_count() {
-        const int kWarpsPerCol = tl::num_cols<WarpLayout>;
-
-        static_assert(
-            Tile::kCols % BaseTile::kCols == 0,
-            "The number of shared memory columns must be divisible by the base "
-            "tile column.\n");
-
         switch (kMode) {
             // Warps in the same rows (`warps_per_col` in total) repeatedly load
             // the shared memory columns. Therefore, `col_exec` is not divided
@@ -508,5 +506,4 @@ struct SharedOffsetHelper {
 
     OffsetHelper helper_;
 };
-
 }  // namespace tilefusion::cell::copy::warp
