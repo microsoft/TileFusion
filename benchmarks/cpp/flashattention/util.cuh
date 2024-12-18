@@ -89,5 +89,58 @@ class G2SCopyTile {
     int cur_iter;
 }
 
+template <class TiledCopyQ, class TiledCopyK, class STensorQ, class RTensorQ,
+          class STensorK, class RTensorK, class RTensorAcc, class TiledMMA>
+class S2RCopyTileQK {
+  public:
+    S2RCopyTileQK(TiledCopyQ& copy_q, TiledCopyK& copy_k, STensorQ& sQ,
+                  RTensorQ& rQ, STensorK& sK, RTensorK& rK, RTensorAcc& acc,
+                  TiledMMA tiled_mma, int sQ_stride, int rQ_stride,
+                  int sK_stride, int rK_stride, int num_stage = 2)
+        : copy_q(copy_q),
+          copy_k(copy_k),
+          sQ(sQ),
+          rQ(rQ),
+          sK(sK),
+          rK(rK),
+          sQ_stride(sQ_stride),
+          rQ_stride(rQ_stride),
+          sK_stride(sK_stride),
+          rK_stride(rK_stride),
+          num_stage(num_stage),
+          cur_iter(0),
+          cur_iter_sq(0) {}
+
+    inline __device__ void prologue() {}
+
+    inline __device__ void body() {
+        cute::copy(copy_q, sQ(_, _, _0{}), rQ(_, _, _0{}));
+        cute::copy(copy_k, sK(_, _, _0{}), rK(_, _, _0{}));
+
+        // Software pipelining Technique.
+        // Loading from SMEM to RMEM is handled by LSU(Load/Store Unit), while
+        // computation is handled by a computational unit(e.g., tensor cores).
+#pragma unroll
+        for (int i = 0; i < size<2>(rK); ++i) {
+            if (i < size<2>(rK) - 1) {
+                cute::copy(copy_q, sQ(_, _, i + 1), rQ(_, _, i + 1));
+                cute::copy(copy_k, sK(_, _, i + 1), rK(_, _, i + 1));
+            }
+
+            cute::gemm(tiled_mma, rQ(_, _, i), rK(_, _, i), acc);
+        }
+
+        sQ.data() = sQ.data() + sQ_stride;
+        sK.data() = sK.data() + sK_stride;
+
+        if ((cur_iter + 1) % num_stage == 0) {
+            sQ.data() = sQ.data() - sQ_stride * num_stage;
+            sK.data() = sK.data() - sK_stride * num_stage;
+        }
+
+        cur_iter++;
+        cur_iter_sq++;
+    }
+
 }  // namespace cutlass_wrapper
 }  // namespace benchmarks
