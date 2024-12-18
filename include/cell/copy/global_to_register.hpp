@@ -312,8 +312,8 @@ struct GlobalToRegLoader {
 
     // how many times a `BaseTile` is executed along the row and column
     // direction.
-    static constexpr int kRowExec = Reg::DType::kRows;
-    static constexpr int kColExec = Reg::DType::kCols;
+    static constexpr int kRowExec = Reg::kRows;
+    static constexpr int kColExec = Reg::kCols;
 
     template <typename Global>
     DEVICE void operator()(const Global& src, Reg& dst) {
@@ -350,8 +350,8 @@ struct RegToGlobalStorer {
 
     // how many times a `BaseTile` is executed along the row and column
     // direction.
-    static constexpr int kRowExec = Reg::DType::kRows;
-    static constexpr int kColExec = Reg::DType::kCols;
+    static constexpr int kRowExec = Reg::kRows;
+    static constexpr int kColExec = Reg::kCols;
 
     DEVICE void operator()(const Reg& src, Global& dst) {
         DType* dst_ptr = dst.mutable_data();
@@ -370,5 +370,4 @@ struct RegToGlobalStorer {
 
     GlobalOffset global_offset_;
 };
-
 }  // namespace tilefusion::cell::copy

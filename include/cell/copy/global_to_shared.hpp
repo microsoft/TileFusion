@@ -343,11 +343,11 @@ struct SharedToGlobalStorer {
     }
 
   private:
-    using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, WarpReuse::kCont>;
-    using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont, Shared>;
-
-    GlobalOffset global_offset_;
+    static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
+    using SharedOffset = warp::SharedOffsetHelper<WarpLayout, kMode, Shared>;
     SharedOffset shared_offset_;
+
+    using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
+    GlobalOffset global_offset_;
 };
 }  // namespace tilefusion::cell::copy
