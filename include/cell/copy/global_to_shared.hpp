@@ -259,19 +259,22 @@ struct GlobalToSharedLoader {
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
 
-    static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
-    using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
-    using SharedOffset = warp::SharedOffsetHelper<WarpLayout, kMode, Shared>;
-
     // FIXME(ying): automatically infer the warp-level tile shape instead
     // of using a fixed `BaseShape`.
     // using WarpShape =
     //     warp::WarpTileShape<DType, typename Shared::Layout, Shared::kType>;
-    // using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout,
-    // kMode>;
 
-    using BaseShape = traits::BaseTileShape<DType>;
-    using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
+    using WarpShape = traits::BaseTileShape<DType>;
+    static_assert(Shared::kRows % WarpShape::kRows == 0,
+                  "Shared::kRows must be divisible by WarpShape::kRows.");
+    static_assert(Shared::kCols % WarpShape::kCols == 0,
+                  "Shared::kCols must be divisible by WarpShape::kCols.");
+
+    static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
+    using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
+    using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
+    using SharedOffset =
+        warp::SharedOffsetHelper<WarpLayout, WarpShape, kMode, Shared>;
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
@@ -312,16 +315,17 @@ struct SharedToGlobalStorer {
 
     // FIXME(ying): automatically infer the warp-level tile shape instead
     // of using a fixed `BaseShape`.
-    using BaseShape = traits::BaseTileShape<DType>;
-    static_assert(Shared::kRows % BaseShape::kRows == 0,
-                  "Shared::kRows must be divisible by BaseShape::kRows.");
-    static_assert(Shared::kCols % BaseShape::kCols == 0,
-                  "Shared::kCols must be divisible by BaseShape::kCols.");
+    using WarpShape = traits::BaseTileShape<DType>;
+    static_assert(Shared::kRows % WarpShape::kRows == 0,
+                  "Shared::kRows must be divisible by WarpShape::kRows.");
+    static_assert(Shared::kCols % WarpShape::kCols == 0,
+                  "Shared::kCols must be divisible by WarpShape::kCols.");
 
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
-    using SharedOffset = warp::SharedOffsetHelper<WarpLayout, kMode, Shared>;
+    using SharedOffset =
+        warp::SharedOffsetHelper<WarpLayout, WarpShape, kMode, Shared>;
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
-    using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
+    using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;

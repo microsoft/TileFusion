@@ -196,7 +196,7 @@ template <typename Reg_, typename WarpLayout_, const WarpReuse kMode_>
 struct SharedToRegLoader {
     using Reg = Reg_;
     using DType = typename Reg::DType::DType;  // the element data type
-    using BaseShape = BaseTileShape<DType>;
+    using WarpShape = BaseTileShape<DType>;
 
     using WarpLayout = WarpLayout_;
     static constexpr WarpReuse kMode = kMode_;
@@ -218,7 +218,7 @@ struct SharedToRegLoader {
                       "be divisible by tl::num_cols<WarpLayout>");
 
         using SharedOffset =
-            warp::SharedOffsetHelper<WarpLayout, kMode, Shared>;
+            warp::SharedOffsetHelper<WarpLayout, WarpShape, kMode, Shared>;
         SharedOffset shared_offset_;
 
         // advance the pointer to input data to the current warp according to
@@ -241,7 +241,7 @@ struct RegToSharedStorer {
     using Reg = Reg_;
     // elementary data type stored in the register tile.
     using DType = typename Reg::DType::DType;
-    using BaseShape = BaseTileShape<DType>;
+    using WarpShape = BaseTileShape<DType>;
     using WarpLayout = WarpLayout_;
 
     // how many times a `BaseTile` is executed along the row and column
@@ -265,10 +265,10 @@ struct RegToSharedStorer {
         static_assert(
             Shared::kType == Reg::kType,
             "The layout of Shared and Register tile must be the same.");
-        static_assert(Shared::kRows % BaseShape::kRows == 0,
+        static_assert(Shared::kRows % WarpShape::kRows == 0,
                       "The number of shared memory rows must be divisible by "
                       "the base tile row.");
-        static_assert(Shared::kCols % BaseShape::kCols == 0,
+        static_assert(Shared::kCols % WarpShape::kCols == 0,
                       "The number of shared memory columns must be divisible "
                       "by the base tile column.");
 
@@ -276,8 +276,8 @@ struct RegToSharedStorer {
         // warp reuse mode. During the store process, threads do not write to
         // the same shared memory location, thus the warp reuse mode is set to
         // `Cont`.
-        using SharedOffset =
-            warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont, Shared>;
+        using SharedOffset = warp::SharedOffsetHelper<WarpLayout, WarpShape,
+                                                      WarpReuse::kCont, Shared>;
         SharedOffset shared_offset_;
         int offset = shared_offset_.get_warp_offset();
 

@@ -45,8 +45,11 @@ DEVICE int warp_offset_impl<WarpReuse::kRowReuseCont>(int warp_row,
 }
 }  // namespace detail
 
-// @brief the warp row that the current thread belongs to, based on the warp
-//        layout.
+/*
+ * @brief In a thread block, warps are organized as 2-D matrices, each with
+ * a row index and a column index. Given `threadIdx.x`, this function
+ * calculates the row index of the current thread.
+ */
 template <typename WarpLayout>
 DEVICE int warp_row_id() {
     /*
@@ -77,8 +80,11 @@ DEVICE int warp_row_id() {
     }
 }
 
-// @brief: Returns the warp col that the current thread belongs to, based on
-//         the warp layout.
+/*
+ * @brief In a thread block, warps are organized as 2-D matrices, each with
+ * a row index and a column index. Given `threadIdx.x`, this function
+ * calculates the column index of the current thread.
+ */
 template <typename WarpLayout>
 DEVICE int warp_col_id() {
     /*
@@ -287,12 +293,13 @@ using namespace cute;
 // This is a hotfix for the current implementation, that is not intended to be
 // exposed outside this header file. Thus, it is placed in an anonymous
 // namespace. Fix this when the implementation is improved.
-template <typename WarpLayout, const WarpReuse kMode, typename Shared,
-          const bool kIsSharedLayout>
+template <typename WarpLayout, typename WarpShape, const WarpReuse kMode,
+          typename Shared, const bool kIsSharedLayout>
 struct SharedOffsetHelperImpl;
 
-template <typename WarpLayout_, const WarpReuse kMode_, typename Shared_>
-struct SharedOffsetHelperImpl<WarpLayout_, kMode_, Shared_, false> {
+template <typename WarpLayout_, typename WarpShape_, const WarpReuse kMode_,
+          typename Shared_>
+struct SharedOffsetHelperImpl<WarpLayout_, WarpShape_, kMode_, Shared_, false> {
     DEVICE int warp_row_id() {
         int warp_row = 0;
         switch (kMode) {
@@ -333,20 +340,17 @@ struct SharedOffsetHelperImpl<WarpLayout_, kMode_, Shared_, false> {
         int tile_id = Shared::kType == tl::Layout::kRowMajor
                           ? base_tiles_row_major_(warp_row_id(), warp_col_id())
                           : base_tiles_col_major_(warp_row_id(), warp_col_id());
-        return tile_id * BaseShape::kNumel;
+        return tile_id * WarpShape::kNumel;
     }
 
   private:
     using Shared = Shared_;
     using WarpLayout = WarpLayout_;
-    // data type __half here is to instantiate the templated class `BaseShape`.
-    // It does not affect shape-related information.
-    using BaseShape = traits::BaseTileShape<__half>;
-
+    using WarpShape = WarpShape_;
     static constexpr WarpReuse kMode = kMode_;
 
-    constexpr static int kBaseTilePerRow = Shared::kRows / BaseShape::kRows;
-    constexpr static int kBaseTilePerCol = Shared::kCols / BaseShape::kCols;
+    constexpr static int kBaseTilePerRow = Shared::kRows / WarpShape::kRows;
+    constexpr static int kBaseTilePerCol = Shared::kCols / WarpShape::kCols;
 
     constexpr static int kRowStride1 =
         kBaseTilePerRow / tl::num_rows<WarpLayout> * kBaseTilePerCol;
@@ -368,8 +372,9 @@ struct SharedOffsetHelperImpl<WarpLayout_, kMode_, Shared_, false> {
     BaseTilesColMajorLayout base_tiles_col_major_;
 };
 
-template <typename WarpLayout_, const WarpReuse kMode_, typename Shared_>
-struct SharedOffsetHelperImpl<WarpLayout_, kMode_, Shared_, true> {
+template <typename WarpLayout_, typename WarpShape_, const WarpReuse kMode_,
+          typename Shared_>
+struct SharedOffsetHelperImpl<WarpLayout_, WarpShape_, kMode_, Shared_, true> {
     using Shared = Shared_;
     using WarpLayout = WarpLayout_;
     static constexpr WarpReuse kMode = kMode_;
@@ -400,12 +405,10 @@ struct SharedOffsetHelperImpl<WarpLayout_, kMode_, Shared_, true> {
     }
 
   private:
-    // data type __half here is to instantiate the templated class `BaseShape`.
-    // It does not affect shape-related information.
-    using BaseShape = traits::BaseTileShape<__half>;
+    using WarpShape = WarpShape_;
 
-    constexpr static int kTilePerRow = Shared::kCols / BaseShape::kCols;
-    constexpr static int kTilePerCol = Shared::kRows / BaseShape::kRows;
+    constexpr static int kTilePerRow = Shared::kCols / WarpShape::kCols;
+    constexpr static int kTilePerCol = Shared::kRows / WarpShape::kRows;
 
     constexpr static int kTilePerWarpRow =
         kTilePerRow / tl::num_cols<WarpLayout>;
@@ -433,22 +436,9 @@ struct SharedOffsetHelperImpl<WarpLayout_, kMode_, Shared_, true> {
 };
 }  // namespace
 
-template <typename WarpLayout, const WarpReuse kMode, typename Shared>
+template <typename WarpLayout, typename WarpShape, const WarpReuse kMode,
+          typename Shared>
 struct SharedOffsetHelper {
-    /*
-     * @brief In a thread block, warps are organized as 2-D matrices, each with
-     * a row index and a column index. Given `threadIdx.x`, this function
-     * calculates the row index of the current thread.
-     */
-    DEVICE int warp_row_id() { return helper_.warp_row_id(); }
-
-    /*
-     * @brief In a thread block, warps are organized as 2-D matrices, each with
-     * a row index and a column index. Given `threadIdx.x`, this function
-     * calculates the column index of the current thread.
-     */
-    DEVICE int warp_col_id() { return helper_.warp_col_id(); }
-
     DEVICE int get_warp_offset() { return helper_.get_warp_offset(); }
 
   private:
@@ -463,8 +453,8 @@ struct SharedOffsetHelper {
                  Shared::Layout::kColStride == Shared::kRows)
             ? false
             : true;
-    using OffsetHelper =
-        SharedOffsetHelperImpl<WarpLayout, kMode, Shared, kIsSharedLayout>;
+    using OffsetHelper = SharedOffsetHelperImpl<WarpLayout, WarpShape, kMode,
+                                                Shared, kIsSharedLayout>;
 
     OffsetHelper helper_;
 };
