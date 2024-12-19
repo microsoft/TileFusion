@@ -274,7 +274,8 @@ struct GlobalToSharedLoader {
     using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
     using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, WarpShape, kMode, Shared>;
+        warp::SharedOffsetHelper<WarpLayout, WarpShape, kMode, Shared,
+                                 tl::IsSharedLayout<Shared>>;
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
@@ -323,7 +324,8 @@ struct SharedToGlobalStorer {
 
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
     using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, WarpShape, kMode, Shared>;
+        warp::SharedOffsetHelper<WarpLayout, WarpShape, kMode, Shared,
+                                 tl::IsSharedLayout<Shared>>;
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
     using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
 

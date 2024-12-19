@@ -12,8 +12,9 @@
 
 namespace tilefusion::cell::copy::warp {
 namespace tl = tile_layout;
+using namespace cute;
 
-namespace detail {
+namespace {
 template <const WarpReuse kMode>
 DEVICE int warp_offset_impl(int warp_row, int warp_col, int warp_rstride,
                             int warp_cstride) {
@@ -43,7 +44,7 @@ DEVICE int warp_offset_impl<WarpReuse::kRowReuseCont>(int warp_row,
                                                       int warp_cstride) {
     return warp_row * warp_rstride;
 }
-}  // namespace detail
+}  // namespace
 
 /*
  * @brief In a thread block, warps are organized as 2-D matrices, each with
@@ -281,25 +282,19 @@ struct GlobalOffsetHelper {
                 ? kWarpShapeCol
                 : Tile::kColStride * kWarpShapeCol;
 
-        return detail::warp_offset_impl<kMode>(warp_row_id<WarpLayout>(),
-                                               warp_col_id<WarpLayout>(),
-                                               kWarpRstride, kWarpCstride);
+        return warp_offset_impl<kMode>(warp_row_id<WarpLayout>(),
+                                       warp_col_id<WarpLayout>(), kWarpRstride,
+                                       kWarpCstride);
     }
 };
 
-namespace {
-using namespace cute;
-
-// This is a hotfix for the current implementation, that is not intended to be
-// exposed outside this header file. Thus, it is placed in an anonymous
-// namespace. Fix this when the implementation is improved.
 template <typename WarpLayout, typename WarpShape, const WarpReuse kMode,
           typename Shared, const bool kIsSharedLayout>
-struct SharedOffsetHelperImpl;
+struct SharedOffsetHelper;
 
 template <typename WarpLayout_, typename WarpShape_, const WarpReuse kMode_,
           typename Shared_>
-struct SharedOffsetHelperImpl<WarpLayout_, WarpShape_, kMode_, Shared_, false> {
+struct SharedOffsetHelper<WarpLayout_, WarpShape_, kMode_, Shared_, false> {
     DEVICE int warp_row_id() {
         int warp_row = 0;
         switch (kMode) {
@@ -374,7 +369,7 @@ struct SharedOffsetHelperImpl<WarpLayout_, WarpShape_, kMode_, Shared_, false> {
 
 template <typename WarpLayout_, typename WarpShape_, const WarpReuse kMode_,
           typename Shared_>
-struct SharedOffsetHelperImpl<WarpLayout_, WarpShape_, kMode_, Shared_, true> {
+struct SharedOffsetHelper<WarpLayout_, WarpShape_, kMode_, Shared_, true> {
     using Shared = Shared_;
     using WarpLayout = WarpLayout_;
     static constexpr WarpReuse kMode = kMode_;
@@ -433,29 +428,5 @@ struct SharedOffsetHelperImpl<WarpLayout_, WarpShape_, kMode_, Shared_, true> {
         cute::Layout<Shape<Int<kTilePerCol>, Int<kTilePerRow>>,
                      Stride<Int<kRowStride2>, Int<kColStride2>>>;
     BaseTilesColMajorLayout base_tiles_col_major_;
-};
-}  // namespace
-
-template <typename WarpLayout, typename WarpShape, const WarpReuse kMode,
-          typename Shared>
-struct SharedOffsetHelper {
-    DEVICE int get_warp_offset() { return helper_.get_warp_offset(); }
-
-  private:
-    // FIXME(ying): This hotfix addresses the current implementation's inability
-    // to explicitly distinguish between shared memory's row-major or
-    // column-major layout and global memory's layouts. However, this should be
-    // fixed in the future.
-    constexpr static bool kIsSharedLayout =
-        (Shared::Layout::kRowStride == Shared::kCols &&
-         Shared::Layout::kColStride == 1) ||
-                (Shared::Layout::kRowStride == 1 &&
-                 Shared::Layout::kColStride == Shared::kRows)
-            ? false
-            : true;
-    using OffsetHelper = SharedOffsetHelperImpl<WarpLayout, WarpShape, kMode,
-                                                Shared, kIsSharedLayout>;
-
-    OffsetHelper helper_;
 };
 }  // namespace tilefusion::cell::copy::warp

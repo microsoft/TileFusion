@@ -17,12 +17,7 @@ namespace tilefusion::tile_layout {
  * tile_layout to avoid potential name conflicts.
  */
 
-enum class Layout {
-    kRowMajor = 0,  // Tile layout for shared memory.
-    kColMajor = 1,
-    kSwizzledRowMajor = 2,
-    kSwizzledColMajor = 3
-};
+enum class Layout { kRowMajor = 0, kColMajor = 1 };
 
 HOST_DEVICE
 const char* layout_type_to_str(Layout type) {
@@ -31,10 +26,6 @@ const char* layout_type_to_str(Layout type) {
             return "RowMajor";
         case Layout::kColMajor:
             return "ColMajor";
-        case Layout::kSwizzledRowMajor:
-            return "SwizzledRowMajor";
-        case Layout::kSwizzledColMajor:
-            return "SwizzledColMajor";
     }
     return "UnsupportedLayout";
 }
@@ -346,6 +337,17 @@ struct SharedLayoutWrapper {
         detail::SharedLayoutWrapperImpl<Shared::kSwizzled, Shared::kType,
                                         kBitsPerAccess>::Layout;
 };
+
+// FIXME(ying): This hotfix addresses the current implementation's inability
+// to explicitly distinguish between shared memory's row-major or
+// column-major layout and global memory's layouts. However, this should be
+// fixed in the future.
+template <typename Layout>
+static constexpr bool IsSharedLayout =
+    (Layout::kRowStride == Layout::kCols && Layout::kColStride == 1) ||
+            (Layout::kRowStride == 1 && Layout::kColStride == Layout::kRows)
+        ? false
+        : true;
 
 template <typename Layout>
 static constexpr size_t num_rows = Layout::kRows;
