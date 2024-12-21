@@ -1,3 +1,0 @@
-/home/yincao/kuangjux_workspace/TileFusion/benchmarks/cpp/flashattention/build/CMakeFiles/flash_attn.dir
-/home/yincao/kuangjux_workspace/TileFusion/benchmarks/cpp/flashattention/build/CMakeFiles/edit_cache.dir
-/home/yincao/kuangjux_workspace/TileFusion/benchmarks/cpp/flashattention/build/CMakeFiles/rebuild_cache.dir
