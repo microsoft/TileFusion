@@ -3,7 +3,6 @@
 
 #pragma once
 
-// #include <cute/algorithm/copy.hpp>
 #include <cute/tensor.hpp>
 
 namespace benchmarks {
@@ -11,12 +10,112 @@ namespace cutlass_wrapper {
 
 using namespace cute;
 
-// template <typename Element, typename Layout, typename TiledMma>
-// inline __device__ void make_sQ(const Element* data, const Layout& layout,
-//                                const TiledMma& tiled_mma) {
-//     int tid = threadIdx.x;
-//     Tensor sQ = make_tensor(make_smem_ptr, layout);
-// }
+namespace detail {
+template <typename GQTensor, typename SQTensor, typename GKTensor,
+          typename SKTensor, typename TiledCopy>
+class G2SCopyQK {
+  public:
+    __device__ G2SCopyQK(GQTensor& gQ, SQTensor& sQ, GKTensor& gK, SKTensor& sK,
+                         TiledCopy tiled_copy, int gQ_stride, int sQ_stride,
+                         int gK_stride, int sK_stride, int num_stage = 2)
+        : gQ(gQ),
+          sQ(sQ),
+          gK(gK),
+          sK(sK),
+          gQ_stride(gQ_stride),
+          sQ_stride(sQ_stride),
+          gK_stride(gK_stride),
+          sK_stride(sK_stride),
+          cur_iter(0),
+          num_stage(num_stage) {}
+
+    inline __device__ void print_q() {
+        if (thread0()) {
+            print(gQ), print("\n");
+        }
+    }
+
+    inline __device__ void prologue() {
+        // Pipeline the copy operation.
+#pragma unroll
+        for (int m = 0; m < size<1>(gQ); ++m) {
+#pragma unroll
+            for (int k = 0; k < size<2>(gQ); ++k) {
+                cute::copy(tiled_copy, gQ(_, m, k), sQ(_, m, k));
+            }
+        }
+
+#pragma unroll
+        for (int m = 0; m < size<1>(gK); ++m) {
+#pragma unroll
+            for (int k = 0; k < size<2>(gK); ++k) {
+                cute::copy(tiled_copy, gK(_, m, k), sK(_, m, k));
+            }
+        }
+
+        cute::cp_async_fence();
+
+        gQ.data() = gQ.data() + gQ_stride;
+        sQ.data() = sQ.data() + sQ_stride;
+        gK.data() = gK.data() + gK_stride;
+        sK.data() = sK.data() + sK_stride;
+
+        // Circlically read SMEM Buffer
+        if ((cur_iter + 1) % num_stage == 0) {
+            sQ.data() = sQ.data() - sQ_stride * num_stage;
+            sK.data() = sK.data() - sK_stride * num_stage;
+        }
+
+        cur_iter++;
+    }
+
+  private:
+    GQTensor& gQ;
+    SQTensor& sQ;
+    GKTensor& gK;
+    SKTensor& sK;
+
+    TiledCopy tiled_copy;
+
+    int gQ_stride;
+    int sQ_stride;
+    int gK_stride;
+    int sK_stride;
+
+    int cur_iter;
+    int num_stage;
+};
+
+}  // namespace detail
+
+template <typename Element, typename GlobalQLayout, typename SharedQLayout,
+          typename GlobalKLayout, typename SharedKLayout, typename TiledCopy>
+inline __device__ auto make_g2s_qk(const Element* gQ_ptr, Element* sQ_ptr,
+                                   const Element* gK_ptr, Element* sK_ptr,
+                                   int gQ_stride, int sQ_stride, int gK_stride,
+                                   int sK_stride) {
+    int tid = threadIdx.x;
+
+    auto gQ = make_tensor(make_gmem_ptr(gQ_ptr), GlobalQLayout{});
+    auto sQ = make_tensor(make_smem_ptr(sQ_ptr), SharedQLayout{});
+
+    auto gK = make_tensor(make_gmem_ptr(gK_ptr), GlobalKLayout{});
+    auto sK = make_tensor(make_smem_ptr(sK_ptr), SharedKLayout{});
+
+    TiledCopy tiled_copy;
+
+    auto loader = tiled_copy.get_thread_slice(tid);
+
+    auto gQs = loader.partition_S(gQ);
+    auto gKs = loader.partition_S(gK);
+    auto sQs = loader.partition_D(sQ);
+    auto sKs = loader.partition_D(sK);
+
+    detail::G2SCopyQK copy_qk(gQs, sQs, gKs, sKs, tiled_copy, gQ_stride,
+                              sQ_stride, gK_stride, sK_stride);
+
+    return copy_qk;
+}
 
 // template <class G2STiledCopy, class GTensor, class STensor>
 // class G2SCopyTile {

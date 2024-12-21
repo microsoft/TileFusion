@@ -131,11 +131,4 @@ void run(bool check = true) {
     cudaDeviceSynchronize();
 }
 
-int main() {
-    // run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
-    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-    //                         /*kTP*/>,
-    //     1>();
-
-    run();
-}
+int main() { run(); }

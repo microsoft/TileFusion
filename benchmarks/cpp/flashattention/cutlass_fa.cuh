@@ -32,6 +32,10 @@ struct FATraits : public Base {
     // assert(kM == kN)
     using Element = Element_;
 
+    // TODO: fix the hardcode.
+    static constexpr int kWarpPerRow = 1;
+    static constexpr int kWarpPerCol = 1;
+
     // Declare global to shared memory copy layout.
     using GmemLayoutQ = Layout<Shape<Int<kTM>, Int<kTK>>, Stride<Int<kK>, _1>>;
     using GmemLayoutK = Layout<Shape<Int<kTN>, Int<kTK>>, Stride<Int<kK>, _1>>;
@@ -59,9 +63,16 @@ struct FATraits : public Base {
     static constexpr int kWarps = kThreads / 32;
 
     // Declare MMA Operation: [16, 8, 16] * [1, 2, 1] -> [16, 16, 16]
+    // Legacy code
+    // using TiledMma =
+    //     TiledMMA<MMA_Atom<SM80_16x8x16_F32F16F16F32_TN>,
+    //              Layout<Shape<Int<kWarps>, _1, _1>>, Layout<Shape<_1, _2,
+    //              _1>>>;
+
     using TiledMma =
         TiledMMA<MMA_Atom<SM80_16x8x16_F32F16F16F32_TN>,
-                 Layout<Shape<Int<kWarps>, _1, _1>>, Layout<Shape<_1, _2, _1>>>;
+                 Layout<Shape<Int<kWarpPerRow>, Int<kWarpPerCol>, _1>>,
+                 Tile<Int<16 * kWarpPerRow>, Int<16 * kWarpPerCol>, _16>>;
 
 #ifdef CP_ASYNC_SM80_ENABLED
     // for Ampere
@@ -110,15 +121,16 @@ __global__ void __launch_bounds__(Nthreads)
     Element* sV_ptr = sK_ptr + kTN * kTK;
     // Element* sO_ptr = sQ_ptr;
 
-    // typename KeTraits::TiledMma mma;
+    typename KeTraits::TiledMma mma;
     typename KeTraits::TiledCopyG2S tiled_copy_g2s;
 
-    // auto rQ = make_s2rA(sQ_ptr, typename KeTraits::SmemLayoutQ{}, mma);
-    // auto rK = make_s2rA(sK_ptr, typename KeTraits::SmemLayoutK{}, mma);
-    // auto acc1 = get_acc<kM, kN>(mma);
+    auto g2s_copy_qk = make_g2s_qk<
+        Element, typename KeTraits::GmemLayoutQ, typename KeTraits::SmemLayoutQ,
+        typename KeTraits::GmemLayoutK, typename KeTraits::SmemLayoutK,
+        typename KeTraits::TiledCopyG2S>(Q, sQ_ptr, K, sK_ptr, kK, kTK, kK,
+                                         kTK);
 
-    // auto rV = make_s2rB(sV_ptr, typename KeTraits::SmemLayoutV{}, mma);
-    // auto acc2 = get_acc<kM, kP>(mma);
+    g2s_copy_qk.print_q();
 }
 
 }  // namespace cutlass_wrapper
