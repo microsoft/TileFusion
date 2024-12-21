@@ -4,21 +4,33 @@
 #include "cutlass_fa.cuh"
 #include "util.hpp"
 
-template <typename WholeShape, typename CtaTileShape, const int kBatch>
+// template <typename WholeShape, typename CtaTileShape, const int kBatch>
 void run(bool check = true) {
-    using InType = __half;
-    using AccType = float;
-    using OutType = __half;
+    using InType = cutlass::half_t;
+    using AccType = cutlass::half_t;
+    using OutType = cutlass::half_t;
 
-    static constexpr int kM = dim_size<0, WholeShape>;
-    static constexpr int kN = dim_size<1, WholeShape>;
-    static constexpr int kK = dim_size<2, WholeShape>;
-    static constexpr int kP = dim_size<3, WholeShape>;
+    // static constexpr int kM = dim_size<0, WholeShape>;
+    // static constexpr int kN = dim_size<1, WholeShape>;
+    // static constexpr int kK = dim_size<2, WholeShape>;
+    // static constexpr int kP = dim_size<3, WholeShape>;
 
-    static constexpr int kTM = dim_size<0, CtaTileShape>;
-    static constexpr int kTN = dim_size<1, CtaTileShape>;
-    static constexpr int kTK = dim_size<2, CtaTileShape>;
-    static constexpr int kTP = dim_size<3, CtaTileShape>;
+    // static constexpr int kTM = dim_size<0, CtaTileShape>;
+    // static constexpr int kTN = dim_size<1, CtaTileShape>;
+    // static constexpr int kTK = dim_size<2, CtaTileShape>;
+    // static constexpr int kTP = dim_size<3, CtaTileShape>;
+
+    static constexpr int kM = 64;
+    static constexpr int kN = 64;
+    static constexpr int kK = 128;
+    static constexpr int kP = 128;
+
+    static constexpr int kTM = 64;
+    static constexpr int kTN = 64;
+    static constexpr int kTK = 128;
+    static constexpr int kTP = 128;
+
+    static constexpr int kBatch = 1;
 
     static constexpr int kThreads = 128;
 
@@ -88,8 +100,10 @@ void run(bool check = true) {
     const InType* C = thrust::raw_pointer_cast(d_c.data());
     InType* D = thrust::raw_pointer_cast(d_d.data());
 
-    int block_x = CeilDiv<kM, kTM>;
-    int block_y = CeilDiv<kP, kTP>;
+    // int block_x = CeilDiv<kM, kTM>;
+    // int block_y = CeilDiv<kP, kTP>;
+    int block_x = (kM + kTM - 1) / kTM;
+    int block_y = (kP + kTP - 1) / kTP;
     int block_z = kBatch;
 
     dim3 grid(block_x, block_y, block_z);
@@ -100,27 +114,28 @@ void run(bool check = true) {
     int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
                                           : shm_input * sizeof(InType);
 
-    using Traits = benchmarks::cutlass_wrapper::FlashAttentionTraits<
-        cutlass::half_t, kM, kN, kK, kP, kTM, kTN, kTK, kTP, kThreads>;
+    using Traits =
+        benchmarks::cutlass_wrapper::FATraits<cutlass::half_t, kM, kN, kK, kP,
+                                              kTM, kTN, kTK, kTP, kThreads>;
 
-    auto fa_kernel =
-        benchmarks::cutlass_wrapper::fa_kernel<cutlass::half_t, cutlass::half_t,
-                                               Traits, kM, kN, kK, kP, kTM, kTN,
-                                               kTK, kTP, kThreads>;
+    auto fa_kernel = benchmarks::cutlass_wrapper::fa_kernel<
+        cutlass::half_t, Traits, kM, kN, kK, kP, kTM, kTN, kTK, kTP, kThreads>;
 
     if (shm_size > 48 * 1024) {
         cudaFuncSetAttribute(
-            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
+            fa_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
     }
 
-    kernel<<<grid, block, shm_size, 0>>>(A, B, C, D);
+    fa_kernel<<<grid, block, shm_size, 0>>>(A, B, C, D);
 
     cudaDeviceSynchronize();
 }
 
 int main() {
-    run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
-        FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-                            /*kTP*/>,
-        1>();
+    // run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
+    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
+    //                         /*kTP*/>,
+    //     1>();
+
+    run();
 }

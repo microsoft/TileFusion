@@ -3,15 +3,18 @@
 # MIT License.
 # --------------------------------------------------------------------------
 
-cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
-project(flash_attn_example LANGUAGES C CXX CUDA)
+cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
+project(gemm_bench LANGUAGES C CXX CUDA)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
-                      "${PROJECT_SOURCE_DIR}/../../../scripts/cmake")
+                      "${PROJECT_SOURCE_DIR}/../../../cmake")
+set(THIRD_PARTY_DIR "${PROJECT_SOURCE_DIR}/../../../3rd-party")
+
 include(generic)
 
-set(THIRD_PARTY_DIR "${PROJECT_SOURCE_DIR}/../../../3rd-party")
-include_directories(${THIRD_PARTY_DIR}/cutlass/include)
 include_directories("${PROJECT_SOURCE_DIR}/../../../include")
+include_directories("${PROJECT_SOURCE_DIR}/../../utils/cpp")
+include_directories("${THIRD_PARTY_DIR}/cutlass/include")
 
 add_executable(flash_attn main.cu)
+target_link_libraries(flash_attn ${CUDA_CUBLAS_LIBRARIES})

@@ -4,5 +4,8 @@
         "string": "cpp",
         "string_view": "cpp",
         "span": "cpp"
-    }
+    },
+    "gotoSymbolStack.currentStackPosition": 0,
+    "gotoSymbolStack.maxStackPosition": 0,
+    "gotoSymbolStack.filePositionInfo": []
 }

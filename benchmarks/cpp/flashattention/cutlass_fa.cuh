@@ -8,10 +8,10 @@
 #include "cutlass/copy.cuh"
 #include "cutlass/traits_base.cuh"
 
-#include <cute/tensor.hpp>
+// #include <cute/tensor.hpp>
 
-template <const int kM, const int kN, const int kK, const int kP>
-using FAShape = TileShape<kM, kN, kK, kP>;
+// template <const int kM, const int kN, const int kK, const int kP>
+// using FAShape = TileShape<kM, kN, kK, kP>;
 
 namespace benchmarks {
 namespace cutlass_wrapper {
@@ -50,14 +50,13 @@ struct FATraits : public Base {
     // [kTN / Atom, kTK / Atom, Atom]
     using SmemLayoutK =
         decltype(tile_to_shape(SmemLayoutAtom{}, Shape<Int<kTN>, Int<kTK>>{}));
-    ));
     // [kTP / Atom, kTN / Atom, Atom]
     using SmemLayoutV =
         decltype(tile_to_shape(SmemLayoutAtom{}, Shape<Int<kTP>, Int<kTN>>{}));
     using SmemLayoutO =
         decltype(tile_to_shape(SmemLayoutAtom{}, Shape<Int<kTM>, Int<kTP>>{}));
 
-    constexpr int kWarps = kThreads / 32;
+    static constexpr int kWarps = kThreads / 32;
 
     // Declare MMA Operation: [16, 8, 16] * [1, 2, 1] -> [16, 16, 16]
     using TiledMma =
@@ -76,7 +75,7 @@ struct FATraits : public Base {
     // Why this configuration?
     using GmemCopyLayoutAtom =
         Layout<Shape<Int<kThreads / (SmemKAtom / 8)>, Int<SmemKAtom / 8>>,
-               Stride<Int<SmemKAtom / 8>, _ 1>>;
+               Stride<Int<SmemKAtom / 8>, _1>>;
 
     using TiledCopyG2S = decltype(make_tiled_copy(
         CopyInstG2S{}, GmemCopyLayoutAtom{}, Layout<Shape<_1, _8>>{}));
@@ -86,13 +85,13 @@ struct FATraits : public Base {
         Layout<Shape<_1, _8>>{}));
 };
 
-template <typename InType, typename AccType, typename KeTraits, const int kM,
-          const int kN, const kK, const int kP, const int kTM, const int kTN,
+template <typename Element, typename KeTraits, const int kM, const int kN,
+          const int kK, const int kP, const int kTM, const int kTN,
           const int kTK, const int kTP, const int Nthreads>
 __global__ void __launch_bounds__(Nthreads)
-    fa_kernel(const InType* dQ, const InType* dK, const InType* dV,
-              InType* dO) {
-    constexpr float softmax_scale = 1.250000e-01f;
+    fa_kernel(const Element* dQ, const Element* dK, const Element* dV,
+              Element* dO) {
+    // constexpr float softmax_scale = 1.250000e-01f;
 
     // Q, K: [batch, head, length, hidden_qk]
     // V, O: [batch, head, length, hidden_v]
@@ -100,26 +99,26 @@ __global__ void __launch_bounds__(Nthreads)
     extern __shared__ __align__(sizeof(double)) unsigned char buf_[];
     auto* buf = reinterpret_cast<Element*>(buf_);
 
-    const InType* Q = dQ + blockIdx.z * kTM * kN + blockIdx.x * kTM * kK;
-    const InType* K = dK + blockIdx.z * kK * kN;
-    const InType* V = dV + blockIdx.z * kP * kN + blockIdx.y * kTP * kN;
-    InType* O =
+    const Element* Q = dQ + blockIdx.z * kTM * kN + blockIdx.x * kTM * kK;
+    const Element* K = dK + blockIdx.z * kK * kN;
+    const Element* V = dV + blockIdx.z * kP * kN + blockIdx.y * kTP * kN;
+    Element* O =
         dO + blockIdx.z * kM * kP + blockIdx.x * (kTM * kP) + blockIdx.y * kTP;
 
-    InType* sQ_ptr = reinterpret_cast<Element*>(buf);
-    InType* sK_ptr = sQ_ptr + kTM * kTK;
-    InType* sV_ptr = sK_ptr + kTN * kTK;
-    InType* sO_ptr = sQ_ptr;
+    Element* sQ_ptr = reinterpret_cast<Element*>(buf);
+    Element* sK_ptr = sQ_ptr + kTM * kTK;
+    Element* sV_ptr = sK_ptr + kTN * kTK;
+    // Element* sO_ptr = sQ_ptr;
 
-    typename KeTraits::TiledMma mma;
+    // typename KeTraits::TiledMma mma;
     typename KeTraits::TiledCopyG2S tiled_copy_g2s;
 
-    auto rQ = make_s2rA(sQ_ptr, typename KeTraits::SmemLayoutQ{}, mma);
-    auto rK = make_s2rA(sK_ptr, typename KeTraits::SmemLayoutK{}, mma);
-    auto acc1 = get_acc<kM, kN>(mma);
+    // auto rQ = make_s2rA(sQ_ptr, typename KeTraits::SmemLayoutQ{}, mma);
+    // auto rK = make_s2rA(sK_ptr, typename KeTraits::SmemLayoutK{}, mma);
+    // auto acc1 = get_acc<kM, kN>(mma);
 
-    auto rV = make_s2rB(sV_ptr, typename KeTraits::SmemLayoutV{}, mma);
-    auto acc2 = get_acc<kM, kP>(mma);
+    // auto rV = make_s2rB(sV_ptr, typename KeTraits::SmemLayoutV{}, mma);
+    // auto acc2 = get_acc<kM, kP>(mma);
 }
 
 }  // namespace cutlass_wrapper

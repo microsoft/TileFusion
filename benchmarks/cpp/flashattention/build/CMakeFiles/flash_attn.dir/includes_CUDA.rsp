@@ -1,0 +1,1 @@
+-I/home/yincao/kuangjux_workspace/TileFusion/benchmarks/cpp/flashattention/../../../include -I/home/yincao/kuangjux_workspace/TileFusion/benchmarks/cpp/flashattention/../../utils/cpp -I"/home/yincao/kuangjux_workspace/TileFusion/benchmarks/cpp/flashattention/../../../3rd-party/cutlass/include"
