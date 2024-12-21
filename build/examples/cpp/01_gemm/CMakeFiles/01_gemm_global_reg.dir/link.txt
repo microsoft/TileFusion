@@ -1,1 +1,0 @@
-/usr/bin/g++ @CMakeFiles/01_gemm_global_reg.dir/objects1.rsp -o 01_gemm_global_reg @CMakeFiles/01_gemm_global_reg.dir/linkLibs.rsp -L"/data/yincao/cuda-12.4/targets/x86_64-linux/lib/stubs" -L"/data/yincao/cuda-12.4/targets/x86_64-linux/lib"
