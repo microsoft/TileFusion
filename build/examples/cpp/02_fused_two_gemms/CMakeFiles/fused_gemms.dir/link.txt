@@ -1,0 +1,1 @@
+/usr/bin/g++ @CMakeFiles/fused_gemms.dir/objects1.rsp -o fused_gemms @CMakeFiles/fused_gemms.dir/linkLibs.rsp -L"/data/yincao/cuda-12.4/targets/x86_64-linux/lib/stubs" -L"/data/yincao/cuda-12.4/targets/x86_64-linux/lib"

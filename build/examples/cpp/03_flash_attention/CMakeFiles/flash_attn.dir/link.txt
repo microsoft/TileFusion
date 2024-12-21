@@ -1,0 +1,1 @@
+/usr/bin/g++ @CMakeFiles/flash_attn.dir/objects1.rsp -o flash_attn @CMakeFiles/flash_attn.dir/linkLibs.rsp -L"/data/yincao/cuda-12.4/targets/x86_64-linux/lib/stubs" -L"/data/yincao/cuda-12.4/targets/x86_64-linux/lib"

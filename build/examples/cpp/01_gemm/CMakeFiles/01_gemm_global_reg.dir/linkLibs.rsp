@@ -1,0 +1,1 @@
+ "/data/yincao/cuda-12.4/targets/x86_64-linux/lib/libcublas.so" "/data/yincao/cuda-12.4/targets/x86_64-linux/lib/libcublasLt.so" -lcudadevrt -lcudart_static -lrt -lpthread -ldl 

@@ -1,0 +1,1 @@
+  -L"/data/yincao/cuda-12.4/targets/x86_64-linux/lib/stubs"  -L"/data/yincao/cuda-12.4/targets/x86_64-linux/lib"   -ldl "/usr/lib/x86_64-linux-gnu/librt.a" -lcudadevrt -lcudart_static -lrt -lpthread 

@@ -1,0 +1,1 @@
+/usr/bin/g++ @CMakeFiles/02_gemm_all_mem.dir/objects1.rsp -o 02_gemm_all_mem @CMakeFiles/02_gemm_all_mem.dir/linkLibs.rsp -L"/data/yincao/cuda-12.4/targets/x86_64-linux/lib/stubs" -L"/data/yincao/cuda-12.4/targets/x86_64-linux/lib"
