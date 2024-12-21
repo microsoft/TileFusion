@@ -3,11 +3,15 @@
 
 #pragma once
 
+#include "copy.cuh"
 #include "cuda_utils.cuh"
 #include "cutlass/copy.cuh"
 #include "cutlass/traits_base.cuh"
 
 #include <cute/tensor.hpp>
+
+template <const int kM, const int kN, const int kK, const int kP>
+using FAShape = TileShape<kM, kN, kK, kP>;
 
 namespace benchmarks {
 namespace cutlass_wrapper {
@@ -16,13 +20,6 @@ using namespace cute;
 //
 /// @brief
 /// @tparam Element_
-/// @tparam L: Q, K, V, O length
-/// @tparam kDimK: Q, K hidden size
-/// @tparam kDimV: V, O hidden size
-/// @tparam kTileQRow: Tile size of Q row.
-/// @tparam kTileQCol: Tile size of Q col.
-/// @tparam kTileKCol: Tile size of K col.
-/// @tparam kTileVCol: Tile size of V row.
 template <typename Element_, const int kM, const int kN, const int kK,
           const int kP, const int kTM, const int kTN, const int kTK,
           const int kTP, const int kThreads, const int SmemKAtom = 64,
@@ -47,11 +44,14 @@ struct FATraits : public Base {
         Layout<Shape<_8, Int<SmemKAtom>>, Stride<Int<SmemKAtom>, _1>>{}));
 
     // Declare shared memory layout.
+    // [kTM / Atom, kTK / Atom, Atom]
     using SmemLayoutQ =
         decltype(tile_to_shape(SmemLayoutAtom{}, Shape<Int<kTM>, Int<kTK>>{}));
+    // [kTN / Atom, kTK / Atom, Atom]
     using SmemLayoutK =
         decltype(tile_to_shape(SmemLayoutAtom{}, Shape<Int<kTN>, Int<kTK>>{}));
     ));
+    // [kTP / Atom, kTN / Atom, Atom]
     using SmemLayoutV =
         decltype(tile_to_shape(SmemLayoutAtom{}, Shape<Int<kTP>, Int<kTN>>{}));
     using SmemLayoutO =
@@ -90,8 +90,8 @@ template <typename InType, typename AccType, typename KeTraits, const int kM,
           const int kN, const kK, const int kP, const int kTM, const int kTN,
           const int kTK, const int kTP, const int Nthreads>
 __global__ void __launch_bounds__(Nthreads)
-    fa_kernel(const InType* dQ, const InType* dK, const InType* dV, InType* dO,
-              int length_k, int length_q) {
+    fa_kernel(const InType* dQ, const InType* dK, const InType* dV,
+              InType* dO) {
     constexpr float softmax_scale = 1.250000e-01f;
 
     // Q, K: [batch, head, length, hidden_qk]

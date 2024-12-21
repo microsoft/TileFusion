@@ -1,0 +1,105 @@
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineSystem.cmake:205 (message)"
+      - "CMakeLists.txt:7 (project)"
+    message: |
+      The system is: Linux - 6.5.0-1025-azure - x86_64
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCCompiler.cmake:123 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:7 (project)"
+    message: |
+      Compiling the C compiler identification source file "CMakeCCompilerId.c" succeeded.
+      Compiler: /usr/bin/cc 
+      Build flags: 
+      Id flags:  
+      
+      The output was:
+      0
+      
+      
+      Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "a.out"
+      
+      The C compiler identification is GNU, found in:
+        /home/yangwang5/kuangjux_workspace/TileFusion/benchmarks/cpp/flashattention/CMakeFiles/3.31.3/CompilerIdC/a.out
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCXXCompiler.cmake:126 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:7 (project)"
+    message: |
+      Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" succeeded.
+      Compiler: /usr/bin/c++ 
+      Build flags: 
+      Id flags:  
+      
+      The output was:
+      0
+      
+      
+      Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "a.out"
+      
+      The CXX compiler identification is GNU, found in:
+        /home/yangwang5/kuangjux_workspace/TileFusion/benchmarks/cpp/flashattention/CMakeFiles/3.31.3/CompilerIdCXX/a.out
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCompilerId.cmake:1250 (message)"
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCUDACompiler.cmake:75 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "CMakeLists.txt:7 (project)"
+    message: |
+      Checking whether the CUDA compiler is NVIDIA using "" did not match "nvcc: NVIDIA \\(R\\) Cuda compiler driver":
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCompilerId.cmake:1250 (message)"
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCUDACompiler.cmake:75 (CMAKE_DETERMINE_COMPILER_ID_VENDOR)"
+      - "CMakeLists.txt:7 (project)"
+    message: |
+      Checking whether the CUDA compiler is Clang using "" did not match "(clang version)":
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCUDACompiler.cmake:131 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:7 (project)"
+    message: |
+      Compiling the CUDA compiler identification source file "CMakeCUDACompilerId.cu" failed.
+      Compiler: CMAKE_CUDA_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags:  -v
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/yangwang5/kuangjux_workspace/cmake-3.31.3-linux-x86_64/share/cmake-3.31/Modules/CMakeDetermineCUDACompiler.cmake:131 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:7 (project)"
+    message: |
+      Compiling the CUDA compiler identification source file "CMakeCUDACompilerId.cu" failed.
+      Compiler: CMAKE_CUDA_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags:  -v
+      
+      The output was:
+      no such file or directory
+      
+      
+...

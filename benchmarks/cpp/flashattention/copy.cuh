@@ -11,6 +11,13 @@ namespace cutlass_wrapper {
 
 using namespace cute;
 
+template <typename Element, typename Layout, typename TiledMma>
+inline __device__ void make_sQ(const Element* data, const Layout& layout,
+                               const TiledMma& tiled_mma) {
+    int tid = threadIdx.x;
+    Tensor sQ = make_tensor(make_smem_ptr, layout);
+}
+
 template <class G2STiledCopy, class GTensor, class STensor>
 class G2SCopyTile {
   public:
@@ -111,7 +118,26 @@ class S2RCopyTileQK {
           cur_iter(0),
           cur_iter_sq(0) {}
 
-    inline __device__ void prologue() {}
+    inline __device__ void prologue() {
+        cur_iter = 0;
+        cute::copy(copy_q, sQ(_, _, _0{}), rQ(_, _, _0{}));
+        cute::copy(copy_k, sK(_, _, _0{}), rK(_, _, _0{}));
+
+        // Software pipelining Technique.
+#pragma unroll
+        for (int i = 0; i < size<2>(rK); ++i) {
+            if (i < size<2>(rK) - 1) {
+                cute::copy(copy_q, sQ(_, _, i + 1), rQ(_, _, i + 1));
+                cute::copy(copy_k, sK(_, _, i + 1), rK(_, _, i + 1));
+            }
+
+            cute::gemm(tiled_mma, rQ(_, _, i), rK(_, _, i), acc);
+        }
+
+        sQ.data() = sQ.data() + sQ_stride;
+        sK.data() = sK.data() + sK_stride;
+        cur_iter++;
+    }
 
     inline __device__ void body() {
         cute::copy(copy_q, sQ(_, _, _0{}), rQ(_, _, _0{}));
@@ -134,13 +160,56 @@ class S2RCopyTileQK {
         sK.data() = sK.data() + sK_stride;
 
         if ((cur_iter + 1) % num_stage == 0) {
-            sQ.data() = sQ.data() - sQ_stride * num_stage;
             sK.data() = sK.data() - sK_stride * num_stage;
         }
 
         cur_iter++;
         cur_iter_sq++;
     }
+
+    inline __device__ void epilogue() {
+        cute::copy(copy_q, sQ(_, _, _0{}), rQ(_, _, _0{}));
+        cute::copy(copy_k, sK(_, _, _0{}), rK(_, _, _0{}));
+
+        // Software pipelining Technique.
+#pragma unroll
+        for (int i = 0; i < size<2>(rK); ++i) {
+            if (i < size<2>(rK) - 1) {
+                cute::copy(copy_q, sQ(_, _, i + 1), rQ(_, _, i + 1));
+                cute::copy(copy_k, sK(_, _, i + 1), rK(_, _, i + 1));
+            }
+
+            cute::gemm(tiled_mma, rQ(_, _, i), rK(_, _, i), acc);
+        }
+
+        sQ.data() = sQ.data() - sQ_stride * cur_iter_sq;
+        sK.data() = sK.data() + sK_stride;
+
+        if ((cur_iter + 1) % num_stage == 0) {
+            sK.data() = sK.data() - sK_stride * num_stage;
+        }
+
+        cur_iter++;
+        cur_iter_sq = 0;
+    }
+
+  private:
+    TiledCopyQ& copy_q;
+    TiledCopyK& copy_k;
+    STensorQ& sQ;
+    RTensorQ& rQ;
+    STensorK& sK;
+    RTensorK& rK;
+    RTensorAcc& acc;
+    TiledMMA tiled_mma;
+    int sQ_stride;
+    int rQ_stride;
+    int sK_stride;
+    int rK_stride;
+    int num_stage;
+    int cur_iter;
+    int cur_iter_sq;
+}
 
 }  // namespace cutlass_wrapper
 }  // namespace benchmarks
