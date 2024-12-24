@@ -409,24 +409,5 @@ struct SharedOffsetHelper<WarpLayout_, WarpShape_, kMode_, Shared_, true> {
         kTilePerRow / tl::num_cols<WarpLayout>;
     constexpr static int kTilePerWarpCol =
         kTilePerCol / tl::num_rows<WarpLayout>;
-
-    // for row-major shared memory tile
-    constexpr static int kRowStride1 =
-        kTilePerCol / tl::num_rows<WarpLayout> * kTilePerRow;
-    constexpr static int kColStride1 = kTilePerRow / tl::num_cols<WarpLayout>;
-
-    using BaseTilesRowMajorLayout =
-        cute::Layout<Shape<Int<kTilePerCol>, Int<kTilePerRow>>,
-                     Stride<Int<kRowStride1>, Int<kColStride1>>>;
-    BaseTilesRowMajorLayout base_tiles_row_major_;
-
-    // for column-major shared memory tile
-    constexpr static int kRowStride2 = kTilePerCol / tl::num_rows<WarpLayout>;
-    constexpr static int kColStride2 =
-        kTilePerRow / tl::num_cols<WarpLayout> * kTilePerCol;
-    using BaseTilesColMajorLayout =
-        cute::Layout<Shape<Int<kTilePerCol>, Int<kTilePerRow>>,
-                     Stride<Int<kRowStride2>, Int<kColStride2>>>;
-    BaseTilesColMajorLayout base_tiles_col_major_;
 };
 }  // namespace tilefusion::cell::copy::warp
