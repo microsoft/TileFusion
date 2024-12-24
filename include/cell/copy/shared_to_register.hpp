@@ -218,8 +218,7 @@ struct SharedToRegLoader {
                       "be divisible by tl::num_cols<WarpLayout>");
 
         using SharedOffset =
-            warp::SharedOffsetHelper<WarpLayout, WarpShape, kMode, Shared,
-                                     tl::IsSharedLayout<Shared>>;
+            warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared, kMode>;
         SharedOffset shared_offset_;
 
         // advance the pointer to input data to the current warp according to
@@ -277,15 +276,10 @@ struct RegToSharedStorer {
         // warp reuse mode. During the store process, threads do not write to
         // the same shared memory location, thus the warp reuse mode is set to
         // `Cont`.
-        using SharedOffset =
-            warp::SharedOffsetHelper<WarpLayout, WarpShape, WarpReuse::kCont,
-                                     Shared, tl::IsSharedLayout<Shared>>;
+        using SharedOffset = warp::SharedOffsetHelper<WarpLayout, WarpShape,
+                                                      Shared, WarpReuse::kCont>;
         SharedOffset shared_offset_;
         int offset = shared_offset_.get_warp_offset();
-
-        if (thread(32)) {
-            printf("kRowExec: %d, kColExec: %d\n", kRowExec, kColExec);
-        }
 
         using Storer = detail::RegToSharedStorerImpl<Reg, Shared, kRowExec,
                                                      kColExec, Reg::kType>;
