@@ -3,13 +3,12 @@
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
-import os
+import ctypes
 import importlib.util
-import shutil
+import os
+import subprocess
 from collections import defaultdict
 
-import subprocess
-import ctypes
 import torch
 
 __all__ = [

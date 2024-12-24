@@ -10,7 +10,13 @@ repos:
     rev: v0.32.0
     hooks:
     -   id: yapf
+        additional_dependencies: [toml]
         files: (.*\.(py|bzl)|BUILD|.*\.BUILD|WORKSPACE)$
+-   repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+    -   id: isort
+        name: isort (python)
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
