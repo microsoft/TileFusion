@@ -17,12 +17,7 @@ namespace tilefusion::tile_layout {
  * tile_layout to avoid potential name conflicts.
  */
 
-enum class Layout {
-    kRowMajor = 0,  // Tile layout for shared memory.
-    kColMajor = 1,
-    kSwizzledRowMajor = 2,
-    kSwizzledColMajor = 3
-};
+enum class Layout { kRowMajor = 0, kColMajor = 1 };
 
 HOST_DEVICE
 const char* layout_type_to_str(Layout type) {
@@ -31,10 +26,6 @@ const char* layout_type_to_str(Layout type) {
             return "RowMajor";
         case Layout::kColMajor:
             return "ColMajor";
-        case Layout::kSwizzledRowMajor:
-            return "SwizzledRowMajor";
-        case Layout::kSwizzledColMajor:
-            return "SwizzledColMajor";
     }
     return "UnsupportedLayout";
 }

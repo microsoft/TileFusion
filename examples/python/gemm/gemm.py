@@ -4,9 +4,8 @@
 # --------------------------------------------------------------------------
 
 import torch
-from torch import Tensor
-
 from compile import Compile
+from torch import Tensor
 
 __all__ = [
     "gemm_func",

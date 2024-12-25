@@ -3,11 +3,11 @@
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
-import torch
-from torch import Tensor
 from typing import Tuple
 
+import torch
 from gemm import gemm_func
+from torch import Tensor
 
 
 def run_unittest(a: Tensor,

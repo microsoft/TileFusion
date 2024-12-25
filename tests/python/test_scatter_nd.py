@@ -6,9 +6,9 @@
 import random
 import unittest
 
+import context
 import torch
 
-import context
 from pytilefusion import scatter_nd
 
 
