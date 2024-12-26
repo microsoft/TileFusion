@@ -56,11 +56,9 @@ struct WarpOffsetHelper<WarpReuse::kRowReuseCont, kRowStride_, kColStride_> {
 };
 }  // namespace
 
-/*
- * @brief In a thread block, warps are organized as 2-D matrices, each with
- * a row index and a column index. Given `threadIdx.x`, this function
- * calculates the row index of the current thread.
- */
+// @brief In a thread block, warps are organized as 2-D matrices, each with
+//        a row index and a column index. Given `threadIdx.x`, this function
+//        calculates the row index of the current thread.
 template <typename WarpLayout>
 DEVICE int warp_row_id() {
     /*
@@ -91,11 +89,9 @@ DEVICE int warp_row_id() {
     }
 }
 
-/*
- * @brief In a thread block, warps are organized as 2-D matrices, each with
- * a row index and a column index. Given `threadIdx.x`, this function
- * calculates the column index of the current thread.
- */
+// @brief In a thread block, warps are organized as 2-D matrices, each with
+//        a row index and a column index. Given `threadIdx.x`, this function
+//        calculates the column index of the current thread.
 template <typename WarpLayout>
 DEVICE int warp_col_id() {
     /*
