@@ -6,7 +6,7 @@
 import random
 import unittest
 
-import context
+import context  # noqa: F401
 import torch
 
 from pytilefusion import scatter_nd

@@ -110,13 +110,13 @@ template <typename Element, typename ElementAcc, const int kM, const int kN,
 struct TestTraits {
     using BaseShape = traits::BaseTileShape<Element>;
 
-    /// ======== 1. configurate threads and warp layout in a CTA ============
+    /// ======== 1. configure threads and warp layout in a CTA ============
     using WarpLayout = WarpLayout_;
     static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
     static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
     static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
 
-    /// == 2. configurate tile transfer between global and shared using CuTe ==
+    /// == 2. configure tile transfer between global and shared using CuTe ==
     using GlobalA = GlobalTile<Element, tl::RowMajor<kM, kK>>;
     static const bool kSwizzled = true;
     using SharedA = SharedTile<Element, tl::RowMajor<kM, kK>, kSwizzled>;
@@ -126,7 +126,7 @@ struct TestTraits {
     using SharedB = SharedTile<Element, tl::ColMajor<kK, kN>, kSwizzled>;
     using LoadSharedB = GlobalToSharedLoader<SharedB, WarpLayout>;
 
-    /// === 3. configurate tile transfer between shared and register loader ===
+    /// === 3. configure tile transfer between shared and register loader ===
     // shared tile for operand A
     using TileIteratorA = STileIterator<SharedA, TileShape<kM, kChunkK>>;
     // shared tile for operand B

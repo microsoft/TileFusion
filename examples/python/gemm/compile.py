@@ -15,10 +15,12 @@ __all__ = [
     "Compile",
 ]
 
-cutlass_include_dir = os.path.join(os.path.dirname(__file__),
-                                   "../../../3rd-party/cutlass/include")
-tilefusion_include_dir = os.path.join(os.path.dirname(__file__),
-                                      "../../../include/")
+cutlass_include_dir = os.path.join(
+    os.path.dirname(__file__), "../../../3rd-party/cutlass/include"
+)
+tilefusion_include_dir = os.path.join(
+    os.path.dirname(__file__), "../../../include/"
+)
 csrc_include_dir = os.path.join(os.path.dirname(__file__), "csrc")
 
 
@@ -45,9 +47,9 @@ class Compile:
             return os.environ["CUDA_PATH"]
 
         cmd = ["which", "nvcc"]
-        proc = subprocess.Popen(cmd,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT)
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        )
         (out, _) = proc.communicate()
 
         if proc.returncode == 0:
@@ -67,8 +69,9 @@ class Compile:
         warp_per_col: int,
     ):
         entry_code_path = "entry.py"
-        spec = importlib.util.spec_from_file_location("entry_code",
-                                                      entry_code_path)
+        spec = importlib.util.spec_from_file_location(
+            "entry_code", entry_code_path
+        )
         foo = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(foo)
 
@@ -84,27 +87,32 @@ class Compile:
 
         return foo.types.format_map(shape) + foo.entry
 
-    def compile(self,
-                M: int,
-                N: int,
-                K: int,
-                TM: int,
-                TN: int,
-                kChunkK: int,
-                warp_per_row: int,
-                warp_per_col: int,
-                timeout: float = None):
+    def compile(
+        self,
+        M: int,
+        N: int,
+        K: int,
+        TM: int,
+        TN: int,
+        kChunkK: int,
+        warp_per_row: int,
+        warp_per_col: int,
+        timeout: float = None
+    ):
         temp_dir = self.tmp_dir
 
-        file_name = (f"{self.file_prefix}_{M}_{N}_{K}"
-                     f"_{TM}_{TN}_{warp_per_row}_{warp_per_col}")
+        file_name = (
+            f"{self.file_prefix}_{M}_{N}_{K}"
+            f"_{TM}_{TN}_{warp_per_row}_{warp_per_col}"
+        )
         lib_path = os.path.join(temp_dir, f"{file_name}.so")
 
         if os.path.exists(lib_path):
             return lib_path
 
-        entry_code = self._create_entry_code(M, N, K, TM, TN, kChunkK,
-                                             warp_per_row, warp_per_col)
+        entry_code = self._create_entry_code(
+            M, N, K, TM, TN, kChunkK, warp_per_row, warp_per_col
+        )
 
         source_path = os.path.join(temp_dir, f"{file_name}.cu")
         with open(source_path, "w") as f:
@@ -137,5 +145,6 @@ class Compile:
         torch.cuda.set_device(device)
 
         ret = lib.kernel_entry(
-            *[ctypes.c_void_p(arr.data_ptr()) for arr in torch_array])
+            *[ctypes.c_void_p(arr.data_ptr()) for arr in torch_array]
+        )
         return ret

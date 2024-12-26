@@ -330,7 +330,7 @@ using RowMajor = MatrixLayout<kRow, kCol, kStride, 1>;
 template <const int kRow, const int kCol, const int kStride = kRow>
 using ColMajor = MatrixLayout<kRow, kCol, 1, kStride>;
 
-/// @brief: Wapper for creating non-swizzled or swizzled shared memory layout.
+/// @brief: Wrapper for creating non-swizzled or swizzled shared memory layout.
 template <typename Shared, const int kBitsPerAccess>
 struct SharedLayoutWrapper {
     using Layout =
@@ -356,7 +356,7 @@ static constexpr size_t get_numel = Layout::kNumel;
 // We wrap CuTe's `Layout`, which consists of `Shape` and `Stride`, into an
 // intelligent row-major or column-major layout. In a row-major layout, the
 // column stride is 1, whereas in a column-major layout, the row stride is 1.
-// NOTE: A potential issue is that `ColMajor<1, 1>` will also be indentified as
+// NOTE: A potential issue is that `ColMajor<1, 1>` will also be identified as
 // a row-major layout.
 template <typename Layout_>
 static constexpr Layout layout_type = Layout_::kType;

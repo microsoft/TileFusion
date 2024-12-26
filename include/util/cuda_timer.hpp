@@ -6,7 +6,6 @@
 #include "cuda_utils.hpp"
 
 namespace tilefusion {
-
 /// @brief: Cuda timer to measure the time taken by a kernel.
 /// Usage:
 ///    CudaTimer timer;
@@ -43,5 +42,4 @@ class CudaTimer {
     cudaEvent_t stop_event;
     cudaStream_t stream;
 };
-
 }  // namespace tilefusion

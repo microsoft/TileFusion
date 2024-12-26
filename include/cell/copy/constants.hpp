@@ -14,8 +14,6 @@ enum class CopyInst {
 };
 
 enum class WarpReuse {
-    // TODO(haruhi): It seems that Cir/RowReuseCir/ColReuseCir are not ncessary,
-    // thus the reuse mode can be simplified.
     // data are evenly partitioned to be loaded by warps.
     kCont = 0,          // all warps continuously load data, no reuse
     kRowReuseCont = 1,  // Row-wise even reuse, warps in the same row
