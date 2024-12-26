@@ -1,0 +1,30 @@
+name: clang-format
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install clang-format==18.1.5
+    - name: Running clang-format for first party source codes
+      run: |
+        find include src tests/cpp examples/cpp -type f \( -name '*.h' -o name '*.hpp' -o -name '*.cc' -o -name '*.cu' -o -name '*.cuh' \) -print \
+            | xargs clang-format --dry-run --Werror
