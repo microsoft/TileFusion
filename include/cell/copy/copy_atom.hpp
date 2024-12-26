@@ -18,8 +18,8 @@ namespace tl = tile_layout;
 using namespace cute;
 
 template <typename Element>
-requires std::is_same_v<Element, __half> ||
-    std::is_same_v<Element, cutlass::half_t>
+    requires std::is_same_v<Element, __half> ||
+             std::is_same_v<Element, cutlass::half_t>
 struct LoadMatBase {
     using DType = Element;
     using ThreadLayout = tile_layout::ColMajor<16, 2>;
@@ -298,7 +298,7 @@ template <class Global, class Shared>
 struct GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kRowMajor> {
     using DType = Shared::DType;
 
-    // NOTE: Please keep this thread layout striclty consistent with the thread
+    // NOTE: Please keep this thread layout strictly consistent with the thread
     // layout for ldmatrix.
     // The macro kernel breaks down the entire copy operation into iterations
     // over 16x16 BaseTiles. To transfer a single BaseTile, threads in a warp

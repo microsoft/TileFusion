@@ -30,8 +30,9 @@ class GemmFunc(torch.autograd.Function):
         warp_per_col: int,
     ) -> Tensor:
         builder = Compile(file_prefix="gemm", tmp_dir="tmp")
-        lib_name = builder.compile(M, N, K, kM, kN, kChunkK, warp_per_row,
-                                   warp_per_col)
+        lib_name = builder.compile(
+            M, N, K, kM, kN, kChunkK, warp_per_row, warp_per_col
+        )
 
         if lib_name is None:
             raise RuntimeError("Failed to compile the library.")

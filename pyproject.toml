@@ -1,7 +1,10 @@
 [project]
 name = "tilefusion"
 version = "0.0.0"
-authors = []
+authors = [
+    {name="Ying Cao", email="lcy.seso@gmail.com"},
+    {name="ChengXiang Qi", email="KuangjuX@outlook.com"},
+]
 
 description = "TileFusion: Simplifying Kernel Fusion with Tile Processing"
 readme = "README.md"

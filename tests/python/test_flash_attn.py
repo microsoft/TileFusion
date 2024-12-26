@@ -5,7 +5,7 @@
 
 import unittest
 
-import context
+import context  # noqa: F401
 import torch
 
 from pytilefusion import TiledFlashAttention
@@ -56,10 +56,11 @@ class FlashAttention:
             exp_weights = torch.exp(attn_weights - cur_maxes)
             # unnormalized attention score @ values
             exp_values = exp_weights @ v
-            # move the normalization step to the very end of the attention computation.
+            # move the normalization step to the very end
+            # of the attention computation.
             cur_sums = torch.sum(exp_weights, dim=-1, keepdim=True)  # l(x_cur)
 
-            # =======================    renormalization  ======================#
+            # =========   renormalization  ======================#
             new_maxes = torch.max(cur_maxes, prev_maxes)  # update m(x)
             # renormalization factor for the previous block
             renorm_prev = torch.exp(prev_maxes - new_maxes)
@@ -69,8 +70,9 @@ class FlashAttention:
             # update normalization factor l(x)
             new_sums = renorm_prev * prev_sums + renorm_cur * cur_sums
 
-            output = (output * prev_sums * renorm_prev +
-                      renorm_cur * exp_values) / new_sums
+            output = (
+                output * prev_sums * renorm_prev + renorm_cur * exp_values
+            ) / new_sums
 
             prev_sums = new_sums
             prev_maxes = new_maxes
@@ -90,12 +92,12 @@ class TestFlashAttention(unittest.TestCase):
         Q = torch.randn(m, k, device='cpu')
         K = torch.randn(k, n, device='cpu')
         V = torch.randn(n, p, device='cpu')
-        O = torch.empty(m, p, device='cpu')
 
-        flash_attn = FlashAttention(Q.half().flatten(),
-                                    K.half().flatten(),
-                                    V.half().flatten(), m, n, k, p, kTM, kTN,
-                                    kTK, kTP)
+        flash_attn = FlashAttention(
+            Q.half().flatten(),
+            K.half().flatten(),
+            V.half().flatten(), m, n, k, p, kTM, kTN, kTK, kTP
+        )
 
         ref_o = flash_attn.forward().half()
 
@@ -104,12 +106,12 @@ class TestFlashAttention(unittest.TestCase):
         CUDA_V = V.cuda()
 
         tiled_flash_attention = TiledFlashAttention(CUDA_Q, CUDA_K, CUDA_V)
-        O = tiled_flash_attention.forward()
+        out = tiled_flash_attention.forward()
 
-        print('CPU Reference O: ', ref_o)
-        print('tilefusion O: ', O)
+        print('CPU Reference output: ', ref_o)
+        print('tilefusion output: ', out)
 
-        hO = O.cpu()
+        hO = out.cpu()
 
         passed = True
 

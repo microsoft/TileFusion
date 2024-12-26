@@ -175,7 +175,7 @@ struct ExecCounter {
     static constexpr int kColExec = col_exec_count();
 };
 
-/// @brief Determine the automic shape of a single warp based on the shape of
+/// @brief Determine the automatic shape of a single warp based on the shape of
 ///        the entire tile. The final warp tile shape is multiple of this atomic
 ///        shape.
 template <typename DType, typename TileLayout, const tl::Layout kType>

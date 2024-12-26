@@ -10,18 +10,20 @@ from gemm import gemm_func
 from torch import Tensor
 
 
-def run_unittest(a: Tensor,
-                 b: Tensor,
-                 c: Tensor,
-                 M: int,
-                 N: int,
-                 K: int,
-                 TM: int,
-                 TN: int,
-                 kChunkK: int,
-                 warp_layout: Tuple,
-                 epsilon: float = 5e-2,
-                 debug_print=False):
+def run_unittest(
+    a: Tensor,
+    b: Tensor,
+    c: Tensor,
+    M: int,
+    N: int,
+    K: int,
+    TM: int,
+    TN: int,
+    kChunkK: int,
+    warp_layout: Tuple,
+    epsilon: float = 5e-2,
+    debug_print=False
+):
     gemm_func(a, b, c, M, N, K, TM, TN, kChunkK, *warp_layout)
     ref_c = a @ b.t()
 
@@ -33,10 +35,7 @@ def run_unittest(a: Tensor,
         print(ref_c)
 
     avg_diff = (torch.sum(torch.abs(ref_c - c)) / (M * N)).item()
-    if avg_diff > epsilon:
-        return False
-    else:
-        return True
+    return not avg_diff > epsilon
 
 
 def run_test(
@@ -60,7 +59,7 @@ def run_test(
 
     for _ in range(5):  # warm up
         gemm_func(a, b, c, M, N, K, TM, TN, kChunkK, *warp_layout)
-        ref_c = a @ b.t()
+        a @ b.t()
 
     start_event = torch.cuda.Event(enable_timing=True)
     end_event = torch.cuda.Event(enable_timing=True)
@@ -75,8 +74,8 @@ def run_test(
     time1 = start_event.elapsed_time(end_event) / iters
 
     start_event.record()
-    for i in range(iters):
-        ref_c = a @ b.t()
+    for _ in range(iters):
+        a @ b.t()
     end_event.record()
     torch.cuda.synchronize()
 
@@ -89,8 +88,10 @@ if __name__ == "__main__":
     N = 4096
     K = 4096
 
-    print(("Whole Shape\tBlock Shape\tthreads"
-           "\ttilefusion(ms)\tcublass(ms)\tRatio"))
+    print((
+        "Whole Shape\tBlock Shape\tthreads"
+        "\ttilefusion(ms)\tcublass(ms)\tRatio"
+    ))
 
     warp_layout = (1, 2)
     threads = warp_layout[0] * warp_layout[1] * 32
@@ -98,10 +99,13 @@ if __name__ == "__main__":
         for TN in [64, 128]:
             for kChunkK in [32, 64, 128]:
                 time1, time2 = run_test(M, N, K, TM, TN, kChunkK, warp_layout)
-                print(("[{}, {}, {}]\t[{}, {}, {}]"
-                       "\t{}\t{:.4f}\t{:.4f}\t{:.3f}").format(
-                           M, N, K, TM, TN, kChunkK, threads, time1, time2,
-                           time1 / time2))
+                print((
+                    "[{}, {}, {}]\t[{}, {}, {}]"
+                    "\t{}\t{:.4f}\t{:.4f}\t{:.3f}"
+                ).format(
+                    M, N, K, TM, TN, kChunkK, threads, time1, time2,
+                    time1 / time2
+                ))
 
     for warp_layout in [(2, 2), (2, 4)]:
         threads = warp_layout[0] * warp_layout[1] * 32
@@ -109,9 +113,13 @@ if __name__ == "__main__":
         for TM in [64, 128, 256]:
             for TN in [64, 128, 256]:
                 for kChunkK in [32, 64, 128]:
-                    time1, time2 = run_test(M, N, K, TM, TN, kChunkK,
-                                            warp_layout)
-                    print(("[{}, {}, {}]\t[{}, {}, {}]"
-                           "\t{}\t{:.4f}\t{:.4f}\t{:.3f}").format(
-                               M, N, K, TM, TN, kChunkK, threads, time1, time2,
-                               time1 / time2))
+                    time1, time2 = run_test(
+                        M, N, K, TM, TN, kChunkK, warp_layout
+                    )
+                    print((
+                        "[{}, {}, {}]\t[{}, {}, {}]"
+                        "\t{}\t{:.4f}\t{:.4f}\t{:.3f}"
+                    ).format(
+                        M, N, K, TM, TN, kChunkK, threads, time1, time2,
+                        time1 / time2
+                    ))
