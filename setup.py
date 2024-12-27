@@ -32,6 +32,22 @@ class CMakeExtension(Extension):
 class CMakeBuildExt(build_ext):
     """launches the CMake build."""
 
+    def copy_extensions_to_source(self) -> None:
+        build_py = self.get_finalized_command("build_py")
+        for ext in self.extensions:
+            source_path = os.path.join(self.build_lib, "lib" + ext.name + ".so")
+            inplace_file, _ = self._get_inplace_equivalent(build_py, ext)
+
+            target_path = os.path.join(
+                build_py.build_lib, "pytilefusion", inplace_file
+            )
+
+            # Always copy, even if source is older than destination, to ensure
+            # that the right extensions for the current Python/platform are
+            # used.
+            if os.path.exists(source_path) or not ext.optional:
+                self.copy_file(source_path, target_path, level=self.verbose)
+
     def build_extension(self, ext: CMakeExtension) -> None:
         # Ensure that CMake is present and working
         try:
@@ -95,8 +111,11 @@ class CMakeBuildExt(build_ext):
             subprocess.check_call(["cmake", "--build", "."] + build_args,
                                   cwd=self.build_temp)
 
+            print()
+            self.copy_extensions_to_source()
 
-class clean(Command):
+
+class Clean(Command):
     user_options = []
 
     def initialize_options(self):
@@ -134,19 +153,20 @@ class clean(Command):
 
 description = ("PyTileFusion: A Python wrapper for tilefusion C++ library.")
 
-with open(os.path.join("pytilefusion", '__version__.py')) as f:
+with open(os.path.join("pytilefusion", "__version__.py")) as f:
     exec(f.read())
 
 setup(
     name="tilefusion",
+    version=__version__,  # noqa F821
+    description=description,
+    author="Ying Cao, Chengxiang Qi",
     python_requires=">=3.10",
     packages=find_packages(exclude=[""]),
     install_requires=get_requirements(),
-    version=__version__,  # noqa F821
-    description=description,
     ext_modules=[CMakeExtension("tilefusion")],
     cmdclass={
         "build_ext": CMakeBuildExt,
-        "clean": clean,
+        "clean": Clean,
     },
 )

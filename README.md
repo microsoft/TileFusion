@@ -88,6 +88,26 @@ cd TileFusion && git submodule update --init --recursive
 
 TileFusion requires a C++20 host compiler, CUDA 12.0 or later, and GCC version 10.0 or higher to support C++20 features.
 
+### Build from Source
+
+#### Using Makefile
+To build the project using the provided `Makefile`, simply run:
+```bash
+make
+```
+
+#### Building the Python Wrapper
+
+1. Build the wheel:
+    ```bash
+    python3 setup.py build bdist_wheel
+    ```
+
+2. Clean the build:
+    ```bash
+    python3 setup.py clean
+    ```
+
 ### Unit Test
 
 - **Run a single unit test**: `make unit_test UNIT_TEST=test_scatter_nd.py`
