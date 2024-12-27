@@ -15,10 +15,25 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Libraries",
 ]
+# NOTE: setuptools's `install_requires` can overwritten in
+ # `pyproject.toml`'s `dependencies` field.
+ # Make sure to keep this field in sync with what is in `requirements.txt`.
+dependencies = [
+    "torch",
+]
 
 [project.urls]
 Homepage = "https://github.com/microsoft/TileFusion"
 Issues = "https://github.com/microsoft/TileFusion/issues"
+
+[build-system]
+requires = [
+    "cmake",
+    "packaging",
+    "setuptools>=49.4.0",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 line-length = 80

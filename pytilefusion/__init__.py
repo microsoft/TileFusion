@@ -5,8 +5,6 @@
 
 import torch
 
-torch.ops.load_library("build/src/libtilefusion.so")
-
 
 def scatter_nd(scatter_data, scatter_indices, scatter_updates):
     torch.ops.tilefusion.scatter_nd(

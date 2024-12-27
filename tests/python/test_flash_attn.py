@@ -5,7 +5,6 @@
 
 import unittest
 
-import context  # noqa: F401
 import torch
 
 from pytilefusion import TiledFlashAttention
