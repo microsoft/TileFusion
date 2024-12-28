@@ -28,7 +28,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     using LoadMat = LoadMatBase<typename Shared::DType>;
     using DType = Shared::DType;
     using Reg = Reg_;
-    using BaseShape = BaseTileShape<DType>;
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
@@ -193,18 +192,22 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 
 /// @brief partial specialization for loading data from shared memory to
 ///        register file using `ldmatrix`.
-template <typename Reg_, typename WarpLayout_, const WarpReuse kMode_,
-          typename Base = warp::CopyBase<WarpLayout_, kMode_>>
-struct SharedToRegLoader : public Base {
+template <typename Reg_, typename WarpLayout_, const WarpReuse kMode_>
+struct SharedToRegLoader {
     using Reg = Reg_;
     using DType = typename Reg::DType::DType;  // the element data type
-    using BaseShape = BaseTileShape<DType>;
+    using WarpShape = BaseTileShape<DType>;
 
     using WarpLayout = WarpLayout_;
     static constexpr WarpReuse kMode = kMode_;
 
+    // how many times a `BaseTile` is executed along the row and column
+    // direction.
+    static constexpr int kRowExec = Reg::kRows;
+    static constexpr int kColExec = Reg::kCols;
+
     template <typename Shared>
-    DEVICE void operator()(const Shared& src_, Reg& dst) {
+    DEVICE void operator()(const Shared& src, Reg& dst) {
         static_assert(std::is_same_v<typename Shared::DType, DType>,
                       "The data type of Shared and Reg must be the same.");
         static_assert(Shared::kRows % tl::num_rows<WarpLayout> == 0,
@@ -214,42 +217,37 @@ struct SharedToRegLoader : public Base {
                       "The current implementation requires Shared::kCols must "
                       "be divisible by tl::num_cols<WarpLayout>");
 
-        // how many times a `BaseTile` is executed along the row and column
-        // direction.
-        static constexpr int kRowExec =
-            Base::template row_exec_count<BaseShape, Shared::kRows>();
-        static constexpr int kColExec =
-            Base::template col_exec_count<BaseShape, Shared::kCols>();
+        using SharedOffset =
+            warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared, kMode>;
+        SharedOffset shared_offset_;
 
         // advance the pointer to input data to the current warp according to
         // warp reuse mode.
-        const DType* src = src_.data();
-
-        using OffsetHelper =
-            warp::SharedOffsetHelper<WarpLayout, kMode, Shared>;
-
-        OffsetHelper offset_helper_;
-        int offset = offset_helper_.get_warp_offset();
+        int offset = shared_offset_.get_warp_offset();
 
         using Loader =
             detail::SharedToRegLoaderImpl<Shared, Reg, kRowExec, kColExec,
                                           Shared::kType, CopyInst::kLoadMat>;
         Loader loader;
-
-        loader(src + offset, dst);
+        loader(src.data() + offset, dst);
     }
 };
 
 /// @brief partial specialization for 16x16x16 wmma's output, and st.shared.f32
-///        to revert the data distrubution into an comphrehensive row-major
+///        to revert the data distribution into an comprehensive row-major
 ///        matrix.
 template <typename Reg_, typename WarpLayout_>
 struct RegToSharedStorer {
     using Reg = Reg_;
     // elementary data type stored in the register tile.
     using DType = typename Reg::DType::DType;
-    using BaseShape = BaseTileShape<DType>;
+    using WarpShape = BaseTileShape<DType>;
     using WarpLayout = WarpLayout_;
+
+    // how many times a `BaseTile` is executed along the row and column
+    // direction.
+    static constexpr int kRowExec = Reg::kRows;
+    static constexpr int kColExec = Reg::kCols;
 
     /// @brief Store the WMMA output register tile to shared memory. The source
     ///        is the current thread's local register tile, and the destination
@@ -267,28 +265,21 @@ struct RegToSharedStorer {
         static_assert(
             Shared::kType == Reg::kType,
             "The layout of Shared and Register tile must be the same.");
-        static_assert(Shared::kRows % BaseShape::kRows == 0,
+        static_assert(Shared::kRows % WarpShape::kRows == 0,
                       "The number of shared memory rows must be divisible by "
                       "the base tile row.");
-        static_assert(Shared::kCols % BaseShape::kCols == 0,
+        static_assert(Shared::kCols % WarpShape::kCols == 0,
                       "The number of shared memory columns must be divisible "
                       "by the base tile column.");
 
-        // how many times the 16x16 `BaseTile` is executed along the row and
-        // column direction.
-        static constexpr int kRowExec =
-            Shared::kRows / BaseShape::kRows / tl::num_rows<WarpLayout>;
-        static constexpr int kColExec =
-            Shared::kCols / BaseShape::kCols / tl::num_cols<WarpLayout>;
-
-        // 1. advance the pointer to input data to the current warp according to
+        // advance the pointer to input data to the current warp according to
         // warp reuse mode. During the store process, threads do not write to
         // the same shared memory location, thus the warp reuse mode is set to
         // `Cont`.
-        using OffsetHelper =
-            warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont, Shared>;
-        OffsetHelper offset_helper_;
-        int offset = offset_helper_.get_warp_offset();
+        using SharedOffset = warp::SharedOffsetHelper<WarpLayout, WarpShape,
+                                                      Shared, WarpReuse::kCont>;
+        SharedOffset shared_offset_;
+        int offset = shared_offset_.get_warp_offset();
 
         using Storer = detail::RegToSharedStorerImpl<Reg, Shared, kRowExec,
                                                      kColExec, Reg::kType>;

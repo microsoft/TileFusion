@@ -8,7 +8,6 @@ import unittest
 
 import torch
 
-import context
 from pytilefusion import scatter_nd
 
 

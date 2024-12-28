@@ -24,9 +24,3 @@ for file in $(find "$TESTS_DIR/cell/" -name "test_*.cu"); do
     echo "Running test: $test_name"
     ctest -R $test_name
 done
-
-for file in $(find "$TESTS_DIR/kernels/" -name "test_*.cu"); do
-    test_name=$(basename $file .cu)
-    echo "Running test: $test_name"
-    ctest -R $test_name
-done

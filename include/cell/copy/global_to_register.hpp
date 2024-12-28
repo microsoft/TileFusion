@@ -303,36 +303,34 @@ struct RegToGlobalStorerImpl<Global_, Reg_, kRowExec_, kColExec_,
  * @tparam kMode_ Warp reuse mode.
  * @tparam Base Copy base.
  */
-template <typename Reg_, typename WarpLayout_, const WarpReuse kMode_,
-          typename Base = warp::CopyBase<WarpLayout_, kMode_>>
-struct GlobalToRegLoader : public Base {
+template <typename Reg_, typename WarpLayout_, const WarpReuse kMode_>
+struct GlobalToRegLoader {
     using Reg = Reg_;
     using DType = typename Reg::DType::DType;
-    using BaseShape = BaseTileShape<DType>;
-
     using WarpLayout = WarpLayout_;
     static constexpr WarpReuse kMode = kMode_;
 
+    // how many times a `BaseTile` is executed along the row and column
+    // direction.
+    static constexpr int kRowExec = Reg::kRows;
+    static constexpr int kColExec = Reg::kCols;
+
     template <typename Global>
     DEVICE void operator()(const Global& src, Reg& dst) {
-        const DType* src_ptr = src.data();
-
         // 1. advance the pointer to input data to the current warp
         // according to warp reuse mode.
-        src_ptr += Base::template get_warp_offset<Global>();
-
-        // how many times a `BaseTile` is executed along the row and column
-        // direction.
-        static constexpr int kRowExec =
-            Base::template row_exec_count<BaseShape, Global::kRows>();
-        static constexpr int kColExec =
-            Base::template col_exec_count<BaseShape, Global::kCols>();
+        int offset = global_offset_.template get_warp_offset<Global>();
 
         using Loader = GlobalToRegLoaderImpl<Global, Reg, kRowExec, kColExec,
                                              Global::kType>;
         Loader loader;
-        loader(src_ptr, dst);
+        loader(src.data() + offset, dst);
     }
+
+  private:
+    using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, WarpReuse::kCont>;
+
+    GlobalOffset global_offset_;
 };
 
 /**
@@ -342,37 +340,34 @@ struct GlobalToRegLoader : public Base {
  * @tparam Reg_ Register tile type.
  * @tparam WarpLayout_ Warp layout type.
  * @tparam kMode_ Warp reuse mode.
- * @tparam Base Copy base.
  */
-template <typename Global_, typename Reg_, typename WarpLayout_,
-          typename Base = warp::CopyBase<WarpLayout_, WarpReuse::kCont>>
-struct RegToGlobalStorer : public Base {
+template <typename Global_, typename Reg_, typename WarpLayout_>
+struct RegToGlobalStorer {
     using Global = Global_;
     using Reg = Reg_;
     using DType = typename Global::DType;
-    using BaseShape = BaseTileShape<DType>;
-
     using WarpLayout = WarpLayout_;
+
+    // how many times a `BaseTile` is executed along the row and column
+    // direction.
+    static constexpr int kRowExec = Reg::kRows;
+    static constexpr int kColExec = Reg::kCols;
 
     DEVICE void operator()(const Reg& src, Global& dst) {
         DType* dst_ptr = dst.mutable_data();
 
         // 1. advance the pointer to output data to the current warp
         // according to warp reuse mode.
-        dst_ptr += Base::template get_warp_offset<Global>();
-
-        // how many times a `BaseTile` is executed along the row and column
-        // direction.
-        static constexpr int kRowExec =
-            Base::template row_exec_count<BaseShape, Global::kRows>();
-        static constexpr int kColExec =
-            Base::template col_exec_count<BaseShape, Global::kCols>();
+        int offset = global_offset_.template get_warp_offset<Global>();
 
         using Storer = RegToGlobalStorerImpl<Global, Reg, kRowExec, kColExec,
                                              Global::kType>;
         Storer storer;
-        storer(src, dst_ptr);
+        storer(src, dst_ptr + offset);
     }
-};
 
+    using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, WarpReuse::kCont>;
+
+    GlobalOffset global_offset_;
+};
 }  // namespace tilefusion::cell::copy

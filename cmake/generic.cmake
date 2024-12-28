@@ -7,7 +7,7 @@ set(CMAKE_BUILD_TYPE Release)
 
 set(CMAKE_CXX_STANDARD
     20
-    CACHE STRING "The C++ standard whoese features are requested." FORCE)
+    CACHE STRING "The C++ standard whose features are requested." FORCE)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_CUDA_STANDARD
@@ -47,6 +47,12 @@ set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++20)
 set(CUDA_NVCC_FLAGS_DEBUG ${CUDA_NVCC_FLAGS_DEBUG} -std=c++20 -O0)
 set(CUDA_NVCC_FLAGS_RELEASE ${CUDA_NVCC_FLAGS_RELEASE} -std=c++20 -O3)
+
+if(${CUDA_VERSION_MAJOR} VERSION_GREATER_EQUAL "11")
+  add_definitions("-DENABLE_BF16")
+  message(STATUS "CUDA_VERSION ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR} "
+                 "is greater or equal than 11.0, enable -DENABLE_BF16 flag.")
+endif()
 
 message(STATUS "tilefusion: CUDA detected: " ${CUDA_VERSION})
 message(STATUS "tilefusion: CUDA nvcc is: " ${CUDA_NVCC_EXECUTABLE})

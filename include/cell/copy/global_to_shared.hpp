@@ -253,35 +253,38 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, kRowExec_, kColExec_,
 /// @brief The thread-block level API that cooperatively transfers a data tile
 ///        from global memory to shared memory by all the threads within a
 ///        thread block.
-template <typename Shared_, typename WarpLayout_,
-          typename Base = warp::CopyBase<WarpLayout_, WarpReuse::kCont>>
-struct GlobalToSharedLoader : public Base {
+template <typename Shared_, typename WarpLayout_>
+struct GlobalToSharedLoader {
     using Shared = Shared_;
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
 
-    // TODO(ying): The atomic tile shape that a single warp loads. The atomic
-    // tile shape should be automatically determined to choose the best
-    // performance.
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): automatically infer the warp-level tile shape instead
+    // of using a fixed `BaseShape`.
+    // using WarpShape =
+    //     warp::WarpTileShape<DType, typename Shared::Layout, Shared::kType>;
 
-    static_assert((Shared::kSwizzled && sizeof(DType) == 2 ||
-                   Shared::kSwizzled == false),
-                  "Not implemented for swizzled layout with 4-byte data types "
-                  "(single precision floating point).");
+    using WarpShape = traits::BaseTileShape<DType>;
+    static_assert(Shared::kRows % WarpShape::kRows == 0,
+                  "Shared::kRows must be divisible by WarpShape::kRows.");
+    static_assert(Shared::kCols % WarpShape::kCols == 0,
+                  "Shared::kCols must be divisible by WarpShape::kCols.");
 
-    static constexpr int kRowExec =
-        Base::template row_exec_count<BaseShape, Shared::kRows>();
-    static constexpr int kColExec =
-        Base::template col_exec_count<BaseShape, Shared::kCols>();
+    static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
+    using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
+    using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
+    using SharedOffset =
+        warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared, kMode>;
+
+    static constexpr int kRowExec = ExecCounter::kRowExec;
+    static constexpr int kColExec = ExecCounter::kColExec;
 
     static_assert(kRowExec && kColExec,
-                  "Execution count should be greater than 0.");
+                  "Ensure that the execution count for all "
+                  "rows and columns is greater than 0.");
 
     template <typename Global>
     DEVICE void operator()(const Global& src, Shared& dst) {
-        static_assert(Shared::kNumel == Global::kNumel,
-                      "Global and shared memory should have the same shape.");
         static_assert(
             Global::kRows == Shared::kRows && Global::kCols == Shared::kCols,
             "Global and shared memory should have the same shape.");
@@ -289,8 +292,8 @@ struct GlobalToSharedLoader : public Base {
         const DType* src_ptr = src.data();
         DType* dst_ptr = dst.mutable_data();
 
-        int offset_src = Base::template get_warp_offset<Global>();  // global
-        int offset_dst = offset_helper_.get_warp_offset();          // shared
+        int offset_src = global_offset_.template get_warp_offset<Global>();
+        int offset_dst = shared_offset_.get_warp_offset();
 
         using Loader = GlobalToSharedLoaderImpl<Global, Shared, kRowExec,
                                                 kColExec, Shared::kType>;
@@ -300,28 +303,32 @@ struct GlobalToSharedLoader : public Base {
     }
 
   private:
-    using OffsetHelper =
-        warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont, Shared>;
-    OffsetHelper offset_helper_;
+    GlobalOffset global_offset_;
+    SharedOffset shared_offset_;
 };
 
-template <typename Shared_, typename WarpLayout_,
-          typename Base = warp::CopyBase<WarpLayout_, WarpReuse::kCont>>
-struct SharedToGlobalStorer : public Base {
+template <typename Shared_, typename WarpLayout_>
+struct SharedToGlobalStorer {
     using Shared = Shared_;
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
-    using BaseShape = traits::BaseTileShape<DType>;
 
-    static_assert(Shared::kRows % BaseShape::kRows == 0,
-                  "Shared::kRows must be divisible by BaseShape::kRows.");
-    static_assert(Shared::kCols % BaseShape::kCols == 0,
-                  "Shared::kCols must be divisible by BaseShape::kCols.");
+    // FIXME(ying): automatically infer the warp-level tile shape instead
+    // of using a fixed `BaseShape`.
+    using WarpShape = traits::BaseTileShape<DType>;
+    static_assert(Shared::kRows % WarpShape::kRows == 0,
+                  "Shared::kRows must be divisible by WarpShape::kRows.");
+    static_assert(Shared::kCols % WarpShape::kCols == 0,
+                  "Shared::kCols must be divisible by WarpShape::kCols.");
 
-    static constexpr int kRowExec =
-        Shared::kRows / BaseShape::kRows / tl::num_rows<WarpLayout>;
-    static constexpr int kColExec =
-        Shared::kCols / BaseShape::kCols / tl::num_cols<WarpLayout>;
+    static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
+    using SharedOffset =
+        warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared, kMode>;
+    using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
+    using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
+
+    static constexpr int kRowExec = ExecCounter::kRowExec;
+    static constexpr int kColExec = ExecCounter::kColExec;
 
     static_assert(kRowExec && kColExec,
                   "Execution count should be greater than 0.");
@@ -331,8 +338,8 @@ struct SharedToGlobalStorer : public Base {
         const DType* src = src_.data();
         DType* dst = dst_.mutable_data();
 
-        int offset_src = offset_helper_.get_warp_offset();          // shared
-        int offset_dst = Base::template get_warp_offset<Global>();  // global
+        int offset_src = shared_offset_.get_warp_offset();
+        int offset_dst = global_offset_.template get_warp_offset<Global>();
 
         using Storer = SharedToGlobalStorerImpl<Shared, Global, kRowExec,
                                                 kColExec, Shared::kType>;
@@ -342,8 +349,7 @@ struct SharedToGlobalStorer : public Base {
     }
 
   private:
-    using OffsetHelper =
-        warp::SharedOffsetHelper<WarpLayout, WarpReuse::kCont, Shared>;
-    OffsetHelper offset_helper_;
+    SharedOffset shared_offset_;
+    GlobalOffset global_offset_;
 };
 }  // namespace tilefusion::cell::copy

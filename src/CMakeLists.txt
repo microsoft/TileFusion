@@ -21,7 +21,15 @@ set_target_properties(
              CUDA_SEPARABLE_COMPILATION ON)
 
 target_compile_options(
-  ${TARGET} PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: -Werror,-Wall -rdc=true
-                   -std=c++20 -fconcepts -fpermissive>)
+  ${TARGET}
+  PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
+         -Werror,-Wall
+         -rdc=true
+         -std=c++20
+         -fconcepts
+         -fpermissive
+         --use_fast_math
+         --generate-line-info
+         >)
 target_compile_features(${TARGET} PUBLIC cxx_std_20 cuda_std_20)
 target_link_libraries(${TARGET} "${TORCH_LIBRARIES}")
