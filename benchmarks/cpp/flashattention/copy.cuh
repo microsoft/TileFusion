@@ -30,53 +30,50 @@ class G2SCopyQK {
           gK_stride(gK_stride),
           sK_stride(sK_stride),
           cur_iter(0),
+          cur_iter_sk(0),
           num_stage(num_stage) {}
 
-    DEVICE auto get_sQ() { return sQ; }
-
-    DEVICE auto get_sK() { return sK; }
-
-    // For debugging purpose.
-    DEVICE void print_gQ() {
-        if (thread0()) {
-            print(gQ), print("\n");
-            printf("gQ size<0>: %d, size<1>: %d, size<2>: %d\n",
-                   (int)size<0>(gQ), (int)size<1>(gQ), (int)size<2>(gQ));
-        }
+    /**
+     * @brief Update the pointer of the global K tensor.
+     *
+     * Since the K matrix is split along both the n and k dimensions, the
+     * pointer offset for the K matrix needs to be updated to the next kTN * kK
+     * position during the next n dimension iteration.
+     *
+     * @param gK_slice The stride in N dimension.
+     * @param gK_stride The stride in K dimension.
+     */
+    DEVICE void update_tile_K(int gK_slice, int gK_stride) {
+        gK.data() = gK.data() + (-gK_stride) + gK_slice * gK_stride;
     }
 
-    DEVICE void print_gQ_data(int tid) {
-        if (threadIdx.x == tid) {
-            printf("gQ data(%d): \n", tid);
-            for (int i = 0; i < size<0>(gQ); ++i) {
-                for (int j = 0; j < size<1>(gQ); ++j) {
-                    for (int k = 0; k < size<2>(gQ); ++k) {
-                        print(gQ(i, j, k)), print(" ");
-                    }
-                    print("\n");
-                }
-                print("\n");
+    /**
+     * @brief Preload the K matrix. When `load_q_once` is true, the Q matrix
+     * only needs to be loaded once and does not require repeated loading, while
+     * the K matrix needs to be updated and loaded.
+     */
+    DEVICE void prologue_K() {
+#pragma unroll
+        for (int m = 0; m < size<1>(gK); ++m) {
+#pragma unroll
+            for (int k = 0; k < size<2>(gK); ++k) {
+                cute::copy(tiled_copy, gK(_, m, k), sK(_, m, k));
             }
         }
-    }
 
-    DEVICE void print_sQ_data(int tid) {
-        if (threadIdx.x == tid) {
-            printf("sQ data(%d): \n", tid);
-            for (int i = 0; i < size<0>(sQ); ++i) {
-                for (int j = 0; j < size<1>(sQ); ++j) {
-                    for (int k = 0; k < size<2>(sQ); ++k) {
-                        print(sQ(i, j, k)), print(" ");
-                    }
-                    print("\n");
-                }
-                print("\n");
-            }
+        cute::cp_async_fence();
+
+        gK.data() = gK.data() + gK_stride;
+        sK.data() = sK.data() + sK_stride;
+
+        if ((cur_iter_sk + 1) % num_stage == 0) {
+            sK.data() = sK.data() + (-sK_stride * num_stage);
         }
+
+        cur_iter_sk++;
     }
 
     DEVICE void prologue() {
-        // Pipeline the copy operation.
 #pragma unroll
         for (int m = 0; m < size<1>(gQ); ++m) {
 #pragma unroll
@@ -172,6 +169,7 @@ class G2SCopyQK {
     int gK_stride;
     int sK_stride;
     int cur_iter;
+    int cur_iter_sk;
     int num_stage;
 };
 
@@ -187,23 +185,56 @@ class G2SCopyV {
           cur_iter(0),
           num_stage(num_stage) {}
 
-    // For debugging purpose.
-    DEVICE void print_gV() {
-        if (thread0()) {
-            print(gV), print("\n");
-        }
-    }
-
     DEVICE void prologue() {
-        // Pipeline the copy operation.
+#pragma unroll
+        for (int m = 0; m < size<1>(gV); ++m) {
+#pragma unroll
+            for (int k = 0; k < size<2>(gV); ++k) {
+                cute::copy(tiled_copy, gV(_, m, k), sV(_, m, k));
+            }
+        }
+
+        cute::cp_async_fence();
+        gV.data() = gV.data() + gV_stride;
+        sV.data() = sV.data() + sV_stride;
+
+        if ((cur_iter + 1) % num_stage == 0) {
+            sV.data() = sV.data() + (-sV_stride * num_stage);
+        }
+
+        cur_iter++;
     }
 
     DEVICE void body() {
-        // Pipeline the copy operation.
+#pragma unroll
+        for (int m = 0; m < size<1>(gV); ++m) {
+#pragma unroll
+            for (int k = 0; k < size<2>(gV); ++k) {
+                cute::copy(tiled_copy, gV(_, m, k), sV(_, m, k));
+            }
+        }
+
+        cute::cp_async_fence();
+
+        gV.data() = gV.data() + gV_stride;
+        sV.data() = sV.data() + sV_stride;
+
+        if ((cur_iter + 1) % num_stage == 0) {
+            sV.data() = sV.data() + (-sV_stride * num_stage);
+        }
+
+        cur_iter++;
     }
 
     DEVICE void epilogue() {
-        // Pipeline the copy operation.
+#pragma unroll
+        for (int m = 0; m < size<1>(gV); ++m) {
+#pragma unroll
+            for (int k = 0; k < size<2>(gV); ++k) {
+                cute::copy(tiled_copy, gV(_, m, k), sV(_, m, k));
+            }
+        }
+        cute::cp_async_fence();
     }
 
   private:
@@ -243,13 +274,6 @@ class S2RPipelineQK {
           num_stage(num_stage),
           cur_iter(0),
           cur_iter_sq(0) {}
-
-    DEVICE void print_rQ() {
-        if (thread0()) {
-            print(rQ_mma_view), print("\n");
-            print(rQ_copy_view), print("\n");
-        }
-    }
 
     DEVICE void prologue() {
         cur_iter = 0;
@@ -366,8 +390,8 @@ class S2RPipelineV {
                 cute::copy(tiled_copy, sV(_, _, i + 1),
                            rV_copy_view(_, _, i + 1));
             }
-            // TODO: Why do we need to use value(_, _, cur_iter *
-            // size<2>(rV_mma_view) + i)?
+            // TODO(KuangjuX):  Understand this code. Why do we need to use
+            // `value(_, _, cur_iter * size<2>(rV_mma_view) + i)`?
             cute::gemm(tiled_mma,
                        value(_, _, cur_iter * size<2>(rV_mma_view) + i),
                        rV_mma_view(_, _, i), acc);
@@ -445,17 +469,11 @@ template <typename Element, typename GlobalQLayout, typename SharedQLayout,
           typename GlobalKLayout, typename SharedKLayout, typename TiledCopy>
 inline __device__ auto make_g2s_qk(const Element* gQ_ptr, Element* sQ_ptr,
                                    const Element* gK_ptr, Element* sK_ptr,
-                                   int gQ_stride, int sQ_stride, int gK_stride,
-                                   int sK_stride) {
+                                   int gQ_stride, int gK_stride) {
     int tid = threadIdx.x;
 
     auto gQ = make_tensor(make_gmem_ptr(gQ_ptr), GlobalQLayout{});
     auto sQ = make_tensor(make_smem_ptr(sQ_ptr), SharedQLayout{});
-
-    if (thread0()) {
-        printf("sQ: \n");
-        print(sQ), print("\n");
-    }
 
     auto gK = make_tensor(make_gmem_ptr(gK_ptr), GlobalKLayout{});
     auto sK = make_tensor(make_smem_ptr(sK_ptr), SharedKLayout{});
@@ -469,6 +487,14 @@ inline __device__ auto make_g2s_qk(const Element* gQ_ptr, Element* sQ_ptr,
     auto sQs = loader.partition_D(sQ);
     auto sKs = loader.partition_D(sK);
 
+    int sQ_stride = size(sQ);
+    int sK_stride = size(sK);
+
+    if (thread0()) {
+        printf("gQ_stride: %d, sQ_stride: %d, gK_stride: %d, sK_stride: %d\n",
+               gQ_stride, sQ_stride, gK_stride, sK_stride);
+    }
+
     detail::G2SCopyQK copy_qk(gQs, sQs, gKs, sKs, tiled_copy, gQ_stride,
                               sQ_stride, gK_stride, sK_stride);
 
@@ -477,8 +503,7 @@ inline __device__ auto make_g2s_qk(const Element* gQ_ptr, Element* sQ_ptr,
 
 template <typename Element, typename GlobalVLayout, typename SharedVLayout,
           typename TiledCopy>
-DEVICE auto make_g2s_v(const Element* gV_ptr, Element* sV_ptr, int gV_stride,
-                       int sV_stride) {
+DEVICE auto make_g2s_v(const Element* gV_ptr, Element* sV_ptr, int gV_stride) {
     int tid = threadIdx.x;
 
     auto gV = make_tensor(make_gmem_ptr(gV_ptr), GlobalVLayout{});
@@ -491,6 +516,12 @@ DEVICE auto make_g2s_v(const Element* gV_ptr, Element* sV_ptr, int gV_stride,
     auto gVs = loader.partition_S(gV);
     auto sVs = loader.partition_D(sV);
 
+    int sV_stride = size(sV);
+
+    if (thread0()) {
+        printf("gV_stride: %d, sV_stride: %d\n", gV_stride, sV_stride);
+    }
+
     detail::G2SCopyV copy_v(gVs, sVs, tiled_copy, gV_stride, sV_stride);
 
     return copy_v;
@@ -500,7 +531,6 @@ template <typename Element, typename SQLayout, typename SKLayout,
           typename RegAcc, typename SmemCopyAtom, typename TiledMma>
 DEVICE auto make_s2r_qk(const Element* sQ_ptr, const Element* sK_ptr,
                         SQLayout sQ_layout, SKLayout sK_layout, RegAcc acc,
-                        int sQ_stride, int sK_stride,
                         SmemCopyAtom copy_atom = SmemCopyAtom{},
                         TiledMma tiled_mma = TiledMma{}) {
     int tid = threadIdx.x;
@@ -526,6 +556,9 @@ DEVICE auto make_s2r_qk(const Element* sQ_ptr, const Element* sK_ptr,
     auto rQ_copy = s2r_thr_copy_q.retile_D(rQ_mma);
     auto rK_copy = s2r_thr_copy_k.retile_D(rK_mma);
 
+    int sQ_stride = size(sQ_);
+    int sK_stride = size(sK_);
+
     detail::S2RPipelineQK s2r_pipeline_qk(sQ, rQ_mma, rQ_copy, sK, rK_mma,
                                           rK_copy, acc, s2r_copy_q, s2r_copy_k,
                                           tiled_mma, sQ_stride, sK_stride);
@@ -536,8 +569,7 @@ DEVICE auto make_s2r_qk(const Element* sQ_ptr, const Element* sK_ptr,
 template <typename Element, typename SVLayout, typename RegAcc,
           typename SmemCopyAtom, typename TiledMma>
 DEVICE auto make_s2r_v(const Element* sV_ptr, SVLayout sV_layout, RegAcc& acc,
-                       int sV_stride, SmemCopyAtom copy_atom,
-                       TiledMma tiled_mma) {
+                       SmemCopyAtom copy_atom, TiledMma tiled_mma) {
     int tid = threadIdx.x;
 
     auto sV_ = make_tensor(make_smem_ptr(sV_ptr), sV_layout);
@@ -551,6 +583,8 @@ DEVICE auto make_s2r_v(const Element* sV_ptr, SVLayout sV_layout, RegAcc& acc,
 
     auto rV_mma = thr_mma.partition_fragment_B(sV_);
     auto rV_copy = s2r_thr_copy_v.retile_D(rV_mma);
+
+    int sV_stride = size(sV_);
 
     detail::S2RPipelineV s2r_pipeline_v(sV, rV_mma, rV_copy, acc, s2r_copy_v,
                                         tiled_mma, sV_stride);
@@ -567,10 +601,10 @@ DEVICE auto store_r2s_o(Element* sO_ptr, SOLayout sO_layout, RegO& o,
     auto r2s_copy_o = make_tiled_copy_C(copy_atom, tiled_mma);
     auto r2s_thr_copy_o = r2s_copy_o.get_thread_slice(threadIdx.x);
 
-    auto sOs = r2s_thr_copy_o.partition_D(sO);
-    auto rO_copy_view = r2s_thr_copy_o.retile_S(o);
+    auto src = r2s_thr_copy_o.retile_S(o);
+    auto dst = r2s_thr_copy_o.partition_D(sO);
 
-    cute::copy(r2s_copy_o, rO_copy_view, sOs);
+    cute::copy(r2s_copy_o, src, dst);
 }
 
 template <typename Element, typename GOLayout, typename SOLayout,

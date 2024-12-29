@@ -4,21 +4,10 @@
 #include "cutlass_fa.cuh"
 #include "util.hpp"
 
-// template <typename WholeShape, typename CtaTileShape, const int kBatch>
 void run(bool check = true) {
     using InType = cutlass::half_t;
     using AccType = cutlass::half_t;
     using OutType = cutlass::half_t;
-
-    // static constexpr int kM = dim_size<0, WholeShape>;
-    // static constexpr int kN = dim_size<1, WholeShape>;
-    // static constexpr int kK = dim_size<2, WholeShape>;
-    // static constexpr int kP = dim_size<3, WholeShape>;
-
-    // static constexpr int kTM = dim_size<0, CtaTileShape>;
-    // static constexpr int kTN = dim_size<1, CtaTileShape>;
-    // static constexpr int kTK = dim_size<2, CtaTileShape>;
-    // static constexpr int kTP = dim_size<3, CtaTileShape>;
 
     static constexpr int kM = 64;
     static constexpr int kN = 64;
@@ -32,11 +21,11 @@ void run(bool check = true) {
 
     static constexpr int kBatch = 1;
 
-    static constexpr int kWarpPerRow = 4;
+    static constexpr int kWarpPerRow = 1;
     static constexpr int kWarpPerCol = 1;
-    static constexpr int kThreads = 128;
-    static constexpr int kStagesQK = 2;
-    static constexpr int kStagesV = 2;
+    static constexpr int kThreads = kWarpPerCol * kWarpPerRow * 32;
+    static constexpr int kStagesQK = 1;
+    static constexpr int kStagesV = 1;
 
     static_assert(kK == kTK,
                   "The current implementation requires kTK == K for now.");
@@ -104,8 +93,6 @@ void run(bool check = true) {
     const InType* C = thrust::raw_pointer_cast(d_c.data());
     InType* D = thrust::raw_pointer_cast(d_d.data());
 
-    // int block_x = CeilDiv<kM, kTM>;
-    // int block_y = CeilDiv<kP, kTP>;
     int block_x = (kM + kTM - 1) / kTM;
     int block_y = (kP + kTP - 1) / kTP;
     int block_z = kBatch;
@@ -121,7 +108,7 @@ void run(bool check = true) {
     using Traits =
         benchmarks::cutlass_wrapper::FATraits<cutlass::half_t, kM, kN, kK, kP,
                                               kTM, kTN, kTK, kTP, kWarpPerRow,
-                                              kWarpPerCol, kThreads>;
+                                              kWarpPerCol>;
 
     auto fa_kernel =
         benchmarks::cutlass_wrapper::fa_kernel<cutlass::half_t, Traits, kM, kN,
