@@ -3,7 +3,22 @@
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
+import os
+
 import torch
+
+
+def _load_library(filename: str) -> bool:
+    """Load a shared library from the given filename."""
+    try:
+        libdir = os.path.dirname(os.path.dirname(__file__))
+        torch.ops.load_library(os.path.join(libdir, "pytilefusion", filename))
+        print(f"Successfully loaded: '{filename}'")
+    except Exception as error:
+        print(f"Fail to load library: '{filename}', {error}\n")
+
+
+_load_library("libtilefusion.so")
 
 
 def scatter_nd(scatter_data, scatter_indices, scatter_updates):
