@@ -24,7 +24,7 @@ def get_requirements():
 class CMakeExtension(Extension):
     """ specify the root folder of the CMake projects"""
 
-    def __init__(self, name, cmake_lists_dir=".", **kwargs):
+    def __init__(self, name="tilefusion", cmake_lists_dir=".", **kwargs):
         Extension.__init__(self, name, sources=[], **kwargs)
         self.cmake_lists_dir = os.path.abspath(cmake_lists_dir)
 
@@ -32,10 +32,15 @@ class CMakeExtension(Extension):
 class CMakeBuildExt(build_ext):
     """launches the CMake build."""
 
+    def get_ext_filename(self, name):
+        return f"lib{name}.so"
+
     def copy_extensions_to_source(self) -> None:
         build_py = self.get_finalized_command("build_py")
         for ext in self.extensions:
-            source_path = os.path.join(self.build_lib, "lib" + ext.name + ".so")
+            source_path = os.path.join(
+                self.build_lib, self.get_ext_filename(ext.name)
+            )
             inplace_file, _ = self._get_inplace_equivalent(build_py, ext)
 
             target_path = os.path.join(
@@ -164,7 +169,7 @@ setup(
     python_requires=">=3.10",
     packages=find_packages(exclude=[""]),
     install_requires=get_requirements(),
-    ext_modules=[CMakeExtension("tilefusion")],
+    ext_modules=[CMakeExtension()],
     cmdclass={
         "build_ext": CMakeBuildExt,
         "clean": Clean,

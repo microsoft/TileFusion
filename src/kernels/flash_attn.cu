@@ -424,9 +424,9 @@ void run_flash_attention(const InType* dQ, const InType* dK, const InType* dV,
     cudaDeviceSynchronize();
 }
 
-void custom_flash_attention_op(const torch::Tensor& Q, const torch::Tensor& K,
-                               const torch::Tensor& V, torch::Tensor& O,
-                               int64_t m, int64_t n, int64_t k, int64_t p) {
+void flash_attention_op(const torch::Tensor& Q, const torch::Tensor& K,
+                        const torch::Tensor& V, torch::Tensor& O, int64_t m,
+                        int64_t n, int64_t k, int64_t p) {
     using InType = __half;
     using AccType = float;
     using OutType = __half;

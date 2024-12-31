@@ -39,7 +39,7 @@ template <typename T>
 void scatter_nd(torch::Tensor& data, const torch::Tensor& updates,
                 const torch::Tensor& indices);
 
-void custom_scatter_op(torch::Tensor& data, const torch::Tensor& updates,
-                       const torch::Tensor& indices);
+void scatter_op(torch::Tensor& data, const torch::Tensor& updates,
+                const torch::Tensor& indices);
 
 }  // namespace tilefusion::kernels
