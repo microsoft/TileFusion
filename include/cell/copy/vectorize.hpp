@@ -28,7 +28,7 @@ struct Vectorize {
      * @param src Source data.
      * @param dst Destination data.
      */
-    static __device__ inline void copy(const UnVecType* src, UnVecType* dst) {
+    DEVICE void copy(const UnVecType* src, UnVecType* dst) {
         const VecType* src_vec = reinterpret_cast<const VecType*>(src);
         VecType* dst_vec = reinterpret_cast<VecType*>(dst);
         *dst_vec = *src_vec;
@@ -42,7 +42,7 @@ struct Vectorize<__half, 2> {
     static constexpr int vectorize_nums = 2;
     static constexpr int vectorize_bits = 32;
 
-    static __device__ inline void copy(const __half* src, __half* dst) {
+    DEVICE void copy(const __half* src, __half* dst) {
         const __half2* src_vec = reinterpret_cast<const __half2*>(src);
         __half2* dst_vec = reinterpret_cast<__half2*>(dst);
         *dst_vec = *src_vec;
@@ -56,8 +56,7 @@ struct Vectorize<cutlass::half_t, 2> {
     static constexpr int vectorize_nums = 2;
     static constexpr int vectorize_bits = 32;
 
-    static __device__ inline void copy(const cutlass::half_t* src,
-                                       cutlass::half_t* dst) {
+    DEVICE void copy(const cutlass::half_t* src, cutlass::half_t* dst) {
         const __half2* src_vec = reinterpret_cast<const __half2*>(src);
         __half2* dst_vec = reinterpret_cast<__half2*>(dst);
         *dst_vec = *src_vec;
@@ -71,7 +70,7 @@ struct Vectorize<float, 2> {
     static constexpr int vectorize_nums = 2;
     static constexpr int vectorize_bits = 64;
 
-    static __device__ inline void copy(const float* src, float* dst) {
+    DEVICE void copy(const float* src, float* dst) {
         const float2* src_vec = reinterpret_cast<const float2*>(src);
         float2* dst_vec = reinterpret_cast<float2*>(dst);
         *dst_vec = *src_vec;
