@@ -1,0 +1,20 @@
+{
+  "gotoSymbolStack.currentStackPosition": 0,
+  "gotoSymbolStack.maxStackPosition": 0,
+  "gotoSymbolStack.filePositionInfo": [],
+  "files.associations": {
+    "*.tcc": "cpp",
+    "optional": "cpp",
+    "ratio": "cpp",
+    "system_error": "cpp",
+    "array": "cpp",
+    "functional": "cpp",
+    "tuple": "cpp",
+    "type_traits": "cpp",
+    "utility": "cpp",
+    "variant": "cpp",
+    "compare": "cpp",
+    "concepts": "cpp",
+    "random": "cpp"
+  }
+}

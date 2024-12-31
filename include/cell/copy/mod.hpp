@@ -9,4 +9,5 @@
 #include "cell/copy/global_to_shared.hpp"
 #include "cell/copy/register.hpp"
 #include "cell/copy/shared_to_register.hpp"
+#include "cell/copy/vectorize.hpp"
 #include "cell/copy/warp.hpp"
