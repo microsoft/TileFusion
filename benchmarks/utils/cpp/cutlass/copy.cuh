@@ -54,6 +54,12 @@ DEVICE void copy_tile_g2s(const Element* src_data, Element* dst_data,
 
     auto src = loader.partition_S(gtile);
     auto dst = loader.partition_D(stile);
+
+#pragma unroll
+    for (int i = 0; i < int(size<1>(src)); ++i)
+#pragma unroll
+        for (int j = 0; j < int(size<2>(src)); ++j)
+            cute::copy(tiled_copy, src(_, i, j), dst(_, i, j));
 }
 
 // Copy a tensor from shared memory to global memory
