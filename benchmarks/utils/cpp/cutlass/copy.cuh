@@ -32,6 +32,13 @@ DEVICE void __copy_async() {
     wait_group<0>();
 }
 
+template <int N>
+DEVICE void cp_async_wait_flash() {
+#if defined(CP_ASYNC_SM80_ENABLED)
+    asm volatile("cp.async.wait_group %0;\n" ::"n"(N));
+#endif
+}
+
 // Copy a 2d data tile from global memory to shared memory
 template <typename Element, typename SrcLayout, typename DstLayout,
           typename TiledCopy>
