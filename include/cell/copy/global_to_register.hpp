@@ -4,6 +4,7 @@
 #pragma once
 
 #include "cell/copy/constants.hpp"
+#include "cell/copy/vectorize.hpp"
 #include "cell/copy/warp.hpp"
 #include "traits/base.hpp"
 #include "types/mod.hpp"
@@ -29,14 +30,11 @@ struct GlobalToRegMatLoader<Global_, BaseTile_, tl::Layout::kRowMajor> {
     static constexpr int kStride = Global::kRowStride;
 
     DEVICE void operator()(const DType* src, BaseTile& dst) {
-        dst(0, 0) = src[0 * kStride + 0];
-        dst(0, 1) = src[0 * kStride + 1];
-        dst(1, 0) = src[0 * kStride + 8];
-        dst(1, 1) = src[0 * kStride + 9];
-        dst(0, 2) = src[8 * kStride + 0];
-        dst(0, 3) = src[8 * kStride + 1];
-        dst(1, 2) = src[8 * kStride + 8];
-        dst(1, 3) = src[8 * kStride + 9];
+        Vectorize<DType, 2> vectorize;
+        vectorize.copy(src + 0 * kStride + 0, &dst(0, 0));
+        vectorize.copy(src + 0 * kStride + 8, &dst(1, 0));
+        vectorize.copy(src + 8 * kStride + 0, &dst(0, 2));
+        vectorize.copy(src + 8 * kStride + 8, &dst(1, 2));
     }
 };
 
@@ -49,14 +47,11 @@ struct GlobalToRegMatLoader<Global_, BaseTile_, tl::Layout::kColMajor> {
     static constexpr int kStride = Global::kColStride;
 
     DEVICE void operator()(const DType* src, BaseTile& dst) {
-        dst(0, 0) = src[0 * kStride + 0];
-        dst(1, 0) = src[0 * kStride + 1];
-        dst(0, 1) = src[0 * kStride + 8];
-        dst(1, 1) = src[0 * kStride + 9];
-        dst(2, 0) = src[8 * kStride + 0];
-        dst(3, 0) = src[8 * kStride + 1];
-        dst(2, 1) = src[8 * kStride + 8];
-        dst(3, 1) = src[8 * kStride + 9];
+        Vectorize<DType, 2> vectorize;
+        vectorize.copy(src + 0 * kStride + 0, &dst(0, 0));
+        vectorize.copy(src + 0 * kStride + 8, &dst(0, 1));
+        vectorize.copy(src + 8 * kStride + 0, &dst(2, 0));
+        vectorize.copy(src + 8 * kStride + 8, &dst(2, 1));
     }
 };
 
@@ -84,14 +79,11 @@ struct RegToGlobalMatStorer<Global_, BaseTile_, tl::Layout::kRowMajor> {
     static constexpr int kStride = Global::kRowStride;
 
     DEVICE void operator()(const BaseTile& src, DType* dst) {
-        dst[0 * kStride + 0] = src(0, 0);
-        dst[0 * kStride + 1] = src(0, 1);
-        dst[0 * kStride + 8] = src(1, 0);
-        dst[0 * kStride + 9] = src(1, 1);
-        dst[8 * kStride + 0] = src(0, 2);
-        dst[8 * kStride + 1] = src(0, 3);
-        dst[8 * kStride + 8] = src(1, 2);
-        dst[8 * kStride + 9] = src(1, 3);
+        Vectorize<DType, 2> vectorize;
+        vectorize.copy(&src(0, 0), dst + 0 * kStride + 0);
+        vectorize.copy(&src(1, 0), dst + 0 * kStride + 8);
+        vectorize.copy(&src(0, 2), dst + 8 * kStride + 0);
+        vectorize.copy(&src(1, 2), dst + 8 * kStride + 8);
     }
 };
 
@@ -104,14 +96,11 @@ struct RegToGlobalMatStorer<Global_, BaseTile_, tl::Layout::kColMajor> {
     static constexpr int kStride = Global::kColStride;
 
     DEVICE void operator()(const BaseTile& src, DType* dst) {
-        dst[0 * kStride + 0] = src(0, 0);
-        dst[0 * kStride + 1] = src(1, 0);
-        dst[0 * kStride + 8] = src(0, 1);
-        dst[0 * kStride + 9] = src(1, 1);
-        dst[8 * kStride + 0] = src(2, 0);
-        dst[8 * kStride + 1] = src(3, 0);
-        dst[8 * kStride + 8] = src(2, 1);
-        dst[8 * kStride + 9] = src(3, 1);
+        Vectorize<DType, 2> vectorize;
+        vectorize.copy(&src(0, 0), dst + 0 * kStride + 0);
+        vectorize.copy(&src(0, 1), dst + 0 * kStride + 8);
+        vectorize.copy(&src(2, 0), dst + 8 * kStride + 0);
+        vectorize.copy(&src(2, 1), dst + 8 * kStride + 8);
     }
 };
 
