@@ -35,7 +35,8 @@ void test_swizzled_function<__half>() {
     RowMajor layout1;
 
     // only siwizzle the first [16x16] half of the [kRows, kCols] matrix
-    using Swizzled = tl::detail::SwizzledRowMajor<kBits>;
+    using BaseShape = traits::BaseTileShape<__half>;
+    using Swizzled = tl::SwizzledRowMajor<kBits, BaseShape>;
     Swizzled layout2;
 
     Element* ptr = thrust::raw_pointer_cast(data.data());
@@ -74,7 +75,8 @@ void test_swizzled_function<float>() {
     RowMajor layout1;
 
     // only siwizzle the first [16x16] half of the [kRows, kCols] matrix
-    using Swizzled = tl::detail::SwizzledRowMajor<kBits>;
+    using BaseShape = traits::BaseTileShape<__half>;
+    using Swizzled = tl::SwizzledRowMajor<kBits, BaseShape>;
     Swizzled layout2;
 
     for (int i = 0; i < RowMajor::kRows; ++i) {

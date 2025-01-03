@@ -17,6 +17,44 @@ namespace tilefusion::cell::copy::atom {
 namespace tl = tile_layout;
 using namespace cute;
 
+namespace {
+template <const int size>
+DEVICE void async_copy(void const* g_ptr /*source*/,
+                       uint32_t s_ptr /*destination*/) {
+    static_assert(size == 4 || size == 8 || size == 16);
+
+#if (__CUDA_ARCH__ >= 900)
+    // SM90, hopper
+    assert(false && "Not implemented yet.");
+#elif (__CUDA_ARCH__ >= 800)
+    // SM80, SM86, ampere
+    // TODO(ying): add a wrapper to allow choosing between different caching
+    // policies (e.g. "cache all levels").
+    asm volatile("cp.async.cg.shared.global [%0], [%1], %2;\n" ::"r"(s_ptr),
+                 "l"(g_ptr), "n"(size));
+#else
+    // SM75, turing
+    unsigned tmp[size / 4];
+    if constexpr (size == 16) {
+        asm volatile("ld.global.v4.b32 {%0, %1, %2, %3}, [%4];\n"
+                     : "=r"(tmp[0]), "=r"(tmp[1]), "=r"(tmp[2]), "=r"(tmp[3])
+                     : "l"(g_ptr));
+        asm volatile("st.shared.v4.b32 [%0], {%1, %2, %3, %4};\n" ::"r"(s_ptr),
+                     "r"(tmp[0]), "r"(tmp[1]), "r"(tmp[2]), "r"(tmp[3]));
+    } else if constexpr (size == 8) {
+        asm volatile("ld.global.v2.b32 {%0, %1}, [%2];\n"
+                     : "=r"(tmp[0]), "=r"(tmp[1])
+                     : "l"(g_ptr));
+        asm volatile("st.shared.v2.b32 [%0], {%1, %2};\n" ::"r"(s_ptr),
+                     "r"(tmp[0]), "r"(tmp[1]));
+    } else if constexpr (size == 4) {
+        asm volatile("ld.global.b32 %0, [%1];\n" : "=r"(tmp[0]) : "l"(g_ptr));
+        asm volatile("st.shared.b32 [%0], %1;\n" ::"r"(s_ptr), "r"(tmp[0]));
+    }
+#endif
+}
+}  // namespace
+
 template <typename Element>
     requires std::is_same_v<Element, __half> ||
              std::is_same_v<Element, cutlass::half_t>
@@ -28,27 +66,28 @@ struct LoadMatBase {
     static constexpr int kElmentBits = sizeof(DType) * 8;
     static constexpr int kNumPerAccess = kAccessInBits / kElmentBits;
 
-    /// @brief returns the lane row of the current thread within a warp.
-    //         For an example, in ldmatrix, threads in a warp are arranged as
-    //         follows (a 16 x 2 column-major):
-    //
-    //         |  | 0 |  1|
+    /// @brief Returns the lane row of the current thread within a warp.
+    ///        For ldmatrix, threads in a warp are arranged in a 16x2
+    ///        column-major layout:
+    ///
+    ///        |  | 0 |  1|
     //         |--|---|---|
     //         |0 | 0 | 16|
     //         |1 | 2 | 17|
     //         |2 | 4 | 18|
     //         |  |...|...|
     //         |15| 15| 31|
-    //
-    //         if threadIdx.x is 43, then its lane row is 8, lane col is 0.
+    /// For example, if threadIdx.x is 43, its lane_row is 8 and lane_col is 0.
+
+    /// @brief Returns the lane row of the current thread within a warp.
     DEVICE int lane_row_id() {
-        int lane_id = threadIdx.x % warpSize;
+        int lane_id = threadIdx.x % WARP_SIZE;
         return lane_id % tl::num_rows<ThreadLayout>;
     }
 
     /// @brief returns the lane col of the current thread within a warp.
     DEVICE int lane_col_id() {
-        int lane_id = threadIdx.x % warpSize;
+        int lane_id = threadIdx.x % WARP_SIZE;
         return lane_id / tl::num_rows<ThreadLayout>;
     }
 
@@ -100,7 +139,6 @@ struct BaseTileStorer<Shared, tl::Layout::kRowMajor, 16> {
   private:
     // the thread layout for wmma's output tile.
     using ThreadLayout = tile_layout::RowMajor<8, 4>;
-    static constexpr int kWarpSize = 32;
 
     // in the output of a wmma tile, each thread stores four segments in 2x2
     // layout, and each fragment contains 2 elements regardless of the data
@@ -116,11 +154,11 @@ struct BaseTileStorer<Shared, tl::Layout::kRowMajor, 16> {
     typename tl::SharedLayoutWrapper<Shared, kAccessInBits>::Layout in_tile_;
 
     DEVICE int lane_row_id() {
-        return (threadIdx.x % kWarpSize) / tl::num_cols<ThreadLayout>;
+        return (threadIdx.x % WARP_SIZE) / tl::num_cols<ThreadLayout>;
     }
 
     DEVICE int lane_col_id() {
-        return (threadIdx.x % kWarpSize) % tl::num_cols<ThreadLayout>;
+        return (threadIdx.x % WARP_SIZE) % tl::num_cols<ThreadLayout>;
     }
 };
 
@@ -155,7 +193,6 @@ struct BaseTileStorer<Shared, tl::Layout::kRowMajor, 32> {
   private:
     // the thread layout for wmma's output tile.
     using ThreadLayout = tile_layout::RowMajor<8, 4>;
-    static constexpr int kWarpSize = 32;
 
     // in the output of a wmma tile, each thread stores four segments in 2x2
     // layout, and each fragment contains 2 elements regardless of the data
@@ -171,11 +208,11 @@ struct BaseTileStorer<Shared, tl::Layout::kRowMajor, 32> {
     typename tl::SharedLayoutWrapper<Shared, kAccessInBits>::Layout in_tile_;
 
     DEVICE int lane_row_id() {
-        return (threadIdx.x % kWarpSize) / tl::num_cols<ThreadLayout>;
+        return (threadIdx.x % WARP_SIZE) / tl::num_cols<ThreadLayout>;
     }
 
     DEVICE int lane_col_id() {
-        return (threadIdx.x % kWarpSize) % tl::num_cols<ThreadLayout>;
+        return (threadIdx.x % WARP_SIZE) % tl::num_cols<ThreadLayout>;
     }
 };
 
@@ -210,7 +247,6 @@ struct BaseTileStorer<Shared, tl::Layout::kColMajor, 16> {
   private:
     // the thread layout for wmma's output tile.
     using ThreadLayout = tile_layout::ColMajor<4, 8>;
-    static constexpr int kWarpSize = 32;
 
     // in the output of a wmma tile, each thread stores four segments in 2x2
     // layout, and each fragment contains 2 elements regardless of the data
@@ -226,11 +262,11 @@ struct BaseTileStorer<Shared, tl::Layout::kColMajor, 16> {
     typename tl::SharedLayoutWrapper<Shared, kAccessInBits>::Layout in_tile_;
 
     DEVICE int lane_row_id() {
-        return (threadIdx.x % kWarpSize) % tl::num_rows<ThreadLayout>;
+        return (threadIdx.x % WARP_SIZE) % tl::num_rows<ThreadLayout>;
     }
 
     DEVICE int lane_col_id() {
-        return (threadIdx.x % kWarpSize) / tl::num_rows<ThreadLayout>;
+        return (threadIdx.x % WARP_SIZE) / tl::num_rows<ThreadLayout>;
     }
 };
 
@@ -246,10 +282,9 @@ struct BaseTileStorer<Shared, tl::Layout::kColMajor, 32> {
         int lane_row = lane_row_id();
         int lane_col = lane_col_id();
 
-        // A base tile has a fixed shape of 16x16 (a 16x16 2D coordinate space
-        // with integer indices ranging from 0 to 255). `row` and `col` are used
-        // to calculate the index of an element within this 16x16 coordinate
-        // space.
+        // A base tile has a fixed shape of 16x16. Each thread accesses elements
+        // within this 16x16 coordinate space using `row` and `col` indices to
+        // calculate the appropriate memory offsets.
         int row = 0, col = 0;
 #pragma unroll
         for (int i = 0; i < kSegRows; ++i) {
@@ -265,11 +300,9 @@ struct BaseTileStorer<Shared, tl::Layout::kColMajor, 32> {
   private:
     // the thread layout for wmma's output tile.
     using ThreadLayout = tile_layout::ColMajor<4, 8>;
-    static constexpr int kWarpSize = 32;
 
-    // in the output of a wmma tile, each thread stores four segments in 2x2
-    // layout, and each fragment contains 2 elements regardless of the data
-    // type
+    // Each thread stores four segments in a 2x2 layout in the WMMA output tile.
+    // Each segment contains 2 elements, regardless of the data type.
     static constexpr int kSegRows = 2;
     static constexpr int kSegCols = 2;
 
@@ -281,102 +314,79 @@ struct BaseTileStorer<Shared, tl::Layout::kColMajor, 32> {
     typename tl::SharedLayoutWrapper<Shared, kAccessInBits>::Layout in_tile_;
 
     DEVICE int lane_row_id() {
-        return (threadIdx.x % kWarpSize) % tl::num_rows<ThreadLayout>;
+        return (threadIdx.x % WARP_SIZE) % tl::num_rows<ThreadLayout>;
     }
 
     DEVICE int lane_col_id() {
-        return (threadIdx.x % kWarpSize) / tl::num_rows<ThreadLayout>;
+        return (threadIdx.x % WARP_SIZE) / tl::num_rows<ThreadLayout>;
     }
 };
 
-template <class Global, class Shared, const tl::Layout kType>
-struct GlobalToSharedBaseTileLoader;
+template <typename Global, typename Shared, typename WarpShape,
+          const tl::Layout kType = Shared::kType>
+struct GlobalToSharedLoaderBase;
 
-/// @brief  Implement loading a `16x16` BaseTile from global memory to shared
-///         memory.
-template <class Global, class Shared>
-struct GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kRowMajor> {
+/// @brief Load a single BaseTile from global memory to shared memory.
+template <typename Global, typename Shared, typename WarpShape>
+struct GlobalToSharedLoaderBase<Global, Shared, WarpShape,
+                                tl::Layout::kRowMajor> {
     using DType = Shared::DType;
 
-    // NOTE: Please keep this thread layout strictly consistent with the thread
-    // layout for ldmatrix.
-    // The macro kernel breaks down the entire copy operation into iterations
-    // over 16x16 BaseTiles. To transfer a single BaseTile, threads in a warp
-    // are arranged in a 16x2 row-major layout. Each thread uses 128-bit data in
-    // a single access.
-    using ThreadLayout = tile_layout::ColMajor<16, 2>;
-    static constexpr int kThreadsPerRow = tl::num_rows<ThreadLayout>;
-    static constexpr int kThreadsPerCol = tl::num_cols<ThreadLayout>;
-
-    static constexpr int kWarpSize = 32;
-
+    // accessed by derived classes, must be public.
     static constexpr int kNumPerAccess =
         traits::AccessBase<DType>::kNumPerAccess;
+    using GlobalLayout = tl::MatrixLayout<WarpShape::kRows, WarpShape::kCols,
+                                          Global::kRowStride, 1>;
 
-    using BaseShape = traits::BaseTileShape<DType>;
-
-    static constexpr int kColStride = kThreadsPerCol * kNumPerAccess;
-    static constexpr int kExecCount = BaseShape::kCols / kColStride;
-
-    using BaseTileGlobalLayout =
-        cute::Layout<Shape<Int<BaseShape::kRows>, Int<BaseShape::kCols>>,
-                     Stride<Int<Global::kRowStride>, _1>>;
-
-    using BaseTileSharedLayout = tl::SharedLayoutWrapper<
-        Shared, traits::AccessBase<DType>::kAccessInBits>::Layout;
-
-#ifdef CP_ASYNC_SM80_ENABLED
-    using CopyInst =
-        Copy_Atom<SM80_CP_ASYNC_CACHEGLOBAL<cute::uint128_t>, DType>;
-#else
-    using CopyInst = Copy_Atom<DefaultCopy, DType>;
-#endif
-    using TiledCopy = decltype(make_tiled_copy(
-        CopyInst{},
-        cute::Layout<Shape<Int<kThreadsPerRow>, Int<kThreadsPerCol>>,
-                     Stride<Int<kThreadsPerCol>, _1>>{},
-        cute::Layout<Shape<_1, Int<kNumPerAccess>>>{}));
-
-    using DataLayoutPerThread = cute::Layout<Shape<Int<kNumPerAccess>, _1>,
-                                             Stride<_1, Int<kNumPerAccess>>>;
-
-    DEVICE GlobalToSharedBaseTileLoader() : tiled_copy_(TiledCopy{}) {}
+    using NonSwizzled = tl::RowMajor<WarpShape::kRows, WarpShape::kCols>;
+    using Swizzled =
+        tl::SwizzledRowMajor<traits::AccessBase<DType>::kAccessInBits,
+                             WarpShape>;
+    using SharedLayout =
+        std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
 
     DEVICE void copy(const DType* src, DType* dst) {
         int offset = 0;
+        uint32_t s_ptr;
+
 #pragma unroll
         for (int i = 0; i < kExecCount; ++i) {
-            auto src_tensor =
-                make_tensor(make_gmem_ptr(src + offset), data_layout_);
-            auto dst_tensor =
-                make_tensor(make_smem_ptr(dst + offset), data_layout_);
+            s_ptr =
+                static_cast<uint32_t>(__cvta_generic_to_shared(dst + offset));
 
-            cute::copy(tiled_copy_, src_tensor, dst_tensor);
-
+            // a single memory access access 16 bytes
+            async_copy<16>(src + offset, s_ptr);
             offset += kColStride;
         }
     }
 
+    /// @brief returns the lane row of the current thread within a warp.
     DEVICE int lane_row_id() {
-        int lane_id = threadIdx.x % kWarpSize;
-        return lane_id % tl::num_rows<ThreadLayout>;
+        // NOTE: When copying a RowMajor data tile, the thread layout is
+        // interpreted as RowMajor.
+        int lane_id = threadIdx.x % WARP_SIZE;
+        return lane_id / kThreadsPerRow;
     }
 
     /// @brief returns the lane col of the current thread within a warp.
     DEVICE int lane_col_id() {
-        int lane_id = threadIdx.x % kWarpSize;
-        return lane_id / tl::num_rows<ThreadLayout>;
+        // NOTE: When copying a RowMajor data tile, the thread layout is
+        // interpreted as RowMajor.
+        int lane_id = threadIdx.x % WARP_SIZE;
+        return lane_id % kThreadsPerRow;
     }
 
   private:
-    DataLayoutPerThread data_layout_;
-    TiledCopy tiled_copy_;
+    static constexpr int kThreadsPerRow = WarpShape::kColThreads;
+
+    static constexpr int kColStride = kThreadsPerRow * kNumPerAccess;
+    static constexpr int kExecCount = WarpShape::kCols / kColStride;
 };
 
-/// @brief  Implement loading a `16x16` BaseTile from global memory to shared
-///         memory.
-template <class Global, class Shared>
-struct GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kColMajor> {
+/// @brief Load a BaseTile from global memory to shared memory.
+template <typename Global, typename Shared, typename WarpShape>
+struct GlobalToSharedLoaderBase<Global, Shared, WarpShape,
+                                tl::Layout::kColMajor> {
     using DType = Shared::DType;
 
     // The macro kernel breaks down the entire copy operation into iterations
@@ -386,8 +396,6 @@ struct GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kColMajor> {
     using ThreadLayout = tile_layout::RowMajor<2, 16>;
     static constexpr int kThreadsPerRow = tl::num_rows<ThreadLayout>;
     static constexpr int kThreadsPerCol = tl::num_cols<ThreadLayout>;
-
-    static constexpr int kWarpSize = 32;
 
     static constexpr int kNumPerAccess =
         traits::AccessBase<DType>::kNumPerAccess;
@@ -405,23 +413,6 @@ struct GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kColMajor> {
     using BaseTileSharedLayout = tl::SharedLayoutWrapper<
         Shared, traits::AccessBase<DType>::kAccessInBits>::Layout;
 
-#ifdef CP_ASYNC_SM80_ENABLED
-    using CopyInst =
-        Copy_Atom<SM80_CP_ASYNC_CACHEGLOBAL<cute::uint128_t>, DType>;
-#else
-    using CopyInst = Copy_Atom<DefaultCopy, DType>;
-#endif
-    using TiledCopy = decltype(make_tiled_copy(
-        CopyInst{},
-        cute::Layout<Shape<Int<kThreadsPerRow>, Int<kThreadsPerCol>>,
-                     Stride<Int<kThreadsPerCol>, _1>>{},
-        cute::Layout<Shape<Int<kNumPerAccess>, _1>>{}));
-
-    using DataLayoutPerThread = cute::Layout<Shape<Int<kNumPerAccess>, _1>,
-                                             Stride<_1, Int<kNumPerAccess>>>;
-
-    DEVICE GlobalToSharedBaseTileLoader() : tiled_copy_(TiledCopy{}) {}
-
     DEVICE void copy(const DType* src, DType* dst) {
         int offset = 0;
 #pragma unroll
@@ -437,19 +428,36 @@ struct GlobalToSharedBaseTileLoader<Global, Shared, tl::Layout::kColMajor> {
         }
     }
 
-    DEVICE int lane_col_id() {
-        int lane_id = threadIdx.x % kWarpSize;
-        return lane_id % tl::num_cols<ThreadLayout>;
-    }
-
-    /// @brief returns the lane col of the current thread within a warp.
+    /// @brief returns the lane row of the current thread within a warp.
     DEVICE int lane_row_id() {
-        int lane_id = threadIdx.x % kWarpSize;
+        int lane_id = threadIdx.x % WARP_SIZE;
         return lane_id / tl::num_cols<ThreadLayout>;
     }
 
+    /// @brief returns the lane col of the current thread within a warp.
+    DEVICE int lane_col_id() {
+        int lane_id = threadIdx.x % WARP_SIZE;
+        return lane_id % tl::num_cols<ThreadLayout>;
+    }
+
   private:
-    DataLayoutPerThread data_layout_;
+    using DataPerThread = cute::Layout<Shape<Int<kNumPerAccess>, _1>,
+                                       Stride<_1, Int<kNumPerAccess>>>;
+
+    DataPerThread data_layout_;
+
+#ifdef CP_ASYNC_SM80_ENABLED
+    using CopyInst =
+        Copy_Atom<SM80_CP_ASYNC_CACHEGLOBAL<cute::uint128_t>, DType>;
+#else
+    using CopyInst = Copy_Atom<DefaultCopy, DType>;
+#endif
+    using TiledCopy = decltype(make_tiled_copy(
+        CopyInst{},
+        cute::Layout<Shape<Int<kThreadsPerRow>, Int<kThreadsPerCol>>,
+                     Stride<Int<kThreadsPerCol>, _1>>{},
+        data_layout_));
+
     TiledCopy tiled_copy_;
 };
 
@@ -463,8 +471,6 @@ struct SharedToGlobalBaseTileStorer<Shared, Global, tl::Layout::kRowMajor> {
     using ThreadLayout = tile_layout::RowMajor<16, 2>;
     static constexpr int kThreadsPerRow = tl::num_rows<ThreadLayout>;
     static constexpr int kThreadsPerCol = tl::num_cols<ThreadLayout>;
-
-    static constexpr int kWarpSize = 32;
 
     static constexpr int kNumPerAccess =
         traits::AccessBase<DType>::kNumPerAccess;
@@ -516,13 +522,13 @@ struct SharedToGlobalBaseTileStorer<Shared, Global, tl::Layout::kRowMajor> {
     }
 
     DEVICE int lane_row_id() {
-        int lane_id = threadIdx.x % warpSize;
+        int lane_id = threadIdx.x % WARP_SIZE;
         return lane_id / tl::num_cols<ThreadLayout>;
     }
 
     /// @brief returns the lane col of the current thread within a warp.
     DEVICE int lane_col_id() {
-        int lane_id = threadIdx.x % warpSize;
+        int lane_id = threadIdx.x % WARP_SIZE;
         return lane_id % tl::num_cols<ThreadLayout>;
     }
 
@@ -541,7 +547,6 @@ struct SharedToGlobalBaseTileStorer<Shared, Global, tl::Layout::kColMajor> {
     using ThreadLayout = tile_layout::RowMajor<2, 16>;
     static constexpr int kThreadsPerRow = tl::num_rows<ThreadLayout>;
     static constexpr int kThreadsPerCol = tl::num_cols<ThreadLayout>;
-    static constexpr int kWarpSize = 32;
 
     static constexpr int kNumPerAccess =
         traits::AccessBase<DType>::kNumPerAccess;

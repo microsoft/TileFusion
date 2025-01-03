@@ -206,19 +206,19 @@ struct WarpTileShape<DType, TileLayout, tl::Layout::kRowMajor> {
                                      : TileLayout::kCols;
 
     // number of columns in a warp
-    static constexpr int kThreadPerRow = kCols / AccessInfo::kNumPerAccess;
-    static_assert(WARP_SIZE % kThreadPerRow == 0,
+    static constexpr int kColThreads = kCols / AccessInfo::kNumPerAccess;
+    static_assert(WARP_SIZE % kColThreads == 0,
                   "Fail to infer warp thread layout.");
-    static constexpr int kThreadPerCol = WARP_SIZE / kThreadPerRow;
+    static constexpr int kRowThreads = WARP_SIZE / kColThreads;
 
-    static constexpr int kRows = kThreadPerCol;
-    static_assert(TileLayout::kRows % kThreadPerCol == 0,
+    static constexpr int kRows = kRowThreads;
+    static_assert(TileLayout::kRows % kRowThreads == 0,
                   "The number of rows of the tile isn't evenly divisible by "
                   "the number of threads in a column.");
 
     static constexpr int kNumel = kRows * kCols;
 
-    using WarpThreadLayout = tl::RowMajor<kThreadPerCol, kThreadPerRow>;
+    using WarpThreadLayout = tl::RowMajor<kRowThreads, kColThreads>;
 };
 
 template <typename DType, typename TileLayout>
@@ -246,19 +246,19 @@ struct WarpTileShape<DType, TileLayout, tl::Layout::kColMajor> {
                                      : TileLayout::kRows;
 
     // number of rows in a warp
-    static constexpr int kThreadPerCol = kRows / AccessInfo::kNumPerAccess;
-    static_assert(WARP_SIZE % kThreadPerCol == 0,
+    static constexpr int kRowThreads = kRows / AccessInfo::kNumPerAccess;
+    static_assert(WARP_SIZE % kRowThreads == 0,
                   "Fail to infer warp thread layout.");
-    static constexpr int kThreadPerRow = WARP_SIZE / kThreadPerCol;
+    static constexpr int kColThreads = WARP_SIZE / kRowThreads;
 
-    static constexpr int kCols = kThreadPerRow;
-    static_assert(TileLayout::kCols % kThreadPerRow == 0,
+    static constexpr int kCols = kColThreads;
+    static_assert(TileLayout::kCols % kColThreads == 0,
                   "The number of columns of the tile isn't evenly divisible by "
                   "the number of threads in a row.");
 
     static constexpr int kNumel = kRows * kCols;
 
-    using WarpThreadLayout = tl::ColMajor<kThreadPerCol, kThreadPerRow>;
+    using WarpThreadLayout = tl::ColMajor<kRowThreads, kColThreads>;
 };
 
 template <typename WarpLayout_, const WarpReuse kMode_>

@@ -28,6 +28,13 @@ __global__ void copy_g2s(const Element* src_ptr, Element* dst_ptr,
     __copy_async();
     __syncthreads();
 
+#if defined(DEBUG)
+    if (thread(0)) {
+        printf("\nshared\n");
+        inter.dump_value();
+    }
+#endif
+
     storer(inter, dst);
     __syncthreads();
 }
