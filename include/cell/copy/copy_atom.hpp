@@ -67,10 +67,10 @@ struct LoadMatBase {
     static constexpr int kNumPerAccess = kAccessInBits / kElmentBits;
 
     /// @brief Returns the lane row of the current thread within a warp.
-    ///        For ldmatrix, threads in a warp are arranged in a 16x2
-    ///        column-major layout:
-    ///
-    ///        |  | 0 |  1|
+    //         For ldmatrix, threads in a warp are arranged in a 16x2
+    //         column-major layout:
+    //
+    //         |  | 0 |  1|
     //         |--|---|---|
     //         |0 | 0 | 16|
     //         |1 | 2 | 17|
@@ -326,7 +326,12 @@ template <typename Global, typename Shared, typename WarpShape,
           const tl::Layout kType = Shared::kType>
 struct GlobalToSharedLoaderBase;
 
+/// TODO(ying): Determine if a separate implementation is needed for copying an
+/// atomic warp tile. The current implementation is quite simple, so it might be
+/// possible to simplify it into `GlobalToSharedLoaderImpl`.
+///
 /// @brief Load a single BaseTile from global memory to shared memory.
+///
 template <typename Global, typename Shared, typename WarpShape>
 struct GlobalToSharedLoaderBase<Global, Shared, WarpShape,
                                 tl::Layout::kRowMajor> {
@@ -346,18 +351,9 @@ struct GlobalToSharedLoaderBase<Global, Shared, WarpShape,
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
 
     DEVICE void copy(const DType* src, DType* dst) {
-        int offset = 0;
-        uint32_t s_ptr;
-
-#pragma unroll
-        for (int i = 0; i < kExecCount; ++i) {
-            s_ptr =
-                static_cast<uint32_t>(__cvta_generic_to_shared(dst + offset));
-
-            // a single memory access access 16 bytes
-            async_copy<16>(src + offset, s_ptr);
-            offset += kColStride;
-        }
+        // a single memory access access 16 bytes
+        async_copy<16>(src,
+                       static_cast<uint32_t>(__cvta_generic_to_shared(dst)));
     }
 
     /// @brief returns the lane row of the current thread within a warp.
@@ -365,7 +361,7 @@ struct GlobalToSharedLoaderBase<Global, Shared, WarpShape,
         // NOTE: When copying a RowMajor data tile, the thread layout is
         // interpreted as RowMajor.
         int lane_id = threadIdx.x % WARP_SIZE;
-        return lane_id / kThreadsPerRow;
+        return lane_id / WarpShape::kColThreads;
     }
 
     /// @brief returns the lane col of the current thread within a warp.
@@ -373,14 +369,8 @@ struct GlobalToSharedLoaderBase<Global, Shared, WarpShape,
         // NOTE: When copying a RowMajor data tile, the thread layout is
         // interpreted as RowMajor.
         int lane_id = threadIdx.x % WARP_SIZE;
-        return lane_id % kThreadsPerRow;
+        return lane_id % WarpShape::kColThreads;
     }
-
-  private:
-    static constexpr int kThreadsPerRow = WarpShape::kColThreads;
-
-    static constexpr int kColStride = kThreadsPerRow * kNumPerAccess;
-    static constexpr int kExecCount = WarpShape::kCols / kColStride;
 };
 
 /// @brief Load a BaseTile from global memory to shared memory.

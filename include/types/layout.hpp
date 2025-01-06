@@ -28,8 +28,6 @@ struct SwizzledRowMajor;
 /// @brief  Swizzled row-major layout for storing half-typed 16x16 BaseTile.
 template <typename BaseShape>
 struct SwizzledRowMajor<32, BaseShape> {
-    // using BaseShape = traits::BaseTileShape<__half>;
-
     static constexpr int kB = 2;
     static constexpr int kM = 3;
     static constexpr int kS = 3;
@@ -52,8 +50,6 @@ struct SwizzledRowMajor<32, BaseShape> {
 
 template <typename BaseShape>
 struct SwizzledRowMajor<64, BaseShape> {
-    // using BaseShape = traits::BaseTileShape<float>;
-
     static constexpr int kB = 2;
     static constexpr int kM = 2;
     static constexpr int kS = 3;
@@ -106,8 +102,6 @@ struct SwizzledColMajor;
 
 template <typename BaseShape>
 struct SwizzledColMajor<64, BaseShape> {
-    // using BaseShape = traits::BaseTileShape<__half>;
-
     static constexpr int kB = 2;
     static constexpr int kM = 2;
     static constexpr int kS = 3;
@@ -131,8 +125,6 @@ struct SwizzledColMajor<64, BaseShape> {
 
 template <typename BaseShape>
 struct SwizzledColMajor<128, BaseShape> {
-    // using BaseShape = traits::BaseTileShape<__half>;
-
     static constexpr int kB = 2;
     static constexpr int kM = 3;
     static constexpr int kS = 3;

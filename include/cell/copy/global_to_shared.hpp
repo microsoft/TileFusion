@@ -7,8 +7,6 @@
 #include "traits/base.hpp"
 #include "types/mod.hpp"
 
-#include <cuda_runtime.h>
-
 namespace tilefusion::cell::copy {
 using namespace atom;
 namespace tl = tile_layout;
@@ -277,11 +275,13 @@ struct GlobalToSharedLoader {
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
 
+    // This implementation uses a fixed 16x16 `BaseShape` as the atomic data
+    // tile accessed by threads in a single warp that issues a single load/store
+    // instruction.
     // FIXME(ying): uncomment the following lines to automatically infer the
     // warp-level tile shape instead of using a fixed 16x16 `BaseShape`. using
     // WarpShape =
     //     warp::WarpTileShape<DType, typename Shared::Layout, Shared::kType>;
-
     using WarpShape =
         warp::WarpTileShape<DType, tl::RowMajor<16, 16>, Shared::kType>;
 
@@ -300,8 +300,8 @@ struct GlobalToSharedLoader {
     static constexpr int kColExec = ExecCounter::kColExec;
 
     static_assert(kRowExec && kColExec,
-                  "Ensure that the execution count for all "
-                  "rows and columns is greater than 0.");
+                  "Ensure that the execution count for all rows and columns is "
+                  "greater than 0.");
 
     template <typename Global>
     DEVICE void operator()(const Global& src, Shared& dst) {
