@@ -48,6 +48,17 @@ class G2SCopyQK {
     }
 
     /**
+     * @brief Reset the pointer of the global K tensor.
+     *
+     * The current function is called when `load_q_once` is true, i.e., when
+     * kTK == kK. In this case, the pointer of Q needs to be restored to the
+     * starting position.
+     *
+     * @param stride The stride in K dimension.
+     */
+    DEVICE void reset_tile_Q(int stride) { sQ.data() = sQ.data() + (-stride); }
+
+    /**
      * @brief Preload the K matrix. When `load_q_once` is true, the Q matrix
      * only needs to be loaded once and does not require repeated loading, while
      * the K matrix needs to be updated and loaded.

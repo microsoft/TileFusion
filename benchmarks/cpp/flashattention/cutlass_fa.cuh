@@ -312,6 +312,13 @@ __global__ void __launch_bounds__(Nthreads)
              */
             if (load_q_once) {
                 g2s_copy_qk.prologue_K();
+            } else {
+                /**
+                 * In this case, we need to reset thr pointer of Q to the
+                 * starting position and simultaneously preload the Q and K.
+                 */
+                g2s_copy_qk.reset_tile_Q(kK);
+                g2s_copy_qk.prologue();
             }
         }
 
