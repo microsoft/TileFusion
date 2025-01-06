@@ -23,7 +23,6 @@ template <typename Element_, const int kM, const int kN, const int kK,
 struct FATraits : public Base {
     using Element = Element_;
 
-    static_assert(kTK == kK, "The current implementation requires kTK == K.");
     static_assert(kTP == kP, "The current implementation requires kTP == P.");
 
     // Declare global to shared memory copy layout.
