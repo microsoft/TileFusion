@@ -186,7 +186,7 @@ __global__ void __launch_bounds__(Nthreads)
     for (int n = 0; n < split_n; ++n) {
         clear(acc0);
 
-        // When `load_q_once` is true, the folling code is not executed.
+        // When `load_q_once` is true, the following code is not executed.
         int slice_k = kK / kTK - 1;
         for (int k = 0; k < slice_k; ++k) {
             // Barrier to ensure all data are loaded into shared memory.
