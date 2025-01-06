@@ -23,6 +23,9 @@ template <typename Element_, const int kM, const int kN, const int kK,
 struct FATraits : public Base {
     using Element = Element_;
 
+    static_assert(kTK == kK, "The current implementation requires kTK == K.");
+    static_assert(kTP == kP, "The current implementation requires kTP == P.");
+
     // Declare global to shared memory copy layout.
     using GmemLayoutQ = Layout<Shape<Int<kTM>, Int<kTK>>, Stride<Int<kK>, _1>>;
     using GmemLayoutK = Layout<Shape<Int<kTN>, Int<kTK>>, Stride<Int<kK>, _1>>;
@@ -137,6 +140,22 @@ __global__ void __launch_bounds__(Nthreads)
     auto acc0 = get_acc<kTM, kTN>(mma);
     auto acco = get_acc<kTM, kTP>(mma);
 
+    if (thread0()) {
+        printf("acc0 size<0>: %d, size<1>: %d\n", (int)size<0>(acc0),
+               (int)size<1>(acc0));
+        printf("acco size<0>: %d, size<1>: %d\n", (int)size<0>(acco),
+               (int)size<1>(acco));
+    }
+
+    /**
+     * In TileFusion, we use
+     * ```cpp
+     *  using RegVec = RegTile<InType, tl::RowMajor<kAccMs, 2>>;
+     * ```
+     * We need to store the reduce results for both the top row and the bottom
+     * row simultaneously.
+     */
+
     auto m_new = make_tensor<float>(Shape<Int<2 * size<1>(acc0)>>{});
     auto lse_new = make_fragment_like(m_new);
 
@@ -165,6 +184,8 @@ __global__ void __launch_bounds__(Nthreads)
     int split_n = kN / kTN;
     for (int n = 0; n < split_n; ++n) {
         clear(acc0);
+
+        // When `load_q_once` is true, the folling code is not executed.
         int slice_k = kK / kTK - 1;
         for (int k = 0; k < slice_k; ++k) {
             // Barrier to ensure all data are loaded into shared memory.
@@ -178,6 +199,8 @@ __global__ void __launch_bounds__(Nthreads)
         cp_async_wait_flash<0>();
         __syncthreads();
         g2s_copy_v.prologue();
+        // When `load_q_once` is true, `g2s_copy_qk.prologue()` is executed only
+        // once, and `s2r_pipeline_qk.epilogue()` is executed once as well.
         s2r_pipeline_qk.epilogue();
 
         // scores = dot(q, k)
@@ -200,7 +223,7 @@ __global__ void __launch_bounds__(Nthreads)
         auto acco_rowcol =
             make_tensor(acco.data(), convert_layout_scores(acco.layout()));
 
-        // Renormalizatio for the previous block.
+        // Renormalization for the previous block.
         for (int ax0 = 0; ax0 < size<0>(acco_rowcol); ++ax0) {
             float scale = exp((m_old(ax0) - m_new(ax0)) * softmax_scale);
             lse_new(ax0) = lse_new(ax0) * scale;
