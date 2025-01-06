@@ -95,7 +95,9 @@ template <typename Element, typename KeTraits, const int kM, const int kN,
 __global__ void __launch_bounds__(Nthreads)
     fa_kernel(const Element* dQ, const Element* dK, const Element* dV,
               Element* dO) {
-    constexpr float softmax_scale = 1.250000e-01f;
+    // constexpr float softmax_scale = 1.250000e-01f;
+    // TODO(KuangjuX): Use a fixed value for easy comparison.
+    constexpr float softmax_scale = 1.0f;
     const bool load_q_once = (kTK == kK);
 
     extern __shared__ __align__(sizeof(double)) unsigned char buf_[];
@@ -234,25 +236,29 @@ __global__ void __launch_bounds__(Nthreads)
 
         // Renormalization for the previous block.
         for (int ax0 = 0; ax0 < size<0>(previous_attn_block); ++ax0) {
+            // Compute `acc_o_scale = exp(m_i - m_ij)`
             float scale = exp((m_old(ax0) - m_new(ax0)) * softmax_scale);
             lse_new(ax0) = lse_new(ax0) * scale;
+            // Compute `acc_o = acc_o_scale * acc_o`
             for (int ax1 = 0; ax1 < size<1>(previous_attn_block); ++ax1) {
                 previous_attn_block(ax0, ax1) *= scale;
             }
         }
 
         for (int ax0 = 0; ax0 < size<0>(scores); ++ax0) {
-            float m_scaled = exp((m_old(ax0) - m_new(ax0)) * softmax_scale);
-            lse_new(ax0) = lse_new(ax0) * m_scaled;
+            // Compute `p = exp(qk - m_ij)`
+            float m_scaled = m_new(ax0) * softmax_scale;
             for (int ax1 = 0; ax1 < size<1>(scores); ++ax1) {
                 scores(ax0, ax1) =
                     exp(scores(ax0, ax1) * softmax_scale - m_scaled);
             }
         }
 
+        // Compute `l_ij = sum(p)`.
         auto scores_sum = make_fragment_like(lse_new);
         reduce_sum<4>(scores, scores_sum);
 
+        // Compute `l_i_new = exp(lse_i - m_ij) + l_ij`.
         for (int ax0 = 0; ax0 < size<0>(lse_new); ++ax0) {
             lse_new(ax0) = lse_new(ax0) + scores_sum(ax0);
         }
@@ -309,17 +315,28 @@ __global__ void __launch_bounds__(Nthreads)
             }
         }
 
+        // Compute `acc_o = acc_o + dot(p, v)`
         s2r_pipeline_v.epilogue(rP_Aregs);
+
+        // Compute `lse_i = m_ij + log(l_i_new)`.
+        for (int ax0 = 0; ax0 < size<0>(m_new); ++ax0) {
+            m_new(ax0) = m_new(ax0) * softmax_scale + log(lse_new(ax0));
+        }
     }
 
     // Normalize the attention block.
     auto attn_block =
         make_tensor(acco.data(), convert_layout_scores(acco.layout()));
     for (int ax0 = 0; ax0 < size<0>(attn_block); ++ax0) {
-        float scale = 1 / lse_new(ax0);
-        lse_new(ax0) = m_new(ax0) * softmax_scale + log(lse_new(ax0));
+        // TODO(KuangjuX): fix the following code? -> `o_scale = exp(m_i -
+        // lse_i)`.
+
+        // float scale = 1 / lse_new(ax0);
+        float o_scale = exp(m_new(ax0) - lse_new(ax0));
+        // TODO(KuangjuX): Move this code into loop?
+        // lse_new(ax0) = m_new(ax0) * softmax_scale + log(lse_new(ax0));
         for (int ax1 = 0; ax1 < size<1>(attn_block); ++ax1) {
-            attn_block(ax0, ax1) *= scale;
+            attn_block(ax0, ax1) *= o_scale;
         }
     }
 

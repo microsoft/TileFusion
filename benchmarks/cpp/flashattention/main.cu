@@ -118,5 +118,5 @@ int main() {
     // <kM, kN, kK, kP, kTM, kTN, kTK, kTP, kWarpPerRow, kWarpPerCol, kStagesQK,
     // kStagesV>
     run<64, 64, 128, 128, 64, 64, 128, 128, 1, 1, 1, 1>();
-    run<64, 64, 256, 128, 64, 64, 128, 128, 1, 1, 1, 1>();
+    // run<64, 64, 256, 128, 64, 64, 128, 128, 1, 1, 1, 1>();
 }
