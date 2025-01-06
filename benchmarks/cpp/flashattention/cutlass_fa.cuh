@@ -141,10 +141,10 @@ __global__ void __launch_bounds__(Nthreads)
     auto acco = get_acc<kTM, kTP>(mma);
 
     if (thread0()) {
-        printf("acc0 size<0>: %d, size<1>: %d\n", (int)size<0>(acc0),
-               (int)size<1>(acc0));
-        printf("acco size<0>: %d, size<1>: %d\n", (int)size<0>(acco),
-               (int)size<1>(acco));
+        printf("acc0 size<0>: %d, size<1>: %d, size<2>: %d\n",
+               (int)size<0>(acc0), (int)size<1>(acc0), (int)size<2>(acc0));
+        printf("acco size<0>: %d, size<1>: %d, size<2>: %d\n",
+               (int)size<0>(acco), (int)size<1>(acco), (int)size<2>(acco));
     }
 
     /**
@@ -220,15 +220,25 @@ __global__ void __launch_bounds__(Nthreads)
             m_new(ax0) = max(m_new(ax0), scores_max(ax0));
         }
 
-        auto acco_rowcol =
+        // Currently, `acco` stores the results from the previous iteration's
+        // computation.
+        auto previous_attn_block =
             make_tensor(acco.data(), convert_layout_scores(acco.layout()));
 
+        if (thread0()) {
+            printf("scores size<0>: %d, size<1>: %d\n", (int)size<0>(scores),
+                   (int)size<1>(scores));
+            printf("previous_attn_block size<0>: %d, size<1>: %d\n",
+                   (int)size<0>(previous_attn_block),
+                   (int)size<1>(previous_attn_block));
+        }
+
         // Renormalization for the previous block.
-        for (int ax0 = 0; ax0 < size<0>(acco_rowcol); ++ax0) {
+        for (int ax0 = 0; ax0 < size<0>(previous_attn_block); ++ax0) {
             float scale = exp((m_old(ax0) - m_new(ax0)) * softmax_scale);
             lse_new(ax0) = lse_new(ax0) * scale;
-            for (int ax1 = 0; ax1 < size<1>(acco_rowcol); ++ax1) {
-                acco_rowcol(ax0, ax1) *= scale;
+            for (int ax1 = 0; ax1 < size<1>(previous_attn_block); ++ax1) {
+                previous_attn_block(ax0, ax1) *= scale;
             }
         }
 
@@ -301,6 +311,17 @@ __global__ void __launch_bounds__(Nthreads)
         }
 
         s2r_pipeline_v.epilogue(rP_Aregs);
+    }
+
+    // Normalize the attention block.
+    auto attn_block =
+        make_tensor(acco.data(), convert_layout_scores(acco.layout()));
+    for (int ax0 = 0; ax0 < size<0>(attn_block); ++ax0) {
+        float scale = 1 / lse_new(ax0);
+        lse_new(ax0) = m_new(ax0) * softmax_scale + log(lse_new(ax0));
+        for (int ax1 = 0; ax1 < size<1>(attn_block); ++ax1) {
+            attn_block(ax0, ax1) *= scale;
+        }
     }
 
     // Store O from registers to shared memory and then to global memory.
