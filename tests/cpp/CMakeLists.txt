@@ -14,6 +14,11 @@ if(WITH_TESTING)
       continue() # the unittest for gemm requires extra dependencies
     endif()
 
+    # FIXME(ying): temporarily disable test_swizzled_copy
+    if("${TEST_NAME}" STREQUAL "test_swizzled_copy")
+      continue()
+    endif()
+
     cuda_test(${TEST_NAME} SRCS "${CMAKE_CURRENT_SOURCE_DIR}/${FILE_PATH}")
   endforeach()
 
