@@ -141,12 +141,14 @@ __global__ void __launch_bounds__(Nthreads)
     auto acc0 = get_acc<kTM, kTN>(mma);
     auto acco = get_acc<kTM, kTP>(mma);
 
+#ifdef DEBUG
     if (thread0()) {
         printf("acc0 size<0>: %d, size<1>: %d, size<2>: %d\n",
                (int)size<0>(acc0), (int)size<1>(acc0), (int)size<2>(acc0));
         printf("acco size<0>: %d, size<1>: %d, size<2>: %d\n",
                (int)size<0>(acco), (int)size<1>(acco), (int)size<2>(acco));
     }
+#endif
 
     /**
      * In TileFusion, we use
@@ -226,6 +228,7 @@ __global__ void __launch_bounds__(Nthreads)
         auto previous_attn_block =
             make_tensor(acco.data(), convert_layout_scores(acco.layout()));
 
+#ifdef DEBUG
         if (thread0()) {
             printf("scores size<0>: %d, size<1>: %d\n", (int)size<0>(scores),
                    (int)size<1>(scores));
@@ -233,6 +236,7 @@ __global__ void __launch_bounds__(Nthreads)
                    (int)size<0>(previous_attn_block),
                    (int)size<1>(previous_attn_block));
         }
+#endif
 
         // Renormalization for the previous block.
         for (int ax0 = 0; ax0 < size<0>(previous_attn_block); ++ax0) {

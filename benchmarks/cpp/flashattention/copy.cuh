@@ -491,6 +491,10 @@ inline __device__ auto make_g2s_qk(const Element* gQ_ptr, Element* sQ_ptr,
 
     TiledCopy tiled_copy;
 
+    // if (thread0()) {
+    //     print_latex(tiled_copy);
+    // }
+
     auto loader = tiled_copy.get_thread_slice(tid);
 
     auto gQs = loader.partition_S(gQ);
@@ -501,10 +505,12 @@ inline __device__ auto make_g2s_qk(const Element* gQ_ptr, Element* sQ_ptr,
     int sQ_stride = size(sQ);
     int sK_stride = size(sK);
 
+#ifdef DEBUG
     if (thread0()) {
         printf("gQ_stride: %d, sQ_stride: %d, gK_stride: %d, sK_stride: %d\n",
                gQ_stride, sQ_stride, gK_stride, sK_stride);
     }
+#endif
 
     detail::G2SCopyQK copy_qk(gQs, sQs, gKs, sKs, tiled_copy, gQ_stride,
                               sQ_stride, gK_stride, sK_stride);
@@ -529,9 +535,11 @@ DEVICE auto make_g2s_v(const Element* gV_ptr, Element* sV_ptr, int gV_stride) {
 
     int sV_stride = size(sV);
 
+#ifdef DEBUG
     if (thread0()) {
         printf("gV_stride: %d, sV_stride: %d\n", gV_stride, sV_stride);
     }
+#endif
 
     detail::G2SCopyV copy_v(gVs, sVs, tiled_copy, gV_stride, sV_stride);
 
@@ -556,6 +564,15 @@ DEVICE auto make_s2r_qk(const Element* sQ_ptr, const Element* sK_ptr,
     auto s2r_thr_copy_q = s2r_copy_q.get_thread_slice(tid);
     auto s2r_thr_copy_k = s2r_copy_k.get_thread_slice(tid);
 
+#ifdef DEBUG
+    if (thread0()) {
+        printf("sQ_Layout: ");
+        print(sQ_layout), print('\n');
+        printf("s2r_copy_q: ");
+        print(s2r_copy_q), print('\n');
+    }
+#endif
+
     auto sQ = s2r_thr_copy_q.partition_S(sQ_);
     auto sK = s2r_thr_copy_k.partition_S(sK_);
 
@@ -566,6 +583,19 @@ DEVICE auto make_s2r_qk(const Element* sQ_ptr, const Element* sK_ptr,
     // Thread partition for shared to register copy.
     auto rQ_copy = s2r_thr_copy_q.retile_D(rQ_mma);
     auto rK_copy = s2r_thr_copy_k.retile_D(rK_mma);
+
+#ifdef DEBUG
+    if (thread0()) {
+        printf("sQ_: ");
+        print(sQ_), print('\n');
+        printf("sQ: ");
+        print(sQ), print('\n');
+        printf("rQ_copy: ");
+        print(rQ_copy), print('\n');
+        printf("rQ_mma: ");
+        print(rQ_mma), print('\n');
+    }
+#endif
 
     int sQ_stride = size(sQ_);
     int sK_stride = size(sK_);

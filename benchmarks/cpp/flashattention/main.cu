@@ -89,7 +89,8 @@ void run(bool check = true) {
     dim3 grid(block_x, block_y, block_z);
     dim3 block(kThreads, 1, 1);
 
-    int shm_input = (kTM * kTK + kTK * kTN + kTN * kTP);
+    int shm_input =
+        (kTM * kTK * kStagesQK + kTK * kTN * kStagesQK + kTN * kTP * kStagesV);
     int shm_output = kTM * kTP;
     int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
                                           : shm_input * sizeof(InType);
