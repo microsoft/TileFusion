@@ -108,6 +108,16 @@ make
     python3 setup.py clean
     ```
 
+3. Install the Python wrapper in editable mode:
+
+   This mode is recommended for developing the Python wrapper:
+   
+    ```bash
+    python3 setup.py develop
+    ```
+
+    This allows you to edit the source code directly without needing to reinstall it repeatedly.
+
 ### Unit Test
 
 - **Run a single unit test**: `make unit_test UNIT_TEST=test_scatter_nd.py`

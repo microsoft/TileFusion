@@ -15,8 +15,7 @@ DYNAMIC_LIB	:= $(BUILD_DIR)/libtilefusion.so
 .PHONY: build example unit_test clean
 
 build:
-	@mkdir -p build 
-	@cd build && cmake -DWITH_TESTING=$(WITH_TEST) .. && make -j$(proc)
+	@python3 setup.py build
 
 $(DYNAMIC_LIB): build
 
