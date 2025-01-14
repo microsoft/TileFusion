@@ -18,12 +18,19 @@ using namespace cute;
 template <typename Element_, const int kM, const int kN, const int kK,
           const int kP, const int kTM, const int kTN, const int kTK,
           const int kTP, const int kWarpPerRow, const int kWarpPerCol,
-          const int SmemKAtom = 64, const int kSwizzle = 3,
-          typename Base = AccessBase<Element_>>
+          const int kSecondaryTN = kTN, const int SmemKAtom = 64,
+          const int kSwizzle = 3, typename Base = AccessBase<Element_>>
 struct FATraits : public Base {
     using Element = Element_;
 
     static_assert(kTP == kP, "The current implementation requires kTP == P.");
+    static_assert(kSecondaryTN == kTN,
+                  "The current implementation requires kSecondaryTN == kTN.");
+    static_assert(kM % kTM == 0, "kM must be a multiple of kTM.");
+    static_assert(kN % kTN == 0, "kN must be a multiple of kTN.");
+    static_assert(kK % kTK == 0, "kK must be a multiple of kTK.");
+    static_assert(kWarpPerCol == 1,
+                  "The current implementation requires kWarpPerCol == 1.");
 
     // Declare global to shared memory copy layout.
     using GmemLayoutQ = Layout<Shape<Int<kTM>, Int<kTK>>, Stride<Int<kK>, _1>>;
