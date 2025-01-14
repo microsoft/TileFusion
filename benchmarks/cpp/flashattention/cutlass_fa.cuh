@@ -91,7 +91,7 @@ struct FATraits : public Base {
 template <typename Element, typename KeTraits, const int kM, const int kN,
           const int kK, const int kP, const int kTM, const int kTN,
           const int kTK, const int kTP, const int Nthreads, const int kStagesQK,
-          const int kStageV>
+          const int kStageV, bool kUnrollLastIteration = false>
 __global__ void __launch_bounds__(Nthreads)
     fa_kernel(const Element* dQ, const Element* dK, const Element* dV,
               Element* dO) {
@@ -184,8 +184,9 @@ __global__ void __launch_bounds__(Nthreads)
      * the K dimension, the V matrix is split along the N dimension, and the K
      * matrix is split along both dimensions simultaneously.
      */
+    // TODO(KuangjuX): Add unroll for last iteration.
     int split_n = kN / kTN;
-    for (int n = 0; n < split_n; ++n) {
+    for (int n = 0; n < split_n - (kUnrollLastIteration ? 1 : 0); ++n) {
         clear(acc0);
 
         // When `load_q_once` is true, the following code is not executed.
@@ -325,6 +326,108 @@ __global__ void __launch_bounds__(Nthreads)
                 g2s_copy_qk.prologue();
             }
         }
+
+        // Compute `acc_o = acc_o + dot(p, v)`
+        s2r_pipeline_v.epilogue(rP_Aregs);
+
+        // Compute `lse_i = m_ij + log(l_i_new)`.
+        for (int ax0 = 0; ax0 < size<0>(m_new); ++ax0) {
+            m_new(ax0) = m_new(ax0) * softmax_scale + log(lse_new(ax0));
+        }
+    }
+
+    if (kUnrollLastIteration) {
+        clear(acc0);
+
+        // When `load_q_once` is true, the following code is not executed.
+        int slice_k = kK / kTK - 1;
+        for (int k = 0; k < slice_k; ++k) {
+            // Barrier to ensure all data are loaded into shared memory.
+            cp_async_wait_flash<0>();
+            __syncthreads();
+            g2s_copy_qk.body();
+            // Load data from shared memory into register and issue MMA.
+            s2r_pipeline_qk.body();
+        }
+
+        cp_async_wait_flash<0>();
+        __syncthreads();
+        g2s_copy_v.prologue();
+        s2r_pipeline_qk.epilogue();
+
+        // scores = dot(q, k)
+        auto scores =
+            make_tensor(acc0.data(), convert_layout_scores(acc0.layout()));
+
+        auto m_old = make_fragment_like(m_new);
+        copy(m_new, m_old);
+
+        auto scores_max = make_fragment_like(m_new);
+
+        // scores_max = reduce_max(scores, axis=1)
+        reduce_max<4, true>(scores, scores_max);
+
+        // Compute new partial max value.
+        for (int ax0 = 0; ax0 < size<0>(m_new); ++ax0) {
+            m_new(ax0) = max(m_new(ax0), scores_max(ax0));
+        }
+
+        // Currently, `acco` stores the results from the previous iteration's
+        // computation.
+        auto previous_attn_block =
+            make_tensor(acco.data(), convert_layout_scores(acco.layout()));
+
+        // Renormalization for the previous block.
+        for (int ax0 = 0; ax0 < size<0>(previous_attn_block); ++ax0) {
+            // Compute `acc_o_scale = exp(m_i - m_ij)`
+            float scale = exp((m_old(ax0) - m_new(ax0)) * softmax_scale);
+            lse_new(ax0) = lse_new(ax0) * scale;
+            // Compute `acc_o = acc_o_scale * acc_o`
+            for (int ax1 = 0; ax1 < size<1>(previous_attn_block); ++ax1) {
+                previous_attn_block(ax0, ax1) *= scale;
+            }
+        }
+
+        for (int ax0 = 0; ax0 < size<0>(scores); ++ax0) {
+            // Compute `p = exp(qk - m_ij)`
+            float m_scaled = m_new(ax0) * softmax_scale;
+            for (int ax1 = 0; ax1 < size<1>(scores); ++ax1) {
+                scores(ax0, ax1) =
+                    exp(scores(ax0, ax1) * softmax_scale - m_scaled);
+            }
+        }
+
+        // Compute `l_ij = sum(p)`.
+        auto scores_sum = make_fragment_like(lse_new);
+        reduce_sum<4>(scores, scores_sum);
+
+        // Compute `l_i_new = exp(lse_i - m_ij) + l_ij`.
+        for (int ax0 = 0; ax0 < size<0>(lse_new); ++ax0) {
+            lse_new(ax0) = lse_new(ax0) + scores_sum(ax0);
+        }
+
+        // TODO(KuangjuX): Understand the following code.
+        auto frag = convert_type<Element>(scores);
+        auto rP = make_tensor(make_rmem_ptr<Element>(&frag), scores.layout());
+        auto rP_Aregs =
+            make_tensor(rP.data(), convert_layout_rowcol_Aregs(rP.layout()));
+
+        /**
+         * In FractalTensor, the `kTN` dimension is split again. To simplify the
+         * current implementation of rhe pipeline flashattention, the `tile_n`
+         * is hardcoded to 0 at this point.
+         */
+        const int tile_n = 0;
+        for (int tile_ = 0; tile_ < tile_n; ++tile_) {
+            // Barrier to ensure all data are loaded into shared memory.
+            cp_async_wait_flash<0>();
+            __syncthreads();
+            g2s_copy_v.body();
+            s2r_pipeline_v.body(rP_Aregs);
+        }
+
+        cp_async_wait_flash<0>();
+        __syncthreads();
 
         // Compute `acc_o = acc_o + dot(p, v)`
         s2r_pipeline_v.epilogue(rP_Aregs);

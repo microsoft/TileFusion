@@ -491,10 +491,6 @@ inline __device__ auto make_g2s_qk(const Element* gQ_ptr, Element* sQ_ptr,
 
     TiledCopy tiled_copy;
 
-    // if (thread0()) {
-    //     print_latex(tiled_copy);
-    // }
-
     auto loader = tiled_copy.get_thread_slice(tid);
 
     auto gQs = loader.partition_S(gQ);
