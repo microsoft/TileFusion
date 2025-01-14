@@ -90,11 +90,24 @@ TileFusion requires a C++20 host compiler, CUDA 12.0 or later, and GCC version 1
 
 ### Build from Source
 
-#### Using Makefile
-To build the project using the provided `Makefile`, simply run:
-```bash
-make
-```
+#### Building the C++ Library Using Makefile
+
+1. To build the project using the provided `Makefile`, simply run:
+
+    ```bash
+    make
+    ```
+
+2. Run the C++ unit tests:
+
+    - **Run a single C++ unit test**: 
+      ```bash
+      make unit_test_cpp CPP_UT=test_gemm
+      ```
+    - **Run all C++ unit tests**: 
+      ```bash
+      make unit_test_cpps
+      ```
 
 #### Building the Python Wrapper
 
@@ -108,22 +121,13 @@ make
     python3 setup.py clean
     ```
 
-3. Install the Python wrapper in editable mode:
+3. Install the Python wrapper in editable mode (recommended for development):
 
-   This mode is recommended for developing the Python wrapper:
-   
     ```bash
     python3 setup.py develop
     ```
 
     This allows you to edit the source code directly without needing to reinstall it repeatedly.
-
-### Unit Test
-
-- **Run a single unit test**: `make unit_test UNIT_TEST=test_scatter_nd.py`
-- **Run all unit tests**: `./scripts/unittests/python.sh`
-- **Run a single cpp unit test**: `make unit_test_cpp CPP_UT=test_copy`
-- **Run all cpp unit tests**: `make unit_test_cpps`
 
 ## Contributing
 

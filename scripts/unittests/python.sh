@@ -4,12 +4,9 @@
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
-# for file in find(); do
-#     unit = $(basename $file .py)
-#     make unit_test UNIT_TEST=$unit
-# done
+echo "Make sure the Python wrapper is installed first."
 
-for file in $(find tests/python -name *.py); do
-    unit=$(basename $file .py)
-    make unit_test UNIT_TEST=$unit
+for file in $(find tests/python -name "*.py"); do
+    echo "Running unit test: $file"
+    python3 $file
 done
