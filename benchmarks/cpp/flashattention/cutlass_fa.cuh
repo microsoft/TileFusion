@@ -90,8 +90,9 @@ struct FATraits : public Base {
 
 template <typename Element, typename KeTraits, const int kM, const int kN,
           const int kK, const int kP, const int kTM, const int kTN,
-          const int kTK, const int kTP, const int Nthreads, const int kStagesQK,
-          const int kStageV, bool kUnrollLastIteration = false>
+          const int kTK, const int kTP, const int Nthreads = 32,
+          const int kStagesQK = 1, const int kStageV = 1,
+          bool kUnrollLastIteration = false, const int kSecondaryTN = kTN>
 __global__ void __launch_bounds__(Nthreads)
     fa_kernel(const Element* dQ, const Element* dK, const Element* dV,
               Element* dO) {
@@ -279,8 +280,8 @@ __global__ void __launch_bounds__(Nthreads)
          * current implementation of rhe pipeline flashattention, the `tile_n`
          * is hardcoded to 0 at this point.
          */
-        const int tile_n = 0;
-        for (int tile_ = 0; tile_ < tile_n; ++tile_) {
+        int secondary_tile_n = kSecondaryTN / kTN - 1;
+        for (int tile_ = 0; tile_ < secondary_tile_n; ++tile_) {
             // Barrier to ensure all data are loaded into shared memory.
             cp_async_wait_flash<0>();
             __syncthreads();
@@ -414,11 +415,11 @@ __global__ void __launch_bounds__(Nthreads)
 
         /**
          * In FractalTensor, the `kTN` dimension is split again. To simplify the
-         * current implementation of rhe pipeline flashattention, the `tile_n`
+         * current implementation of the pipeline flashattention, the `tile_n`
          * is hardcoded to 0 at this point.
          */
-        const int tile_n = 0;
-        for (int tile_ = 0; tile_ < tile_n; ++tile_) {
+        int secondary_tile_n = kTN / kSecondaryTN - 1;
+        for (int tile_ = 0; tile_ < secondary_tile_n; ++tile_) {
             // Barrier to ensure all data are loaded into shared memory.
             cp_async_wait_flash<0>();
             __syncthreads();
