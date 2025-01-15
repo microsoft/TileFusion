@@ -7,9 +7,11 @@ import os
 import subprocess
 from pathlib import Path
 
+from packaging.version import Version, parse
 from setuptools import Command, Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
+from torch.utils.cpp_extension import CUDA_HOME
 
 cur_path = Path(__file__).parent
 
@@ -20,6 +22,22 @@ def get_requirements():
         requirements = f.read().strip().split("\n")
     requirements = [req for req in requirements if "https" not in req]
     return requirements
+
+
+def get_cuda_bare_metal_version(cuda_dir):
+    raw_output = subprocess.check_output([cuda_dir + "/bin/nvcc", "-V"],
+                                         universal_newlines=True)
+    output = raw_output.split()
+    release_idx = output.index("release") + 1
+    bare_metal_version = parse(output[release_idx].split(",")[0])
+    return raw_output, bare_metal_version
+
+
+def nvcc_threads():
+    _, bare_metal_version = get_cuda_bare_metal_version(CUDA_HOME)
+    if bare_metal_version >= Version("11.2"):
+        nvcc_threads = os.getenv("NVCC_THREADS") or (os.cpu_count())
+        return nvcc_threads
 
 
 class CMakeExtension(Extension):
@@ -73,12 +91,10 @@ class CMakeBuildExt(build_ext):
                 "-DCMAKE_BUILD_TYPE=%s" % cfg,
                 "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}".format(
                     cfg.upper(), extdir
-                ),
-                "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_{}={}".format(
+                ), "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_{}={}".format(
                     cfg.upper(), self.build_temp
-                ),
-                "-DUSER_CUDA_ARCH_LIST={}".format(arch_list)
-                if arch_list else "",
+                ), "-DUSER_CUDA_ARCH_LIST={}".format(arch_list) if arch_list
+                else "", "-DNVCC_THREADS={}".format(nvcc_threads())
             ]
 
             # Adding CMake arguments set as environment variable
