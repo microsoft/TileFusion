@@ -48,6 +48,15 @@ class CMakeBuildExt(build_ext):
         ) if self.debug is None else self.debug
         cfg = "Debug" if debug else "Release"
 
+        # Set CUDA_ARCH_LIST to build the shared library
+        # for the specified GPU architectures.
+        arch_list = os.environ.get("CUDA_ARCH_LIST", None)
+        if (arch_list is not None):
+            for arch in arch_list.split(" "):
+                arch_num = int(arch.split(".")[0])
+                if arch_num < 8:
+                    raise ValueError("CUDA_ARCH_LIST must be >= 8.0")
+
         parallel_level = os.environ.get("CMAKE_BUILD_PARALLEL_LEVEL", None)
         if parallel_level is not None:
             self.parallel = int(parallel_level)
@@ -64,9 +73,12 @@ class CMakeBuildExt(build_ext):
                 "-DCMAKE_BUILD_TYPE=%s" % cfg,
                 "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}".format(
                     cfg.upper(), extdir
-                ), "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_{}={}".format(
+                ),
+                "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_{}={}".format(
                     cfg.upper(), self.build_temp
-                )
+                ),
+                "-DUSER_CUDA_ARCH_LIST={}".format(arch_list)
+                if arch_list else "",
             ]
 
             # Adding CMake arguments set as environment variable
