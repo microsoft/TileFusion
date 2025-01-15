@@ -206,19 +206,19 @@ struct WarpTileShape<DType, TileLayout, tl::Layout::kRowMajor> {
                                      : TileLayout::kCols;
 
     // number of columns in a warp
-    static constexpr int kThreadPerRow = kCols / AccessInfo::kNumPerAccess;
-    static_assert(WARP_SIZE % kThreadPerRow == 0,
+    static constexpr int kColThreads = kCols / AccessInfo::kNumPerAccess;
+    static_assert(WARP_SIZE % kColThreads == 0,
                   "Fail to infer warp thread layout.");
-    static constexpr int kThreadPerCol = WARP_SIZE / kThreadPerRow;
+    static constexpr int kRowThreads = WARP_SIZE / kColThreads;
 
-    static constexpr int kRows = kThreadPerCol;
-    static_assert(TileLayout::kRows % kThreadPerCol == 0,
+    static constexpr int kRows = kRowThreads;
+    static_assert(TileLayout::kRows % kRowThreads == 0,
                   "The number of rows of the tile isn't evenly divisible by "
                   "the number of threads in a column.");
 
     static constexpr int kNumel = kRows * kCols;
 
-    using WarpThreadLayout = tl::RowMajor<kThreadPerCol, kThreadPerRow>;
+    using WarpThreadLayout = tl::RowMajor<kRowThreads, kColThreads>;
 };
 
 template <typename DType, typename TileLayout>
@@ -246,19 +246,19 @@ struct WarpTileShape<DType, TileLayout, tl::Layout::kColMajor> {
                                      : TileLayout::kRows;
 
     // number of rows in a warp
-    static constexpr int kThreadPerCol = kRows / AccessInfo::kNumPerAccess;
-    static_assert(WARP_SIZE % kThreadPerCol == 0,
+    static constexpr int kRowThreads = kRows / AccessInfo::kNumPerAccess;
+    static_assert(WARP_SIZE % kRowThreads == 0,
                   "Fail to infer warp thread layout.");
-    static constexpr int kThreadPerRow = WARP_SIZE / kThreadPerCol;
+    static constexpr int kColThreads = WARP_SIZE / kRowThreads;
 
-    static constexpr int kCols = kThreadPerRow;
-    static_assert(TileLayout::kCols % kThreadPerRow == 0,
+    static constexpr int kCols = kColThreads;
+    static_assert(TileLayout::kCols % kColThreads == 0,
                   "The number of columns of the tile isn't evenly divisible by "
                   "the number of threads in a row.");
 
     static constexpr int kNumel = kRows * kCols;
 
-    using WarpThreadLayout = tl::ColMajor<kThreadPerCol, kThreadPerRow>;
+    using WarpThreadLayout = tl::ColMajor<kRowThreads, kColThreads>;
 };
 
 template <typename WarpLayout_, const WarpReuse kMode_>
@@ -292,6 +292,33 @@ struct GlobalOffsetHelper {
     }
 };
 
+/**
+ * FIXME(ying): `kIsSharedLayout` is a temporary fix for an issue in the current
+ * implementation where `RowMajor` and `ColMajor` layouts are not explicitly
+ * distinguished between shared memory and global memory. This should be
+ * addressed in the future with a more robust design. The issue arises as
+ * follows: suppose we have a shared memory tile with a row-major layout
+ * declared as:
+ *     using Shared = SharedTile<__half, RowMajor<kRows, kCols>>;
+ *
+ * In physical memory, shared memory is organized in units of a base tile,
+ * which is contiguous in shared memory banks and can be accessed without
+ * bank conflicts. This differs from global memory, where data is laid out
+ * contiguously with specific strides defined by the given layout.
+ *
+ * These differences are transparent to front-end users. The conflicts in the
+ * current implementation arise from the fact that such a shared memory layout
+ * can be declared by the user as above, or created internally by constructs
+ * like `SharedTileIterator`. When calculating the offset of a warp tile in
+ * shared memory or copying data, the caller should be aware of the layout of
+ * the shared memory tile.
+ *
+ * `kIsSharedLayout` is a temporary fix to address this issue. When set to
+ * `false`, the layout is created by the front-end user, since user is not aware
+ * of how data is physically stored, layout parameters (e.g., `strides`) does
+ * not correctly reveal the physical layout of data in memory. This requires
+ * further special treatment.
+ */
 template <typename WarpLayout, typename WarpShape, typename Shared,
           const WarpReuse kMode, const tl::Layout kType = Shared::kType,
           const bool kIsSharedLayout = IsSharedLayout<Shared>>

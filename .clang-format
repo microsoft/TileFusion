@@ -5,6 +5,7 @@ ColumnLimit: 80
 IndentWidth: 4
 AccessModifierOffset: -2
 DerivePointerAlignment: false
+# If true, empty lines at the start of blocks are kept.
 KeepEmptyLinesAtTheStartOfBlocks: false
 SortIncludes: true
 IncludeBlocks: Regroup
@@ -17,7 +18,15 @@ IncludeCategories:
     Priority: 2
   - Regex: '"([A-Za-z0-9.\Q/-_\E])+"'
     Priority: 1
-
+ 
 AllowShortLoopsOnASingleLine: true
 AllowShortIfStatementsOnASingleLine: true
 Cpp11BracedListStyle: true
+# If true, always break after the template<...> of a template declaration.
+AlwaysBreakTemplateDeclarations: true
+# If false, a function declaration's or function definition's parameters will 
+# either all be on the same line or will have one line each.
+BinPackArguments: true
+BreakConstructorInitializersBeforeComma: true
+# The maximum number of consecutive empty lines to keep.
+MaxEmptyLinesToKeep: 1

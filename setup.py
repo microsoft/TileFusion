@@ -9,6 +9,7 @@ from pathlib import Path
 
 from setuptools import Command, Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
+from setuptools.command.develop import develop
 
 cur_path = Path(__file__).parent
 
@@ -32,26 +33,8 @@ class CMakeExtension(Extension):
 class CMakeBuildExt(build_ext):
     """launches the CMake build."""
 
-    def get_ext_filename(self, name):
-        return f"lib{name}.so"
-
     def copy_extensions_to_source(self) -> None:
-        build_py = self.get_finalized_command("build_py")
-        for ext in self.extensions:
-            source_path = os.path.join(
-                self.build_lib, self.get_ext_filename(ext.name)
-            )
-            inplace_file, _ = self._get_inplace_equivalent(build_py, ext)
-
-            target_path = os.path.join(
-                build_py.build_lib, "pytilefusion", inplace_file
-            )
-
-            # Always copy, even if source is older than destination, to ensure
-            # that the right extensions for the current Python/platform are
-            # used.
-            if os.path.exists(source_path) or not ext.optional:
-                self.copy_file(source_path, target_path, level=self.verbose)
+        pass
 
     def build_extension(self, ext: CMakeExtension) -> None:
         # Ensure that CMake is present and working
@@ -65,6 +48,15 @@ class CMakeBuildExt(build_ext):
         ) if self.debug is None else self.debug
         cfg = "Debug" if debug else "Release"
 
+        # Set CUDA_ARCH_LIST to build the shared library
+        # for the specified GPU architectures.
+        arch_list = os.environ.get("CUDA_ARCH_LIST", None)
+        if (arch_list is not None):
+            for arch in arch_list.split(" "):
+                arch_num = int(arch.split(".")[0])
+                if arch_num < 8:
+                    raise ValueError("CUDA_ARCH_LIST must be >= 8.0")
+
         parallel_level = os.environ.get("CMAKE_BUILD_PARALLEL_LEVEL", None)
         if parallel_level is not None:
             self.parallel = int(parallel_level)
@@ -75,14 +67,18 @@ class CMakeBuildExt(build_ext):
             extdir = os.path.abspath(
                 os.path.dirname(self.get_ext_fullpath(ext.name))
             )
+            extdir = os.path.join(extdir, "pytilefusion")
 
             cmake_args = [
                 "-DCMAKE_BUILD_TYPE=%s" % cfg,
                 "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}".format(
                     cfg.upper(), extdir
-                ), "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_{}={}".format(
+                ),
+                "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_{}={}".format(
                     cfg.upper(), self.build_temp
-                )
+                ),
+                "-DUSER_CUDA_ARCH_LIST={}".format(arch_list)
+                if arch_list else "",
             ]
 
             # Adding CMake arguments set as environment variable
@@ -116,8 +112,29 @@ class CMakeBuildExt(build_ext):
             subprocess.check_call(["cmake", "--build", "."] + build_args,
                                   cwd=self.build_temp)
 
-            print()
-            self.copy_extensions_to_source()
+
+class Develop(develop):
+    """Post-installation for development mode."""
+
+    def post_build_copy(self) -> None:
+        build_py = self.get_finalized_command("build_py")
+        source_root = Path(os.path.abspath(build_py.build_lib)).parents[1]
+
+        # NOTE: Do not change the name of the target library. If you do,
+        # you must also update the target name in the CMakeLists.txt file.
+        target = "libtilefusion.so"
+
+        source_path = os.path.join(build_py.build_lib, "pytilefusion", target)
+        target_path = os.path.join(source_root, "pytilefusion", target)
+
+        if os.path.exists(source_path):
+            self.copy_file(source_path, target_path, level=self.verbose)
+        else:
+            raise FileNotFoundError(f"Cannot find built library: {source_path}")
+
+    def run(self):
+        develop.run(self)
+        self.post_build_copy()
 
 
 class Clean(Command):
@@ -173,5 +190,6 @@ setup(
     cmdclass={
         "build_ext": CMakeBuildExt,
         "clean": Clean,
+        "develop": Develop,
     },
 )

@@ -1,11 +1,10 @@
 EXAMPLE_DIR := examples
-TEST_DIR   	:= tests/python
-UNIT_TEST 	?= test_scatter_nd
 CPP_UT		?= test_gemm
 CPP_UTS 	:= scripts/unittests/run_all_cpp_tests.sh
 
-PY_EXAMPLE 	?= $(EXAMPLE_DIR)/python/scatter_nd.py
-UNIT   		?= $(TEST_DIR)/$(UNIT_TEST).py
+# TODO: Update this command as the Python example is outdated and
+# not in sync with the latest changes in the master branch.
+# PY_EXAMPLE 	?= $(EXAMPLE_DIR)/python/scatter_nd.py
 
 WITH_TEST ?= ON
 
@@ -20,11 +19,10 @@ build:
 
 $(DYNAMIC_LIB): build
 
-py_example: $(DYNAMIC_LIB)
-	@python3 $(PY_EXAMPLE)
-
-unit_test: $(DYNAMIC_LIB)
-	@python3 $(UNIT)
+# TODO: Update this command as the Python example is outdated and
+# not in sync with the latest changes in the master branch.
+# py_example: $(DYNAMIC_LIB)
+# 	@python3 $(PY_EXAMPLE)
 
 unit_test_cpp: $(DYNAMIC_LIB)
 	@cd $(BUILD_DIR) && ctest -R $(CPP_UT) -V
