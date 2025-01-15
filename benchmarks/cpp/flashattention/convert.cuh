@@ -48,6 +48,9 @@ DEVICE auto convert_layout_C_Aregs() {
         get<1>(l), get<1>(get<2>(l)));
 }
 
+/**
+ * @brief Convert a 3d register tensor into a 2d register tensor.
+ */
 template <class LayoutType>
 DEVICE auto convert_layout_scores(LayoutType layout_s) {
     using namespace cute;

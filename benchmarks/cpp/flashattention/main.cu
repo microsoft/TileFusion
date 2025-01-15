@@ -4,31 +4,20 @@
 #include "cutlass_fa.cuh"
 #include "util.hpp"
 
+template <const int kM, const int kN, const int kK, const int kP, const int kTM,
+          const int kTN, const int kTK, const int kTP, const int kWarpPerRow,
+          const int kWarpPerCol, const int kStagesQK, const int kStagesV>
 void run(bool check = true) {
     using InType = cutlass::half_t;
     using AccType = cutlass::half_t;
     using OutType = cutlass::half_t;
 
-    static constexpr int kM = 64;
-    static constexpr int kN = 64;
-    static constexpr int kK = 128;
-    static constexpr int kP = 128;
-
-    static constexpr int kTM = 64;
-    static constexpr int kTN = 64;
-    static constexpr int kTK = 128;
-    static constexpr int kTP = 128;
-
+    // Currently `kBatch` is fixed to 1.
     static constexpr int kBatch = 1;
-
-    static constexpr int kWarpPerRow = 1;
-    static constexpr int kWarpPerCol = 1;
     static constexpr int kThreads = kWarpPerCol * kWarpPerRow * 32;
-    static constexpr int kStagesQK = 1;
-    static constexpr int kStagesV = 1;
 
-    static_assert(kK == kTK,
-                  "The current implementation requires kTK == K for now.");
+    // static_assert(kK == kTK,
+    //               "The current implementation requires kTK == K for now.");
     static_assert(kP == kTP,
                   "The current implementation requires kTP == P for now.");
 
@@ -100,7 +89,8 @@ void run(bool check = true) {
     dim3 grid(block_x, block_y, block_z);
     dim3 block(kThreads, 1, 1);
 
-    int shm_input = (kTM * kTK + kTK * kTN + kTN * kTP);
+    int shm_input =
+        (kTM * kTK * kStagesQK + kTK * kTN * kStagesQK + kTN * kTP * kStagesV);
     int shm_output = kTM * kTP;
     int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
                                           : shm_input * sizeof(InType);
@@ -125,4 +115,9 @@ void run(bool check = true) {
     cudaDeviceSynchronize();
 }
 
-int main() { run(); }
+int main() {
+    // <kM, kN, kK, kP, kTM, kTN, kTK, kTP, kWarpPerRow, kWarpPerCol, kStagesQK,
+    // kStagesV>
+    run<64, 64, 128, 128, 64, 64, 128, 128, 1, 1, 1, 1>();
+    // run<64, 64, 256, 128, 64, 64, 128, 128, 1, 1, 1, 1>();
+}
