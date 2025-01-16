@@ -5,14 +5,20 @@
 namespace tilefusion::cell {
 /**
  * @brief A swizzle functor.
+ * A Swizzle can handle 2^B * 2^S * 2^M elements.
  */
 template <const int kB, const int kM, const int kS>
 struct Swizzle {
     static constexpr int Bbits = kB;
     static constexpr int Mbits = kM;
     static constexpr int Sbits = kS;
-
-    DEVICE int32 swizzle(int32 idx) const {
+    /**
+     * @brief Apply the swizzle to an index.
+     *
+     * @param idx The index in a swizzle chunk of 2^B * 2^S * 2^M elements.
+     * @return The swizzled index.
+     */
+    DEVICE int32 apply(int32 idx) const {
         // | Bbits | Sbits | Mbits |
         // Mbits as mask for the lower bits.
         int32 bs = idx >> Mbits;
@@ -27,4 +33,12 @@ struct Swizzle {
                (idx & ((1 << Mbits) - 1));
     }
 };
+
+template <const int kB, const int kM, const int kS>
+struct SwizzleLayout {
+    static constexpr int Bbits = kB;
+    static constexpr int Mbits = kM;
+    static constexpr int Sbits = kS;
+};
+
 }  // namespace tilefusion::cell
