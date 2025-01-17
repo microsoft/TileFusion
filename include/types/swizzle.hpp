@@ -5,6 +5,8 @@
 
 #include "cuda_utils.hpp"
 
+#include <cassert>
+
 namespace tilefusion::cell {
 /**
  * @brief A swizzle functor.
@@ -24,6 +26,9 @@ struct Swizzle {
     HOST_DEVICE int apply(int idx) const {
         // | Bbits | Sbits | Mbits |
         // Mbits as mask for the lower bits.
+
+        assert(idx < (1 << (Bbits + Mbits + Sbits)));
+
         int bs = idx >> Mbits;
         // (b, s) as a 2d coordinate.
         int y = bs & ((1 << Sbits) - 1);
@@ -63,6 +68,9 @@ struct SwizzleLayout {
      */
     DEVICE auto operator()(int x, int y) const {
         int idx = (x << (Mbits + Sbits)) | y;
+
+        assert(idx < (1 << (Bbits + Mbits + Sbits)));
+
         int swizzled_idx = swizzle_.apply(idx);
         int swizzled_x = swizzled_idx >> (Mbits + Sbits);
         int swizzled_y = swizzled_idx & ((1 << (Mbits + Sbits)) - 1);
