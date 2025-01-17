@@ -174,7 +174,7 @@ struct SharedLayout {
 
     static constexpr Layout kType = kType_;
 
-    DEVICE int operator()(int i, int j) const {
+    HOST_DEVICE int operator()(int i, int j) const {
         int tile_x = i / BaseShape::kRows;
         int tile_y = j / BaseShape::kCols;
 
