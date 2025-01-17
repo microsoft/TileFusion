@@ -5,7 +5,6 @@
 #include "config.hpp"
 #include "cuda_utils.hpp"
 #include "traits/base.hpp"
-#include "types/swizzle.hpp"
 
 #include <cute/layout.hpp>
 
@@ -21,25 +20,6 @@ namespace tilefusion::tile_layout {
 enum class Layout { kRowMajor = 0, kColMajor = 1 };
 
 using namespace cute;
-using namespace cell;
-
-/// @brief Swizzled layout for a given Layout.
-template <const int kBitsPerAccess, typename Layout>
-struct SwizzledRowMajorLayout;
-
-template <typename Layout>
-struct SwizzledRowMajorLayout<32, Layout> {
-    static constexpr int kB = 3;
-    static constexpr int kM = 3;
-    static constexpr int kS = 3;
-
-    using SwizzledLayout = SwizzleLayout<Layout, kB, kM, kS>;
-
-    DEVICE int operator()(int i, int j) const { return swizzled_(i, j); }
-
-  private:
-    SwizzledLayout swizzled_;
-};
 
 /// @brief Swizzled layout for a single BaseTile.
 template <const int kBitsPerAccess, typename BaseShape>
