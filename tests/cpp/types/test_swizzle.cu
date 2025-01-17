@@ -21,20 +21,35 @@ int swizzle_ref(int x, int y) {
     return swizzle_idx;
 }
 
+template <const int kB, const int kM, const int kS>
+int2 test_swizzle(int x, int y) {
+    Swizzle<kB, kM, kS> swizzle;
+    int idx = flatten(x, y, 1 << (kS + kM));
+    int swizzled_idx = swizzle.apply(idx);
+
+    int ref_swizzled_idx = swizzle_ref<kB, kM, kS>(x, y);
+
+#ifdef DEBUG
+    printf("idx: %d, swizzled_idx: %d, ref_swizzled_idx: %d\n", idx,
+           swizzled_idx, ref_swizzled_idx);
+#endif
+
+    return make_int2(swizzled_idx, ref_swizzled_idx);
+}
+
 TEST(TESTSwizzle, test_swizzle_apply) {
     const int kB = 3;
     const int kM = 3;
     const int kS = 3;
 
-    int width = 1 << (kS + kM);
-
-    Swizzle<kB, kM, kS> swizzle_3x3x3;
-
-    EXPECT_EQ((swizzle_3x3x3.apply(flatten(0, 0, width))),
-              (swizzle_ref<kB, kM, kS>(0, 0)));
-
-    EXPECT_EQ((swizzle_3x3x3.apply(flatten(1, 0, width))),
-              (swizzle_ref<kB, kM, kS>(1, 0)));
+    EXPECT_EQ((test_swizzle<kB, kM, kS>(0, 0).x),
+              (test_swizzle<kB, kM, kS>(0, 0).y));
+    EXPECT_EQ((test_swizzle<kB, kM, kS>(1, 0).x),
+              (test_swizzle<kB, kM, kS>(1, 0).y));
+    EXPECT_EQ((test_swizzle<kB, kM, kS>(1, 4).x),
+              (test_swizzle<kB, kM, kS>(1, 4).y));
+    EXPECT_EQ((test_swizzle<kB, kM, kS>(2, 0).x),
+              (test_swizzle<kB, kM, kS>(2, 0).y));
 }
 
 }  // namespace tilefusion::testing
