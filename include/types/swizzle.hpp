@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 #pragma once
 
 #include "cuda_utils.hpp"
@@ -18,7 +21,7 @@ struct Swizzle {
      * @param idx The index in a swizzle chunk of 2^B * 2^S * 2^M elements.
      * @return The swizzled index.
      */
-    DEVICE int apply(int idx) const {
+    HOST_DEVICE int apply(int idx) const {
         // | Bbits | Sbits | Mbits |
         // Mbits as mask for the lower bits.
         int bs = idx >> Mbits;
