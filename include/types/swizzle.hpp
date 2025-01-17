@@ -18,15 +18,15 @@ struct Swizzle {
      * @param idx The index in a swizzle chunk of 2^B * 2^S * 2^M elements.
      * @return The swizzled index.
      */
-    DEVICE int32 apply(int32 idx) const {
+    DEVICE int apply(int idx) const {
         // | Bbits | Sbits | Mbits |
         // Mbits as mask for the lower bits.
-        int32 bs = idx >> Mbits;
+        int bs = idx >> Mbits;
         // (b, s) as a 2d coordinate.
-        int32 y = bs & ((1 << Sbits) - 1);
-        int32 x = bs >> Sbits;
+        int y = bs & ((1 << Sbits) - 1);
+        int x = bs >> Sbits;
 
-        int32 swizzled_y = x ^ y;
+        int swizzled_y = x ^ y;
 
         // Use swizzled_y instead of y and build swizzled idx.
         return (x << (Mbits + Sbits)) | (swizzled_y << Mbits) |
@@ -34,11 +34,40 @@ struct Swizzle {
     }
 };
 
-template <const int kB, const int kM, const int kS>
+/**
+ * @brief Swizzle Layout.
+ *
+ * @tparam Layout_ The layout to swizzle.
+ * @tparam kB The number of bits for B.
+ * @tparam kM The number of bits for M.
+ * @tparam kS The number of bits for S.
+ */
+template <typename Layout_, const int kB = 3, const int kM = 3,
+          const int kS = 3>
 struct SwizzleLayout {
     static constexpr int Bbits = kB;
     static constexpr int Mbits = kM;
     static constexpr int Sbits = kS;
+
+    using Layout = Layout_;
+    using Swizzle = Swizzle<Bbits, Mbits, Sbits>;
+
+    /**
+     * @brief Apply the swizzle in a layout.
+     *
+     * @param x Row dimension index, with a total of 2^B rows.
+     * @param y Column dimension index, with a total of 2^S * 2^M columns.
+     */
+    DEVICE auto operator()(int x, int y) const {
+        int idx = (x << (Mbits + Sbits)) | y;
+        int swizzled_idx = swizzle_.apply(idx);
+        int swizzled_x = swizzled_idx >> (Mbits + Sbits);
+        int swizzled_y = swizzled_idx & ((1 << (Mbits + Sbits)) - 1);
+        return Layout{}(swizzled_x, swizzled_y);
+    }
+
+  private:
+    Swizzle swizzle_;
 };
 
 }  // namespace tilefusion::cell
