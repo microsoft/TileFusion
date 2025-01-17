@@ -53,7 +53,7 @@ TEST(TESTSwizzle, test_swizzle_apply) {
               (test_swizzle<kB, kM, kS>(2, 0).y));
 }
 
-TEST(TESTSwizzle, test_swizzle_layout) {
+TEST(TESTSwizzle, test_naive_swizzle_layout) {
     const int kB = 3;
     const int kM = 3;
     const int kS = 3;
@@ -67,11 +67,35 @@ TEST(TESTSwizzle, test_swizzle_layout) {
 
     NaiveSwizzledRowMajorLayout naive_row_major_swizzled_layout;
 
-    EXPECT_EQ((naive_row_major_swizzled_layout(0, 0)), 0);
-    EXPECT_EQ((naive_row_major_swizzled_layout(1, 0)), 72);
-    EXPECT_EQ((naive_row_major_swizzled_layout(1, 4)), 76);
-    EXPECT_EQ((naive_row_major_swizzled_layout(2, 0)), 144);
-    EXPECT_EQ((naive_row_major_swizzled_layout(2, 4)), 148);
+    EXPECT_EQ((naive_row_major_swizzled_layout(0, 0)),
+              (swizzle_ref<kB, kM, kS>(0, 0)));
+    EXPECT_EQ((naive_row_major_swizzled_layout(1, 0)),
+              (swizzle_ref<kB, kM, kS>(1, 0)));
+    EXPECT_EQ((naive_row_major_swizzled_layout(1, 4)),
+              (swizzle_ref<kB, kM, kS>(1, 4)));
+    EXPECT_EQ((naive_row_major_swizzled_layout(2, 0)),
+              (swizzle_ref<kB, kM, kS>(2, 0)));
+    EXPECT_EQ((naive_row_major_swizzled_layout(2, 4)),
+              (swizzle_ref<kB, kM, kS>(2, 4)));
+}
+
+TEST(TESTSwizzle, test_nested_basetile_swizzle_layout) {
+    const int kB = 3;
+    const int kM = 3;
+    const int kS = 3;
+
+    const int kRows = 1 << kB;
+    const int kCols = 1 << (kM + kS);
+
+    using NestedBaseTileLayout =
+        tl::detail::SharedLayout<kRows, kCols, kCols, 1, tl::Layout::kRowMajor>;
+    using NestedBaseTileSwizzledLayout =
+        SwizzleLayout<NestedBaseTileLayout, kB, kM, kS>;
+
+    NestedBaseTileSwizzledLayout nested_base_tile_swizzled_layout;
+
+    EXPECT_EQ((nested_base_tile_swizzled_layout(0, 0)),
+              (swizzle_ref<kB, kM, kS>(0, 0)));
 }
 
 }  // namespace tilefusion::testing
