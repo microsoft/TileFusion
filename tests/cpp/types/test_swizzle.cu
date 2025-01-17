@@ -2,10 +2,11 @@
 // Licensed under the MIT License.
 
 #include "common/test_utils.hpp"
-#include "types/swizzle.hpp"
+#include "types/mod.hpp"
 
 namespace tilefusion::testing {
 using namespace cell;
+namespace tl = tile_layout;
 
 int flatten(int x, int y, int width) { return x * width + y; }
 
@@ -50,6 +51,27 @@ TEST(TESTSwizzle, test_swizzle_apply) {
               (test_swizzle<kB, kM, kS>(1, 4).y));
     EXPECT_EQ((test_swizzle<kB, kM, kS>(2, 0).x),
               (test_swizzle<kB, kM, kS>(2, 0).y));
+}
+
+TEST(TESTSwizzle, test_swizzle_layout) {
+    const int kB = 3;
+    const int kM = 3;
+    const int kS = 3;
+
+    const int kRows = 1 << kB;
+    const int kCols = 1 << (kM + kS);
+
+    using NaiveRowMajorLayout = tl::RowMajor<kRows, kCols>;
+    using NaiveSwizzledRowMajorLayout =
+        SwizzleLayout<NaiveRowMajorLayout, kB, kM, kS>;
+
+    NaiveSwizzledRowMajorLayout naive_row_major_swizzled_layout;
+
+    EXPECT_EQ((naive_row_major_swizzled_layout(0, 0)), 0);
+    EXPECT_EQ((naive_row_major_swizzled_layout(1, 0)), 72);
+    EXPECT_EQ((naive_row_major_swizzled_layout(1, 4)), 76);
+    EXPECT_EQ((naive_row_major_swizzled_layout(2, 0)), 144);
+    EXPECT_EQ((naive_row_major_swizzled_layout(2, 4)), 148);
 }
 
 }  // namespace tilefusion::testing

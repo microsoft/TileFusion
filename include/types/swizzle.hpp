@@ -66,7 +66,7 @@ struct SwizzleLayout {
      * @param x Row dimension index, with a total of 2^B rows.
      * @param y Column dimension index, with a total of 2^S * 2^M columns.
      */
-    DEVICE auto operator()(int x, int y) const {
+    HOST_DEVICE auto operator()(int x, int y) const {
         int idx = (x << (Mbits + Sbits)) | y;
 
         assert(idx < (1 << (Bbits + Mbits + Sbits)));
