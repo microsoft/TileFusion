@@ -43,7 +43,7 @@ struct Swizzle {
 };
 
 /**
- * @brief Swizzle Layout.
+ * @brief Swizzled Layout.
  *
  * @tparam Layout_ The layout to swizzle.
  * @tparam kB The number of bits for B.
@@ -52,7 +52,7 @@ struct Swizzle {
  */
 template <typename Layout_, const int kB = 3, const int kM = 3,
           const int kS = 3>
-struct SwizzleLayout {
+struct SwizzledLayout {
     static constexpr int Bbits = kB;
     static constexpr int Mbits = kM;
     static constexpr int Sbits = kS;

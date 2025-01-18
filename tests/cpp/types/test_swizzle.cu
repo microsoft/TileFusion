@@ -66,7 +66,7 @@ TEST(TESTSwizzle, test_naive_swizzle_layout) {
 
     using NaiveRowMajorLayout = tl::RowMajor<kRows, kCols>;
     using NaiveSwizzledRowMajorLayout =
-        SwizzleLayout<NaiveRowMajorLayout, kB, kM, kS>;
+        SwizzledLayout<NaiveRowMajorLayout, kB, kM, kS>;
 
     NaiveSwizzledRowMajorLayout naive_row_major_swizzled_layout;
 
@@ -94,7 +94,7 @@ TEST(TESTSwizzle, test_nested_basetile_swizzle_layout) {
         tl::detail::SharedLayout<kRows, kCols, kCols * 16, 16,
                                  tl::Layout::kRowMajor>;
     using NestedBaseTileSwizzledLayout =
-        SwizzleLayout<NestedBaseTileLayout, kB, kM, kS>;
+        SwizzledLayout<NestedBaseTileLayout, kB, kM, kS>;
 
     NestedBaseTileLayout nested_base_tile_layout;
     NestedBaseTileSwizzledLayout nested_base_tile_swizzled_layout;
