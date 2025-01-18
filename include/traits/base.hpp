@@ -49,4 +49,18 @@ struct BaseTileShape {
     static constexpr int kCols = kTileSize;
     static constexpr int kNumel = kRows * kCols;
 };
+
+/**
+ * @brief The base tile shape for Swizzle<3, 3, 3>.
+ */
+template <typename Element>
+    requires BaseType<Element>
+struct SwizzleBaseTileShape {
+    using DType = Element;
+
+    static constexpr int kRows = 8;
+    static constexpr int kCols = 64;
+    static constexpr int kNumel = kRows * kCols;
+};
+
 }  // namespace tilefusion::traits
