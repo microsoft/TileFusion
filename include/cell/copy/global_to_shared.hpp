@@ -96,6 +96,8 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     // and where to store it in the shared memory tile, respectively.
     using GlobalLayout = tl::MatrixLayout<BaseShape::kRows, BaseShape::kCols,
                                           Global::kRowStride, 1>;
+
+    // `src_layout_` is a basetile handled by a single warp.
     GlobalLayout src_layout_;
 
     using NonSwizzled = tl::RowMajor<BaseShape::kRows, BaseShape::kCols>;
