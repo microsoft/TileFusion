@@ -9,4 +9,5 @@
 #include "types/register.hpp"
 #include "types/shared.hpp"
 #include "types/shared_tile_iterator.hpp"
+#include "types/swizzle.hpp"
 #include "types/tile_shape.hpp"

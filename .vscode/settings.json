@@ -12,7 +12,8 @@
     "random": "cpp",
     "limits": "cpp",
     "semaphore": "cpp",
-    "regex": "cpp"
+    "regex": "cpp",
+    "tuple": "cpp"
   },
   "gotoSymbolStack.currentStackPosition": 0,
   "gotoSymbolStack.maxStackPosition": 0,

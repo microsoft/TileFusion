@@ -174,7 +174,7 @@ struct SharedLayout {
 
     static constexpr Layout kType = kType_;
 
-    DEVICE int operator()(int i, int j) const {
+    HOST_DEVICE int operator()(int i, int j) const {
         int tile_x = i / BaseShape::kRows;
         int tile_y = j / BaseShape::kCols;
 
@@ -288,7 +288,7 @@ struct MatrixLayout {
     static constexpr Layout kType =
         kColStride == 1 ? Layout::kRowMajor : Layout::kColMajor;
 
-    DEVICE int operator()(int i, int j) const {
+    HOST_DEVICE int operator()(int i, int j) const {
         return i * kRowStride + j * kColStride;
     }
 };
