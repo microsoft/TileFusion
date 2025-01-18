@@ -43,14 +43,17 @@ TEST(TESTSwizzle, test_swizzle_apply) {
     const int kM = 3;
     const int kS = 3;
 
-    EXPECT_EQ((test_swizzle<kB, kM, kS>(0, 0).x),
-              (test_swizzle<kB, kM, kS>(0, 0).y));
-    EXPECT_EQ((test_swizzle<kB, kM, kS>(1, 0).x),
-              (test_swizzle<kB, kM, kS>(1, 0).y));
-    EXPECT_EQ((test_swizzle<kB, kM, kS>(1, 4).x),
-              (test_swizzle<kB, kM, kS>(1, 4).y));
-    EXPECT_EQ((test_swizzle<kB, kM, kS>(2, 0).x),
-              (test_swizzle<kB, kM, kS>(2, 0).y));
+    int2 swizzled_idx_0_0 = test_swizzle<kB, kM, kS>(0, 0);
+    int2 swizzled_idx_1_0 = test_swizzle<kB, kM, kS>(1, 0);
+    int2 swizzled_idx_1_4 = test_swizzle<kB, kM, kS>(1, 4);
+    int2 swizzled_idx_2_0 = test_swizzle<kB, kM, kS>(2, 0);
+    int2 swizzled_idx_2_4 = test_swizzle<kB, kM, kS>(2, 4);
+
+    EXPECT_EQ(swizzled_idx_0_0.x, swizzled_idx_0_0.y);
+    EXPECT_EQ(swizzled_idx_1_0.x, swizzled_idx_1_0.y);
+    EXPECT_EQ(swizzled_idx_1_4.x, swizzled_idx_1_4.y);
+    EXPECT_EQ(swizzled_idx_2_0.x, swizzled_idx_2_0.y);
+    EXPECT_EQ(swizzled_idx_2_4.x, swizzled_idx_2_4.y);
 }
 
 TEST(TESTSwizzle, test_naive_swizzle_layout) {
@@ -96,11 +99,11 @@ TEST(TESTSwizzle, test_nested_basetile_swizzle_layout) {
     NestedBaseTileLayout nested_base_tile_layout;
     NestedBaseTileSwizzledLayout nested_base_tile_swizzled_layout;
 
-    int idex_0_0 = nested_base_tile_layout(0, 0);
-    int idex_1_0 = nested_base_tile_layout(1, 0);
-    int idex_1_4 = nested_base_tile_layout(1, 4);
-    int idex_2_0 = nested_base_tile_layout(2, 0);
-    int idex_2_4 = nested_base_tile_layout(2, 4);
+    int idx_0_0 = nested_base_tile_layout(0, 0);
+    int idx_1_0 = nested_base_tile_layout(1, 0);
+    int idx_1_4 = nested_base_tile_layout(1, 4);
+    int idx_2_0 = nested_base_tile_layout(2, 0);
+    int idx_2_4 = nested_base_tile_layout(2, 4);
 
     int swizzled_idx_0_0 = nested_base_tile_swizzled_layout(0, 0);
     int swizzled_idx_1_0 = nested_base_tile_swizzled_layout(1, 0);
@@ -108,11 +111,13 @@ TEST(TESTSwizzle, test_nested_basetile_swizzle_layout) {
     int swizzled_idx_2_0 = nested_base_tile_swizzled_layout(2, 0);
     int swizzled_idx_2_4 = nested_base_tile_swizzled_layout(2, 4);
 
-    printf("idex_0_0: %d, swizzled_idx_0_0: %d\n", idex_0_0, swizzled_idx_0_0);
-    printf("idex_1_0: %d, swizzled_idx_1_0: %d\n", idex_1_0, swizzled_idx_1_0);
-    printf("idex_1_4: %d, swizzled_idx_1_4: %d\n", idex_1_4, swizzled_idx_1_4);
-    printf("idex_2_0: %d, swizzled_idx_2_0: %d\n", idex_2_0, swizzled_idx_2_0);
-    printf("idex_2_4: %d, swizzled_idx_2_4: %d\n", idex_2_4, swizzled_idx_2_4);
+#ifdef DEBUG
+    printf("idx_0_0: %d, swizzled_idx_0_0: %d\n", idx_0_0, swizzled_idx_0_0);
+    printf("idx_1_0: %d, swizzled_idx_1_0: %d\n", idx_1_0, swizzled_idx_1_0);
+    printf("idx_1_4: %d, swizzled_idx_1_4: %d\n", idx_1_4, swizzled_idx_1_4);
+    printf("idx_2_0: %d, swizzled_idx_2_0: %d\n", idx_2_0, swizzled_idx_2_0);
+    printf("idx_2_4: %d, swizzled_idx_2_4: %d\n", idx_2_4, swizzled_idx_2_4);
+#endif
 }
 
 }  // namespace tilefusion::testing
