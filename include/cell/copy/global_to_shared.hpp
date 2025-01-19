@@ -67,7 +67,26 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
                 src_offset = src_base_tiles_(i, j) + src_lane_offset;
-                dst_offset = dst_base_tiles_(i, j) + dst_lane_offset;
+                // TODO(KuangjuX): Compute the dst offset based on the new
+                // swizzle layout.
+
+                // dst_offset = dst_base_tiles_(i, j) + dst_lane_offset;
+                int row_ = i * Shared::kRowStride + row;
+                int col_ = j * Shared::kColStride + col;
+
+                int block_row = row_ / 8;
+                int block_col = col_ / 64;
+
+                int block_offset = block_row * 8 * Shared::kRowStride +
+                                   block_col * 64 * Shared::kColStride;
+
+                int swizzled_row % 8;
+                int swizzled_col = col_ % 64;
+
+                int swizzled_offset =
+                    swizzled_tiles_(swizzled_row, swizzled_col);
+
+                dst_offset = block_offset + swizzled_offset;
 
                 copy(src + src_offset, dst + dst_offset);
             }
@@ -85,11 +104,20 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     SrcBaseTilesLayout src_base_tiles_;
 
     // a BaseTile is contiguously stored in shared memory
-    using DstBaseTilesLayout =
+    // using DstBaseTilesLayout =
+    //     tl::MatrixLayout<kRowExec, kColExec,
+    //                      BaseShape::kRows * Shared::kRowStride,
+    //                      BaseShape::kNumel>;
+    // DstBaseTilesLayout dst_base_tiles_;
+
+    using DstBaseTileLayout =
         tl::MatrixLayout<kRowExec, kColExec,
                          BaseShape::kRows * Shared::kRowStride,
-                         BaseShape::kNumel>;
-    DstBaseTilesLayout dst_base_tiles_;
+                         BaseShape::kCols>;
+
+    using SharedSwizzledLayout = SwizzledLayout<tl::RowMajor<8, 64>, 3, 3, 3>;
+
+    SharedSwizzledLayout swizzled_tiles_;
 
     // Given a thread index, the GlobalLayout and SharedLayout below return the
     // data offset from which the thread should load from the global memory tile
@@ -129,6 +157,12 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
         int lane_id = threadIdx.x % WARP_SIZE;
         return lane_id % BaseShape::kColThreads;
     }
+
+    /// @brief returns the lane id of the current thread within a warp.
+    DEVICE int lane_id() { return threadIdx.x % WARP_SIZE; }
+
+    /// @brief returns the warp id of the current thread.
+    DEVICE int warp_id() { return threadIdx.x / WARP_SIZE; }
 };
 
 template <typename Global_, typename Shared_, typename BaseShape_,
@@ -366,8 +400,12 @@ struct GlobalToSharedLoader {
     // warp-level tile shape instead of using a fixed 16x16 `BaseShape`. using
     // WarpShape =
     //     warp::WarpTileShape<DType, typename Shared::Layout, Shared::kType>;
+    // using WarpShape =
+    //     warp::WarpTileShape<DType, tl::RowMajor<16, 16>, Shared::kType>;
+
+    // KuangjuX: Use `4x64` as the warp tile shape.
     using WarpShape =
-        warp::WarpTileShape<DType, tl::RowMajor<16, 16>, Shared::kType>;
+        warp::WarpTileShape<DType, tl::RowMajor<4, 64>, Shared::kType>;
 
     static_assert(Shared::kRows % WarpShape::kRows == 0,
                   "Shared::kRows must be divisible by WarpShape::kRows.");
@@ -396,6 +434,7 @@ struct GlobalToSharedLoader {
         const DType* src_ptr = src.data();
         DType* dst_ptr = dst.mutable_data();
 
+        // get warp offset for global and shared memory
         int offset_src = global_offset_.template get_warp_offset<Global>();
         int offset_dst = shared_offset_.get_warp_offset();
 
