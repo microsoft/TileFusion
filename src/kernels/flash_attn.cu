@@ -438,24 +438,27 @@ void flash_attention_op(const torch::Tensor& Q, const torch::Tensor& K,
     auto dV = reinterpret_cast<const InType*>(V.data_ptr());
     auto dO = reinterpret_cast<OutType*>(O.data_ptr());
 
-    if (m == 64 && n == 256 && k == 128 && p == 128) {
-        using WholeShape = FlashAttentionShape<64, 256, 128, 128>;
-        const int kBatch = 1;
-        run_flash_attention<InType, AccType, OutType, WholeShape, CtaTileShape,
-                            kBatch>(dQ, dK, dV, dO);
-    } else if (m == 64 && n == 128 && k == 128 && p == 128) {
-        using WholeShape = FlashAttentionShape<64, 128, 128, 128>;
-        const int kBatch = 1;
-        run_flash_attention<InType, AccType, OutType, WholeShape, CtaTileShape,
-                            kBatch>(dQ, dK, dV, dO);
-    } else if (m == 64 && n == 64 && k == 128 && p == 128) {
-        using WholeShape = FlashAttentionShape<64, 64, 128, 128>;
-        const int kBatch = 1;
-        run_flash_attention<InType, AccType, OutType, WholeShape, CtaTileShape,
-                            kBatch>(dQ, dK, dV, dO);
-    } else {
-        throw std::runtime_error("Unsupported shape");
-    }
+    // if (m == 64 && n == 256 && k == 128 && p == 128) {
+    //     using WholeShape = FlashAttentionShape<64, 256, 128, 128>;
+    //     const int kBatch = 1;
+    //     run_flash_attention<InType, AccType, OutType, WholeShape,
+    //     CtaTileShape,
+    //                         kBatch>(dQ, dK, dV, dO);
+    // } else if (m == 64 && n == 128 && k == 128 && p == 128) {
+    //     using WholeShape = FlashAttentionShape<64, 128, 128, 128>;
+    //     const int kBatch = 1;
+    //     run_flash_attention<InType, AccType, OutType, WholeShape,
+    //     CtaTileShape,
+    //                         kBatch>(dQ, dK, dV, dO);
+    // } else if (m == 64 && n == 64 && k == 128 && p == 128) {
+    //     using WholeShape = FlashAttentionShape<64, 64, 128, 128>;
+    //     const int kBatch = 1;
+    //     run_flash_attention<InType, AccType, OutType, WholeShape,
+    //     CtaTileShape,
+    //                         kBatch>(dQ, dK, dV, dO);
+    // } else {
+    //     throw std::runtime_error("Unsupported shape");
+    // }
 }
 
 }  // namespace tilefusion::kernels
