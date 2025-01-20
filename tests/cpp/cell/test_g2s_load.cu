@@ -28,8 +28,8 @@ __global__ void copy_g2s(const Element* src_ptr, Element* dst_ptr,
     __copy_async();
     __syncthreads();
 
-    // storer(inter, dst);
-    // __syncthreads();
+    storer(inter, dst);
+    __syncthreads();
 
 #if defined(DEBUG)
     if (thread(0)) {
