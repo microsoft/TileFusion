@@ -74,11 +74,9 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
                 int swizzled_j =
                     (j * BaseShape::kCols + col) / SwizzledBaseShape::kCols;
                 int swizzled_row =
-                    (i * BaseShape::kRows + row) %
-                    (SwizzledBaseShape::kRows / BaseShape::kRows);
+                    (i * BaseShape::kRows + row) % SwizzledBaseShape::kRows;
                 int swizzled_col =
-                    (j * BaseShape::kCols + col) %
-                    (SwizzledBaseShape::kCols / BaseShape::kCols);
+                    (j * BaseShape::kCols + col) % SwizzledBaseShape::kCols;
 
                 /// the pointer offset inside a warp tile.
                 int src_lane_offset = src_layout_(row, col);
