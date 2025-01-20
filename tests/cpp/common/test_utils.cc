@@ -18,6 +18,12 @@ void assert_equal(const __half* v1, const __half* v2, int64_t numel,
 
         EXPECT_NEAR(a, b, epsilon) << "v1[" << i << "] vs. v2[" << i
                                    << "] = " << a << " vs. " << b << std::endl;
+
+        // if (std::abs(a - b) > epsilon) {
+        //     std::cerr << "v1[" << i << "] vs. v2[" << i << "] = " << a
+        //               << " vs. " << b << std::endl;
+        //     return;
+        // }
     }
 }
 

@@ -54,9 +54,6 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const DType* src, DType* dst) {
-        if (thread0()) {
-            printf("kRowExec: %d, kColExec: %d\n", kRowExec, kColExec);
-        }
         int row = lane_row_id();
         int col = lane_col_id() * kNumPerAccess;
 
@@ -79,8 +76,7 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
                 int dst_tile_offset = dst_tile_(tile_row, tile_col);
 
                 src_offset = src_base_tiles_(i, j) + src_lane_offset;
-                dst_offset =
-                    dst_base_tiles_(tile_i, tile_j) + dst_tile_offset;
+                dst_offset = dst_base_tiles_(tile_i, tile_j) + dst_tile_offset;
 
                 copy(src + src_offset, dst + dst_offset);
             }
@@ -107,7 +103,7 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     SrcBaseTilesLayout src_base_tiles_;
 
     using DstSwizzledLayout =
-        tl::MatrixLayout<kSwizzledRowExec, kSwizzledCols,
+        tl::MatrixLayout<kSwizzledRowExec, kSwizzledColExec,
                          kSwizzledRows * Shared::kRowStride, kSwizzledCols>;
     DstSwizzledLayout dst_base_tiles_;
 
@@ -120,9 +116,10 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     // `src_tile_` is a basetile handled by a single warp.
     GlobalLayout src_tile_;
 
-    using NonSwizzled = tl::RowMajor<kSwizzledRows, kSwizzledCols>;
-    using Swizzled =
-        SwizzledLayout<tl::RowMajor<kSwizzledRows, kSwizzledCols>, 3, 3, 3>;
+    using NonSwizzled =
+        tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride,
+                         Shared::kColStride>;
+    using Swizzled = SwizzledLayout<NonSwizzled, 3, 3, 3>;
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
@@ -252,9 +249,6 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
     static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const DType* src, DType* dst) {
-        if (thread0()) {
-            printf("kRowExec: %d, kColExec: %d\n", kRowExec, kColExec);
-        }
         int row = lane_row_id();
         int col = lane_col_id() * kNumPerAccess;
 
@@ -294,7 +288,7 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
         kColExec / (kSwizzledCols / BaseShape::kCols);
 
     using SrcSwizzledLayout =
-        tl::MatrixLayout<kSwizzledRowExec, kSwizzledCols,
+        tl::MatrixLayout<kSwizzledRowExec, kSwizzledColExec,
                          kSwizzledRows * Shared::kRowStride, kSwizzledCols>;
     SrcSwizzledLayout src_base_tiles_;
 
@@ -313,9 +307,10 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
     static constexpr int kNumPerAccess =
         traits::AccessBase<DType>::kNumPerAccess;
 
-    using NonSwizzled = tl::RowMajor<kSwizzledRows, kSwizzledCols>;
-    using Swizzled =
-        SwizzledLayout<tl::RowMajor<kSwizzledRows, kSwizzledCols>, 3, 3, 3>;
+    using NonSwizzled =
+        tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride,
+                         Shared::kColStride>;
+    using Swizzled = SwizzledLayout<NonSwizzled, 3, 3, 3>;
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
     SharedLayout src_tile_;

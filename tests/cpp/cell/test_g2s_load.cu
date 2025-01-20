@@ -44,7 +44,7 @@ __global__ void copy_g2s(const Element* src_ptr, Element* dst_ptr,
 }
 
 template <typename Element, typename WarpLayout, const int kRows,
-          const int kCols>
+          const int kCols, const bool kSwizzled = false>
 void run_test_row_major() {
     static const int kThreads = tl::get_numel<WarpLayout> * 32;
 
@@ -56,9 +56,6 @@ void run_test_row_major() {
     thrust::device_vector<Element> d_B(numel);
     thrust::fill(d_B.begin(), d_B.end(), static_cast<Element>(0.));
     thrust::device_vector<Element> d_A = h_A;
-
-    // static const bool kSwizzled = false;
-    static const bool kSwizzled = true;
 
     using SrcTile = GlobalTile<Element, tl::RowMajor<kRows, kCols>>;
     using DstTile = SharedTile<Element, tl::RowMajor<kRows, kCols>, kSwizzled>;
@@ -131,7 +128,9 @@ void run_test_col_major() {
 }  // namespace
 
 TEST(GlobalToSharedLoad, test_row_major_load) {
-    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 64>();
+    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 64, true>();
+    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 256, true>();
+    run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, true>();
     // run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 32>();
     // run_test_row_major<__half, tl::RowMajor<1, 4>, 32, 128>();
     // run_test_row_major<__half, tl::RowMajor<4, 1>, 192, 32>();
