@@ -81,7 +81,7 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
                 /// the pointer offset inside a warp tile.
                 int src_lane_offset = src_layout_(row, col);
                 int dst_swizzled_offset =
-                    dst_swizzled_tiles_(swizzled_row, swizzled_col);
+                    swizzled_tiles_(swizzled_row, swizzled_col);
 
                 src_offset = src_base_tiles_(i, j) + src_lane_offset;
                 dst_offset = dst_swizzled_tiles_(swizzled_i, swizzled_j) +
