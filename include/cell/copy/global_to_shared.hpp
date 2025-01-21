@@ -414,9 +414,8 @@ struct GlobalToSharedLoader {
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
     using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
-    // TODO(KuangjuX): hotfix `true` for `kIsSharedLayout`, fix it.
-    using SharedOffset = warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared,
-                                                  kMode, Shared::kType>;
+    using SharedOffset =
+        warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared, kMode>;
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
@@ -441,10 +440,10 @@ struct GlobalToSharedLoader {
         // Load a single warp tile from global memory to shared memory
         using Loader = GlobalToSharedLoaderImpl<Global, Shared, WarpShape,
                                                 kRowExec, kColExec>;
-        if (threadIdx.x % 32 == 0) {
-            printf("offset_src: %d, offset_dst: %d\n", offset_src, offset_dst);
-            printf("kRowExec: %d, kColExec: %d\n", kRowExec, kColExec);
-        }
+        // if (threadIdx.x % 32 == 0) {
+        //     printf("offset_src: %d, offset_dst: %d\n", offset_src, offset_dst);
+        //     printf("kRowExec: %d, kColExec: %d\n", kRowExec, kColExec);
+        // }
 
         Loader loader;
         loader(src_ptr + offset_src, dst_ptr + offset_dst);
@@ -486,9 +485,8 @@ struct SharedToGlobalStorer {
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
 
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
-    // TODO(KuangjuX): hotfix `true` for `kIsSharedLayout`, fix it.
-    using SharedOffset = warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared,
-                                                  kMode, Shared::kType>;
+    using SharedOffset =
+        warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;
 
     using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
 
