@@ -87,4 +87,13 @@ struct SwizzleBaseTileShape<__half> {
     static constexpr int kNumel = kRows * kCols;
 };
 
+template <>
+struct SwizzleBaseTileShape<float> {
+    using DType = float;
+
+    static constexpr int kRows = 8;
+    static constexpr int kCols = 32;
+    static constexpr int kNumel = kRows * kCols;
+};
+
 }  // namespace tilefusion::traits
