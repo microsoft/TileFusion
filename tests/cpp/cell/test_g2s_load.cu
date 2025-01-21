@@ -66,13 +66,19 @@ void run_test_row_major() {
     using Storer = copy::SharedToGlobalStorer<DstTile, WarpLayout>;
     Storer storer;
 
+    auto copy_kernel = copy_g2s<Element, SrcTile, DstTile, Loader, Storer>;
+
+    int shm_size = kRows * kCols * sizeof(Element);
+    if (shm_size > 48 * 1024) {
+        cudaFuncSetAttribute(
+            copy_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
+    }
+
     dim3 dim_grid(1, 1);
     dim3 dim_block(kThreads);
-
-    copy_g2s<Element, SrcTile, DstTile, Loader, Storer>
-        <<<dim_grid, dim_block, kRows * kCols * sizeof(Element)>>>(
-            thrust::raw_pointer_cast(d_A.data()),
-            thrust::raw_pointer_cast(d_B.data()), loader, storer);
+    copy_kernel<<<dim_grid, dim_block, shm_size>>>(
+        thrust::raw_pointer_cast(d_A.data()),
+        thrust::raw_pointer_cast(d_B.data()), loader, storer);
     cudaDeviceSynchronize();
 
     thrust::host_vector<Element> h_B(numel);
@@ -132,9 +138,11 @@ TEST(GlobalToSharedLoad, test_row_major_load) {
     run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 256, true>();
     run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, false>();
     run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, true>();
-    // run_test_row_major<__half, tl::RowMajor<4, 1>, 192, 32>();
-    // run_test_row_major<__half, tl::RowMajor<2, 2>, 64, 128>();
-    // run_test_row_major<__half, tl::RowMajor<2, 4>, 96, 128>();
+    run_test_row_major<__half, tl::RowMajor<4, 1>, 64, 64, false>();
+    run_test_row_major<__half, tl::RowMajor<4, 1>, 64, 64, true>();
+    run_test_row_major<__half, tl::RowMajor<2, 2>, 32, 128, true>();
+    run_test_row_major<__half, tl::RowMajor<2, 4>, 32, 256, true>();
+    run_test_row_major<__half, tl::RowMajor<2, 4>, 64, 512, true>();
 
     // run_test_row_major<float, tl::RowMajor<1, 1>, 16, 16>();
     // run_test_row_major<float, tl::RowMajor<1, 2>, 32, 64>();

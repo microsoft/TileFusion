@@ -54,6 +54,9 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const DType* src, DType* dst) {
+        // TODO(KuangjuX): When the `WarpRow` is greater than 1, a swizzle block
+        // might be split by two warps, and a solution is needed to address this
+        // situation.
         int row = lane_row_id();
         int col = lane_col_id() * kNumPerAccess;
 
@@ -440,10 +443,6 @@ struct GlobalToSharedLoader {
         // Load a single warp tile from global memory to shared memory
         using Loader = GlobalToSharedLoaderImpl<Global, Shared, WarpShape,
                                                 kRowExec, kColExec>;
-        // if (threadIdx.x % 32 == 0) {
-        //     printf("offset_src: %d, offset_dst: %d\n", offset_src, offset_dst);
-        //     printf("kRowExec: %d, kColExec: %d\n", kRowExec, kColExec);
-        // }
 
         Loader loader;
         loader(src_ptr + offset_src, dst_ptr + offset_dst);
