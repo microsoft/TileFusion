@@ -76,8 +76,11 @@ struct GMemCopyShape<float> {
  */
 template <typename Element>
     requires BaseType<Element>
-struct SwizzleBaseTileShape {
-    using DType = Element;
+struct SwizzleBaseTileShape;
+
+template <>
+struct SwizzleBaseTileShape<__half> {
+    using DType = __half;
 
     static constexpr int kRows = 8;
     static constexpr int kCols = 64;

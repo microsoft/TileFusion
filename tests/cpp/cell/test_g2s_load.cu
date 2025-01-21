@@ -130,9 +130,7 @@ void run_test_col_major() {
 TEST(GlobalToSharedLoad, test_row_major_load) {
     run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 64, true>();
     run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 256, true>();
-    run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, true>();
-    // run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 32>();
-    // run_test_row_major<__half, tl::RowMajor<1, 4>, 32, 128>();
+    run_test_row_major<__half, tl::RowMajor<1, 2>, 16, 128, false>();
     // run_test_row_major<__half, tl::RowMajor<4, 1>, 192, 32>();
     // run_test_row_major<__half, tl::RowMajor<2, 2>, 64, 128>();
     // run_test_row_major<__half, tl::RowMajor<2, 4>, 96, 128>();

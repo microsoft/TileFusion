@@ -117,8 +117,7 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     GlobalLayout src_tile_;
 
     using NonSwizzled =
-        tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride,
-                         Shared::kColStride>;
+        tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride, 1>;
     using Swizzled = SwizzledLayout<NonSwizzled, 3, 3, 3>;
 
     using SharedLayout =
@@ -308,16 +307,14 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
         traits::AccessBase<DType>::kNumPerAccess;
 
     using NonSwizzled =
-        tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride,
-                         Shared::kColStride>;
+        tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride, 1>;
     using Swizzled = SwizzledLayout<NonSwizzled, 3, 3, 3>;
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
     SharedLayout src_tile_;
 
-    using GlobalLayout =
-        tl::MatrixLayout<BaseShape::kRows, BaseShape::kCols, Global::kRowStride,
-                         Global::kColStride>;
+    using GlobalLayout = tl::MatrixLayout<BaseShape::kRows, BaseShape::kCols,
+                                          Global::kRowStride, 1>;
     GlobalLayout dst_tile_;
 
     /// @brief returns the lane col of the current thread within a warp.
@@ -417,8 +414,9 @@ struct GlobalToSharedLoader {
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
     using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
-    using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared, kMode>;
+    // TODO(KuangjuX): hotfix `true` for `kIsSharedLayout`, fix it.
+    using SharedOffset = warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared,
+                                                  kMode, Shared::kType>;
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
@@ -443,6 +441,10 @@ struct GlobalToSharedLoader {
         // Load a single warp tile from global memory to shared memory
         using Loader = GlobalToSharedLoaderImpl<Global, Shared, WarpShape,
                                                 kRowExec, kColExec>;
+        if (threadIdx.x % 32 == 0) {
+            printf("offset_src: %d, offset_dst: %d\n", offset_src, offset_dst);
+            printf("kRowExec: %d, kColExec: %d\n", kRowExec, kColExec);
+        }
 
         Loader loader;
         loader(src_ptr + offset_src, dst_ptr + offset_dst);
@@ -483,9 +485,10 @@ struct SharedToGlobalStorer {
 
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
 
-    using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
+    // TODO(KuangjuX): hotfix `true` for `kIsSharedLayout`, fix it.
+    using SharedOffset = warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared,
+                                                  kMode, Shared::kType>;
 
     using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
 
