@@ -51,27 +51,6 @@ struct BaseTileShape {
 };
 
 /**
- * @brief Single Warp load shape from global memory to shared memory.
- */
-template <typename Element>
-    requires BaseType<Element>
-struct GMemCopyShape;
-
-template <>
-struct GMemCopyShape<__half> {
-    static constexpr int kRows = 64;
-    static constexpr int kCols = 4;
-    static constexpr int kNumel = kRows * kCols;
-};
-
-template <>
-struct GMemCopyShape<float> {
-    static constexpr int kRows = 32;
-    static constexpr int kCols = 4;
-    static constexpr int kNumel = kRows * kCols;
-};
-
-/**
  * @brief The base tile shape for Swizzle<3, 3, 3>.
  */
 template <typename Element>
@@ -85,6 +64,10 @@ struct SwizzleBaseTileShape<__half> {
     static constexpr int kRows = 8;
     static constexpr int kCols = 64;
     static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 3;
+    static constexpr int M = 3;
+    static constexpr int S = 3;
 };
 
 template <>
@@ -94,6 +77,10 @@ struct SwizzleBaseTileShape<float> {
     static constexpr int kRows = 8;
     static constexpr int kCols = 32;
     static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 3;
+    static constexpr int M = 2;
+    static constexpr int S = 3;
 };
 
 }  // namespace tilefusion::traits

@@ -14,7 +14,7 @@ namespace tl = tile_layout;
 /**
  * @brief Load a warp tile from global memory to shared memory.
  *
- * This function loads a warp tile whose shape is specified by `WarpShape`
+ * This function loads a warp tile whose shape is specified by `BaseShape`
  * from global memory to shared memory.
  *
  * @tparam Global_   The type of the global memory pointer.
@@ -93,6 +93,9 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
     static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
+    static constexpr int B = SwizzledBaseShape::B;
+    static constexpr int M = SwizzledBaseShape::M;
+    static constexpr int S = SwizzledBaseShape::S;
 
     static constexpr int kSwizzledRowExec =
         kRowExec / (kSwizzledRows / BaseShape::kRows);
@@ -121,7 +124,7 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
 
     using NonSwizzled =
         tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride, 1>;
-    using Swizzled = SwizzledLayout<NonSwizzled, 3, 3, 3>;
+    using Swizzled = SwizzledLayout<NonSwizzled, B, M, S>;
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
@@ -283,6 +286,9 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
     using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
     static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
+    static constexpr int B = SwizzledBaseShape::B;
+    static constexpr int M = SwizzledBaseShape::M;
+    static constexpr int S = SwizzledBaseShape::S;
 
     static constexpr int kSwizzledRowExec =
         kRowExec / (kSwizzledRows / BaseShape::kRows);
@@ -311,7 +317,7 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
 
     using NonSwizzled =
         tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride, 1>;
-    using Swizzled = SwizzledLayout<NonSwizzled, 3, 3, 3>;
+    using Swizzled = SwizzledLayout<NonSwizzled, B, M, S>;
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
     SharedLayout src_tile_;
@@ -393,32 +399,19 @@ struct GlobalToSharedLoader {
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
 
-    // This implementation uses a fixed 16x16 `BaseShape` as the atomic data
-    // tile accessed by threads in a single warp that issues a single load/store
-    // instruction.
-    // FIXME(ying): uncomment the following lines to automatically infer the
-    // warp-level tile shape instead of using a fixed 16x16 `BaseShape`. using
-    // WarpShape =
-    //     warp::WarpTileShape<DType, typename Shared::Layout, Shared::kType>;
-    // using WarpShape =
-    //     warp::WarpTileShape<DType, tl::RowMajor<16, 16>, Shared::kType>;
+    using BaseShape =
+        warp::WarpBaseTileShape<DType, typename Shared::Layout, Shared::kType>;
 
-    // KuangjuX: Use `4x64` in RowMajor and `64x4` in ColMajor.
-    static constexpr bool kRowMajor = Shared::kType == tl::Layout::kRowMajor;
-    using BaseTile =
-        std::conditional_t<kRowMajor, tl::RowMajor<4, 64>, tl::ColMajor<64, 4>>;
-    using WarpShape = warp::WarpTileShape<DType, BaseTile, Shared::kType>;
-
-    static_assert(Shared::kRows % WarpShape::kRows == 0,
-                  "Shared::kRows must be divisible by WarpShape::kRows.");
-    static_assert(Shared::kCols % WarpShape::kCols == 0,
-                  "Shared::kCols must be divisible by WarpShape::kCols.");
+    static_assert(Shared::kRows % BaseShape ::kRows == 0,
+                  "Shared::kRows must be divisible by BaseShape::kRows.");
+    static_assert(Shared::kCols % BaseShape::kCols == 0,
+                  "Shared::kCols must be divisible by BaseShape::kCols.");
 
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
-    using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
+    using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
     using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared, kMode>;
+        warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
@@ -441,7 +434,7 @@ struct GlobalToSharedLoader {
         int offset_dst = shared_offset_.get_warp_offset();
 
         // Load a single warp tile from global memory to shared memory
-        using Loader = GlobalToSharedLoaderImpl<Global, Shared, WarpShape,
+        using Loader = GlobalToSharedLoaderImpl<Global, Shared, BaseShape,
                                                 kRowExec, kColExec>;
 
         Loader loader;
@@ -459,22 +452,8 @@ struct SharedToGlobalStorer {
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
 
-    // FIXME(ying): automatically infer the warp-level tile shape instead
-    // of using a fixed `BaseShape`.
-    // using WarpShape =
-    //     warp::WarpTileShape<DType, typename Shared::Layout, Shared::kType>;
-
-    // FIXME(ying): uncomment the following lines to automatically infer the
-    // warp-level tile shape instead of using a fixed 16x16 `BaseShape`.
-    // using BaseShape =
-    //     warp::WarpTileShape<DType, tl::RowMajor<16, 16>, Shared::kType>;
-
-    // KuangjuX: Use `4x64` in RowMajor and `64x4` in ColMajor.
-
-    static constexpr bool kRowMajor = Shared::kType == tl::Layout::kRowMajor;
-    using BaseTile =
-        std::conditional_t<kRowMajor, tl::RowMajor<4, 64>, tl::ColMajor<64, 4>>;
-    using BaseShape = warp::WarpTileShape<DType, BaseTile, Shared::kType>;
+    using BaseShape =
+        warp::WarpBaseTileShape<DType, typename Shared::Layout, Shared::kType>;
 
     static_assert(Shared::kRows % BaseShape::kRows == 0,
                   "Shared::kRows must be divisible by BaseShape::kRows.");

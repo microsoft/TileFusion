@@ -179,10 +179,10 @@ struct ExecCounter {
 ///        the entire tile. The final warp tile shape is multiple of this atomic
 ///        shape.
 template <typename DType, typename TileLayout, const tl::Layout kType>
-struct WarpTileShape;
+struct WarpBaseTileShape;
 
 template <typename DType, typename TileLayout>
-struct WarpTileShape<DType, TileLayout, tl::Layout::kRowMajor> {
+struct WarpBaseTileShape<DType, TileLayout, tl::Layout::kRowMajor> {
     using AccessInfo = traits::AccessBase<DType>;
 
     // In a row-major layout, columns are the contiguous dimension in memory. We
@@ -222,7 +222,7 @@ struct WarpTileShape<DType, TileLayout, tl::Layout::kRowMajor> {
 };
 
 template <typename DType, typename TileLayout>
-struct WarpTileShape<DType, TileLayout, tl::Layout::kColMajor> {
+struct WarpBaseTileShape<DType, TileLayout, tl::Layout::kColMajor> {
     using AccessInfo = traits::AccessBase<DType>;
 
     // In a column-major layout, columns are the contiguous dimension in memory.
