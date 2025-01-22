@@ -14,7 +14,7 @@ namespace tl = tile_layout;
 /**
  * @brief Load a warp tile from global memory to shared memory.
  *
- * This function loads a warp tile whose shape is specified by `WarpShape`
+ * This function loads a warp tile whose shape is specified by `BaseShape`
  * from global memory to shared memory.
  *
  * @tparam Global_   The type of the global memory pointer.
@@ -404,30 +404,23 @@ struct GlobalToSharedLoader {
     // instruction.
     // FIXME(ying): uncomment the following lines to automatically infer the
     // warp-level tile shape instead of using a fixed 16x16 `BaseShape`. using
-    // WarpShape =
-    //     warp::WarpTileShape<DType, typename Shared::Layout, Shared::kType>;
-    // using WarpShape =
-    //     warp::WarpTileShape<DType, tl::RowMajor<16, 16>, Shared::kType>;
+    // BaseShape =
+    //     warp::WarpBaseTileShape<DType, typename Shared::Layout,
+    //     Shared::kType>;
 
-    // KuangjuX: Use `4x64` in RowMajor and `64x4` in ColMajor.
-    using BaseShape = GMemCopyShape<DType>;
-    static constexpr bool kRowMajor = Shared::kType == tl::Layout::kRowMajor;
-    using BaseTile =
-        std::conditional_t<kRowMajor,
-                           tl::RowMajor<BaseShape::kRows, BaseShape::kCols>,
-                           tl::ColMajor<BaseShape::kCols, BaseShape::kRows>>;
-    using WarpShape = warp::WarpTileShape<DType, BaseTile, Shared::kType>;
+    using BaseShape =
+        warp::WarpBaseTileShape<DType, typename Shared::Layout, Shared::kType>;
 
-    static_assert(Shared::kRows % WarpShape::kRows == 0,
-                  "Shared::kRows must be divisible by WarpShape::kRows.");
-    static_assert(Shared::kCols % WarpShape::kCols == 0,
-                  "Shared::kCols must be divisible by WarpShape::kCols.");
+    static_assert(Shared::kRows % BaseShape ::kRows == 0,
+                  "Shared::kRows must be divisible by BaseShape::kRows.");
+    static_assert(Shared::kCols % BaseShape::kCols == 0,
+                  "Shared::kCols must be divisible by BaseShape::kCols.");
 
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
-    using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
+    using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
     using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared, kMode>;
+        warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
@@ -450,7 +443,7 @@ struct GlobalToSharedLoader {
         int offset_dst = shared_offset_.get_warp_offset();
 
         // Load a single warp tile from global memory to shared memory
-        using Loader = GlobalToSharedLoaderImpl<Global, Shared, WarpShape,
+        using Loader = GlobalToSharedLoaderImpl<Global, Shared, BaseShape,
                                                 kRowExec, kColExec>;
 
         Loader loader;
@@ -470,34 +463,30 @@ struct SharedToGlobalStorer {
 
     // FIXME(ying): automatically infer the warp-level tile shape instead
     // of using a fixed `BaseShape`.
-    // using WarpShape =
-    //     warp::WarpTileShape<DType, typename Shared::Layout, Shared::kType>;
+    // using BaseShape =
+    //     warp::WarpBaseTileShape<DType, typename Shared::Layout,
+    //     Shared::kType>;
 
     // FIXME(ying): uncomment the following lines to automatically infer the
     // warp-level tile shape instead of using a fixed 16x16 `BaseShape`.
     // using BaseShape =
-    //     warp::WarpTileShape<DType, tl::RowMajor<16, 16>, Shared::kType>;
+    //     warp::WarpBaseTileShape<DType, tl::RowMajor<16, 16>, Shared::kType>;
 
-    using BaseShape = GMemCopyShape<DType>;
-    static constexpr bool kRowMajor = Shared::kType == tl::Layout::kRowMajor;
-    using BaseTile =
-        std::conditional_t<kRowMajor,
-                           tl::RowMajor<BaseShape::kRows, BaseShape::kCols>,
-                           tl::ColMajor<BaseShape::kCols, BaseShape::kRows>>;
-    using WarpShape = warp::WarpTileShape<DType, BaseTile, Shared::kType>;
+    using BaseShape =
+        warp::WarpBaseTileShape<DType, typename Shared::Layout, Shared::kType>;
 
-    static_assert(Shared::kRows % WarpShape::kRows == 0,
-                  "Shared::kRows must be divisible by WarpShape::kRows.");
-    static_assert(Shared::kCols % WarpShape::kCols == 0,
-                  "Shared::kCols must be divisible by WarpShape::kCols.");
+    static_assert(Shared::kRows % BaseShape::kRows == 0,
+                  "Shared::kRows must be divisible by BaseShape::kRows.");
+    static_assert(Shared::kCols % BaseShape::kCols == 0,
+                  "Shared::kCols must be divisible by BaseShape::kCols.");
 
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
 
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
     using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared, kMode>;
+        warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;
 
-    using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
+    using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
@@ -514,7 +503,7 @@ struct SharedToGlobalStorer {
         int offset_src = shared_offset_.get_warp_offset();
         int offset_dst = global_offset_.template get_warp_offset<Global>();
 
-        using Storer = SharedToGlobalStorerImpl<Shared, Global, WarpShape,
+        using Storer = SharedToGlobalStorerImpl<Shared, Global, BaseShape,
                                                 kRowExec, kColExec>;
 
         Storer storer;
