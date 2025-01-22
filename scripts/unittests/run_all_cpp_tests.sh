@@ -19,7 +19,7 @@ fi
 
 cd $BUILD_DIR
 
-for file in $(find "$TESTS_DIR/cell/" -name "test_*.cu"); do
+for file in $(find "$TESTS_DIR/" -name "test_*.cu"); do
     test_name=$(basename $file .cu)
     echo "Running test: $test_name"
     ctest -R $test_name
