@@ -91,7 +91,7 @@ void run_test_row_major() {
 }
 
 template <typename Element, typename WarpLayout, const int kRows,
-          const int kCols>
+          const int kCols, const bool kSwizzled = false>
 void run_test_col_major() {
     static const int kThreads = tl::get_numel<WarpLayout> * 32;
 
@@ -104,7 +104,6 @@ void run_test_col_major() {
     thrust::fill(d_B.begin(), d_B.end(), static_cast<Element>(0.));
     thrust::device_vector<Element> d_A = h_A;
 
-    static const bool kSwizzled = false;
     using SrcTile = GlobalTile<Element, tl::ColMajor<kRows, kCols>>;
     using DstTile = SharedTile<Element, tl::ColMajor<kRows, kCols>, kSwizzled>;
 
@@ -173,7 +172,7 @@ TEST(GlobalToSharedLoad, test_col_major_load) {
     // FIXME(ying): temporarily disable the test to refactor the copy.
     // Make sure all the unit tests pass after the refactor.
 
-    // run_test_col_major<__half, tl::RowMajor<1, 1>, 16, 16>();
+    run_test_col_major<__half, tl::RowMajor<1, 1>, 16, 16>();
     // run_test_col_major<__half, tl::RowMajor<1, 4>, 32, 128>();
     // run_test_col_major<__half, tl::RowMajor<4, 1>, 192, 32>();
     // run_test_col_major<__half, tl::RowMajor<2, 2>, 64, 128>();

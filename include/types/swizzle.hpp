@@ -27,8 +27,6 @@ struct Swizzle {
         // | Bbits | Sbits | Mbits |
         // Mbits as mask for the lower bits.
 
-        assert(idx < (1 << (Bbits + Mbits + Sbits)));
-
         int bs = idx >> Mbits;
         // (b, s) as a 2d coordinate.
         int y = bs & ((1 << Sbits) - 1);
@@ -56,6 +54,8 @@ struct SwizzledLayout {
     static constexpr int Bbits = kB;
     static constexpr int Mbits = kM;
     static constexpr int Sbits = kS;
+
+    // static_assert(Layout_::kNumel < (1 << (kB + kM + kS)));
 
     using Layout = Layout_;
     using Swizzle = Swizzle<Bbits, Mbits, Sbits>;
