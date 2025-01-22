@@ -329,9 +329,10 @@ template <typename WarpLayout_, typename WarpShape_, typename Shared_,
 struct SharedOffsetHelper<WarpLayout_, WarpShape_, Shared_, kMode_,
                           tl::Layout::kRowMajor, false> {
     DEVICE int get_warp_offset() {
-        int tile_id = warp_row_id<WarpLayout>() * kRowStride +
-                      warp_col_id<WarpLayout>() * kColStride;
-        return tile_id * WarpShape::kNumel;
+        // TODO(KuangjuX): hotfix this.
+        return warp_row_id<WarpLayout>() * kRowStride * WarpShape::kRows *
+                   Shared::kCols +
+               warp_col_id<WarpLayout>() * kColStride * WarpShape::kCols;
     }
 
   private:
@@ -343,8 +344,8 @@ struct SharedOffsetHelper<WarpLayout_, WarpShape_, Shared_, kMode_,
     constexpr static int kTilePerRow = Shared::kRows / WarpShape::kRows;
     constexpr static int kTilePerCol = Shared::kCols / WarpShape::kCols;
 
-    constexpr static int kRowStride =
-        kTilePerRow / tl::num_rows<WarpLayout> * kTilePerCol;
+    // TODO(KuangjuX): hotfix this.
+    constexpr static int kRowStride = kTilePerRow / tl::num_rows<WarpLayout>;
     constexpr static int kColStride = kTilePerCol / tl::num_cols<WarpLayout>;
 };
 
@@ -355,6 +356,7 @@ struct SharedOffsetHelper<WarpLayout_, WarpShape_, Shared_, kMode_,
     DEVICE int get_warp_offset() {
         int tile_id = warp_row_id<WarpLayout>() * kRowStride +
                       warp_col_id<WarpLayout>() * kColStride;
+
         return tile_id * WarpShape::kNumel;
     }
 
