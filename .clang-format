@@ -1,12 +1,19 @@
 # Run manually to reformat a file:
 # clang-format -i --style=file <file>
 BasedOnStyle: Google
+UseTab: Never
 ColumnLimit: 80
 IndentWidth: 4
+
 AccessModifierOffset: -2
+
 DerivePointerAlignment: false
-# If true, empty lines at the start of blocks are kept.
-KeepEmptyLinesAtTheStartOfBlocks: false
+PointerAlignment: Left
+
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+IndentPPDirectives: BeforeHash
+
 SortIncludes: true
 IncludeBlocks: Regroup
 IncludeCategories:
@@ -18,7 +25,10 @@ IncludeCategories:
     Priority: 2
   - Regex: '"([A-Za-z0-9.\Q/-_\E])+"'
     Priority: 1
- 
+
+# If true, empty lines at the start of blocks are kept.
+KeepEmptyLinesAtTheStartOfBlocks: false
+
 AllowShortLoopsOnASingleLine: true
 AllowShortIfStatementsOnASingleLine: true
 Cpp11BracedListStyle: true

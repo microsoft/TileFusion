@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 #include "kernels/scatter_nd.hpp"
+#include "traits/base.hpp"
 
 #include <torch/script.h>
 
@@ -52,8 +53,7 @@ __global__ void scatter_nd_kernel(const T* in, T* out, const int64_t* indices,
     }
 }
 
-template <typename T>
-void scatter_nd(torch::Tensor& data, const torch::Tensor& updates,
+void scatter_op(torch::Tensor& data, const torch::Tensor& updates,
                 const torch::Tensor& indices) {
     auto data_dims = data.sizes();
     auto update_dims = updates.sizes();
@@ -88,40 +88,31 @@ void scatter_nd(torch::Tensor& data, const torch::Tensor& updates,
 
     size_t data_size = data.numel();
 
-    // #ifdef DEBUG
-    //     for (int i = rank - 1; i >= 0; --i) {
-    //         std::cout << "strides[" << i << "]: " << strides[i] << std::endl;
-    //     }
-    //     for (int i = rank - 1; i >= 0; --i) {
-    //         std::cout << "data_dims[" << i << "]: " << data_dims[i] <<
-    //         std::endl;
-    //     }
-    //     std::cout << "k: " << k << ", rank: " << rank << std::endl;
-    //     std::cout << "n: " << n << ", slice_size: " << slice_size <<
-    //     std::endl; std::cout << "data_size: " << data_size << std::endl;
-    // #endif
+#ifdef DEBUG
+    for (int i = rank - 1; i >= 0; --i) {
+        std::cout << "strides[" << i << "]: " << strides[i] << std::endl;
+    }
+    for (int i = rank - 1; i >= 0; --i) {
+        std::cout << "data_dims[" << i << "]: " << data_dims[i] << std::endl;
+    }
+    std::cout << "k: " << k << ", rank: " << rank << std::endl;
+    std::cout << "n: " << n << ", slice_size: " << slice_size << std::endl;
+    std::cout << "data_size: " << data_size << std::endl;
+#endif
 
     // TODO: Add some assertion checks.
 
     int64_t block = 256;
     int64_t grid = (n + block - 1) / block;
 
-    scatter_nd_kernel<<<grid, block>>>(
-        reinterpret_cast<const T*>(indices.const_data_ptr()),
-        reinterpret_cast<T*>(data.mutable_data_ptr()),
-        reinterpret_cast<const int64_t*>(indices.const_data_ptr()),
-        reinterpret_cast<const unsigned int*>(device_strides), n, k,
-        slice_size);
-}
-
-void scatter_op(torch::Tensor& data, const torch::Tensor& updates,
-                const torch::Tensor& indices) {
-    auto dtype = data.dtype();
-    if (dtype == torch::kFloat32) {
-        scatter_nd<float>(data, updates, indices);
-    } else if (dtype == torch::kHalf) {
-        scatter_nd<__half>(data, updates, indices);
-    }
+    TILEFUSION_DISPATCH_ALL_TYPES(data.scalar_type(), [&] {
+        scatter_nd_kernel<<<grid, block>>>(
+            reinterpret_cast<const scalar_t*>(indices.const_data_ptr()),
+            reinterpret_cast<scalar_t*>(data.mutable_data_ptr()),
+            reinterpret_cast<const int64_t*>(indices.const_data_ptr()),
+            reinterpret_cast<const unsigned int*>(device_strides), n, k,
+            slice_size);
+    });
 }
 
 }  // namespace tilefusion::kernels

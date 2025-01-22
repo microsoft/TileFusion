@@ -4,10 +4,9 @@
 #pragma once
 
 #include "cuda_utils.hpp"
+#include "dispatch_macros.hpp"
 
 #include <torch/script.h>
-
-#include <cstdint>
 
 namespace tilefusion::kernels {
 
@@ -34,10 +33,6 @@ template <typename T>
 __global__ void scatter_nd_kernel(const T* in, T* out, const int64_t* indices,
                                   unsigned int const* __restrict__ strides,
                                   size_t n, size_t rank, size_t slice_size);
-
-template <typename T>
-void scatter_nd(torch::Tensor& data, const torch::Tensor& updates,
-                const torch::Tensor& indices);
 
 void scatter_op(torch::Tensor& data, const torch::Tensor& updates,
                 const torch::Tensor& indices);

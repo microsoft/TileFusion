@@ -11,7 +11,7 @@ import torch
 from pytilefusion import scatter_nd
 
 
-class TestGemm(unittest.TestCase):
+class TestScatterNd(unittest.TestCase):
 
     def _compute_output_shape(self, index_dims, input_dims):
         end_size = index_dims[-1]
@@ -24,38 +24,45 @@ class TestGemm(unittest.TestCase):
         torch.manual_seed(1234)
 
     def test_scatter_nd(self):
-        data_shape = [7, 8, 9, 10]
-        data = torch.empty(data_shape, dtype=torch.float32,
-                           device='cuda').fill_(5.0)
-        scatter_data = data.flatten()
 
-        indices_shape = [5, 2]
-        indices = torch.empty(indices_shape, dtype=torch.int64, device='cuda')
+        for dtype in [
+            torch.float32,
+            torch.float16,
+            torch.bfloat16,
+        ]:
+            data_shape = [7, 8, 9, 10]
+            data = torch.empty(data_shape, dtype=dtype,
+                               device='cuda').fill_(5.0)
+            scatter_data = data.flatten()
 
-        for i in range(indices_shape[0]):
-            indices[i][0] = random.randint(0, data_shape[0] - 1)
-            indices[i][1] = random.randint(0, data_shape[1] - 1)
+            indices_shape = [5, 2]
+            indices = torch.empty(
+                indices_shape, dtype=torch.int64, device='cuda'
+            )
 
-        scatter_indices = indices.flatten()
+            for i in range(indices_shape[0]):
+                indices[i][0] = random.randint(0, data_shape[0] - 1)
+                indices[i][1] = random.randint(0, data_shape[1] - 1)
 
-        update_shape = self._compute_output_shape(indices_shape, data_shape)
-        updates = torch.empty(update_shape, dtype=torch.float32,
-                              device='cuda').fill_(10.0)
-        scatter_updates = updates.flatten()
+            scatter_indices = indices.flatten()
 
-        # import pytilefusion
-        scatter_nd(scatter_data, scatter_indices, scatter_updates)
+            update_shape = self._compute_output_shape(indices_shape, data_shape)
+            updates = torch.empty(update_shape, dtype=dtype,
+                                  device='cuda').fill_(10.0)
+            scatter_updates = updates.flatten()
 
-        # Implement `scatter_nd` in Python.
-        data[indices[:, 0], indices[:, 1]] = updates
+            scatter_nd(scatter_data, scatter_indices, scatter_updates)
 
-        flattened_data = data.flatten()
+            # Implement `scatter_nd` in Python.
+            data[indices[:, 0], indices[:, 1]] = updates
 
-        # Print data
-        print(scatter_data)
-        print(flattened_data)
+            flattened_data = data.flatten()
 
-        assert torch.allclose(scatter_data, flattened_data)
+            # Print data
+            print(scatter_data)
+            print(flattened_data)
+
+            assert torch.allclose(scatter_data, flattened_data)
 
 
 if __name__ == "__main__":
