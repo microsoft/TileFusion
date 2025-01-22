@@ -399,15 +399,6 @@ struct GlobalToSharedLoader {
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
 
-    // This implementation uses a fixed 16x16 `BaseShape` as the atomic data
-    // tile accessed by threads in a single warp that issues a single load/store
-    // instruction.
-    // FIXME(ying): uncomment the following lines to automatically infer the
-    // warp-level tile shape instead of using a fixed 16x16 `BaseShape`. using
-    // BaseShape =
-    //     warp::WarpBaseTileShape<DType, typename Shared::Layout,
-    //     Shared::kType>;
-
     using BaseShape =
         warp::WarpBaseTileShape<DType, typename Shared::Layout, Shared::kType>;
 
@@ -460,17 +451,6 @@ struct SharedToGlobalStorer {
     using Shared = Shared_;
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
-
-    // FIXME(ying): automatically infer the warp-level tile shape instead
-    // of using a fixed `BaseShape`.
-    // using BaseShape =
-    //     warp::WarpBaseTileShape<DType, typename Shared::Layout,
-    //     Shared::kType>;
-
-    // FIXME(ying): uncomment the following lines to automatically infer the
-    // warp-level tile shape instead of using a fixed 16x16 `BaseShape`.
-    // using BaseShape =
-    //     warp::WarpBaseTileShape<DType, tl::RowMajor<16, 16>, Shared::kType>;
 
     using BaseShape =
         warp::WarpBaseTileShape<DType, typename Shared::Layout, Shared::kType>;

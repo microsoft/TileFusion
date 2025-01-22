@@ -51,28 +51,6 @@ struct BaseTileShape {
 };
 
 /**
- * @brief Single Warp load shape from global memory to shared memory in
- * `RowMajor`.
- */
-template <typename Element>
-    requires BaseType<Element>
-struct GMemCopyShape;
-
-template <>
-struct GMemCopyShape<__half> {
-    static constexpr int kRows = 4;
-    static constexpr int kCols = 64;
-    static constexpr int kNumel = kRows * kCols;
-};
-
-template <>
-struct GMemCopyShape<float> {
-    static constexpr int kRows = 4;
-    static constexpr int kCols = 32;
-    static constexpr int kNumel = kRows * kCols;
-};
-
-/**
  * @brief The base tile shape for Swizzle<3, 3, 3>.
  */
 template <typename Element>
