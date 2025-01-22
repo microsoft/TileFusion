@@ -404,9 +404,12 @@ struct GlobalToSharedLoader {
     //     warp::WarpTileShape<DType, tl::RowMajor<16, 16>, Shared::kType>;
 
     // KuangjuX: Use `4x64` in RowMajor and `64x4` in ColMajor.
+    using BaseShape = GMemCopyShape<DType>;
     static constexpr bool kRowMajor = Shared::kType == tl::Layout::kRowMajor;
     using BaseTile =
-        std::conditional_t<kRowMajor, tl::RowMajor<4, 64>, tl::ColMajor<64, 4>>;
+        std::conditional_t<kRowMajor,
+                           tl::RowMajor<BaseShape::kRows, BaseShape::kCols>,
+                           tl::ColMajor<BaseShape::kCols, BaseShape::kRows>>;
     using WarpShape = warp::WarpTileShape<DType, BaseTile, Shared::kType>;
 
     static_assert(Shared::kRows % WarpShape::kRows == 0,
@@ -469,25 +472,26 @@ struct SharedToGlobalStorer {
     // using BaseShape =
     //     warp::WarpTileShape<DType, tl::RowMajor<16, 16>, Shared::kType>;
 
-    // KuangjuX: Use `4x64` in RowMajor and `64x4` in ColMajor.
-
+    using BaseShape = GMemCopyShape<DType>;
     static constexpr bool kRowMajor = Shared::kType == tl::Layout::kRowMajor;
     using BaseTile =
-        std::conditional_t<kRowMajor, tl::RowMajor<4, 64>, tl::ColMajor<64, 4>>;
-    using BaseShape = warp::WarpTileShape<DType, BaseTile, Shared::kType>;
+        std::conditional_t<kRowMajor,
+                           tl::RowMajor<BaseShape::kRows, BaseShape::kCols>,
+                           tl::ColMajor<BaseShape::kCols, BaseShape::kRows>>;
+    using WarpShape = warp::WarpTileShape<DType, BaseTile, Shared::kType>;
 
-    static_assert(Shared::kRows % BaseShape::kRows == 0,
-                  "Shared::kRows must be divisible by BaseShape::kRows.");
-    static_assert(Shared::kCols % BaseShape::kCols == 0,
-                  "Shared::kCols must be divisible by BaseShape::kCols.");
+    static_assert(Shared::kRows % WarpShape::kRows == 0,
+                  "Shared::kRows must be divisible by WarpShape::kRows.");
+    static_assert(Shared::kCols % WarpShape::kCols == 0,
+                  "Shared::kCols must be divisible by WarpShape::kCols.");
 
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
 
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
     using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;
+        warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared, kMode>;
 
-    using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
+    using ExecCounter = warp::ExecCounter<WarpShape, Shared, WarpLayout, kMode>;
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
@@ -504,7 +508,7 @@ struct SharedToGlobalStorer {
         int offset_src = shared_offset_.get_warp_offset();
         int offset_dst = global_offset_.template get_warp_offset<Global>();
 
-        using Storer = SharedToGlobalStorerImpl<Shared, Global, BaseShape,
+        using Storer = SharedToGlobalStorerImpl<Shared, Global, WarpShape,
                                                 kRowExec, kColExec>;
 
         Storer storer;
