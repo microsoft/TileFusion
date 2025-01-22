@@ -93,6 +93,9 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
     static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
+    static constexpr int B = SwizzledBaseShape::B;
+    static constexpr int M = SwizzledBaseShape::M;
+    static constexpr int S = SwizzledBaseShape::S;
 
     static constexpr int kSwizzledRowExec =
         kRowExec / (kSwizzledRows / BaseShape::kRows);
@@ -121,7 +124,7 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
 
     using NonSwizzled =
         tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride, 1>;
-    using Swizzled = SwizzledLayout<NonSwizzled, 3, 3, 3>;
+    using Swizzled = SwizzledLayout<NonSwizzled, B, M, S>;
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
@@ -283,6 +286,9 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
     using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
     static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
+    static constexpr int B = SwizzledBaseShape::B;
+    static constexpr int M = SwizzledBaseShape::M;
+    static constexpr int S = SwizzledBaseShape::S;
 
     static constexpr int kSwizzledRowExec =
         kRowExec / (kSwizzledRows / BaseShape::kRows);
@@ -311,7 +317,7 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
 
     using NonSwizzled =
         tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride, 1>;
-    using Swizzled = SwizzledLayout<NonSwizzled, 3, 3, 3>;
+    using Swizzled = SwizzledLayout<NonSwizzled, B, M, S>;
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
     SharedLayout src_tile_;

@@ -134,22 +134,39 @@ void run_test_col_major() {
 }  // namespace
 
 TEST(GlobalToSharedLoad, test_row_major_load) {
+    // test non-swizzled __half.
+    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 64, false>();
+    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 256, false>();
+    run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, false>();
+    run_test_row_major<__half, tl::RowMajor<4, 1>, 64, 64, false>();
+    run_test_row_major<__half, tl::RowMajor<2, 2>, 32, 128, false>();
+    run_test_row_major<__half, tl::RowMajor<2, 4>, 32, 256, false>();
+    run_test_row_major<__half, tl::RowMajor<2, 4>, 64, 512, false>();
+
+    // test swizzled __half.
     run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 64, true>();
     run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 256, true>();
-    run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, false>();
     run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, true>();
-    run_test_row_major<__half, tl::RowMajor<4, 1>, 64, 64, false>();
     run_test_row_major<__half, tl::RowMajor<4, 1>, 64, 64, true>();
     run_test_row_major<__half, tl::RowMajor<2, 2>, 32, 128, true>();
     run_test_row_major<__half, tl::RowMajor<2, 4>, 32, 256, true>();
     run_test_row_major<__half, tl::RowMajor<2, 4>, 64, 512, true>();
 
+    // test non-swizzled float.
     run_test_row_major<float, tl::RowMajor<1, 1>, 8, 32, false>();
     run_test_row_major<float, tl::RowMajor<1, 1>, 16, 64, false>();
     run_test_row_major<float, tl::RowMajor<1, 4>, 16, 128, false>();
     run_test_row_major<float, tl::RowMajor<4, 1>, 64, 32, false>();
     run_test_row_major<float, tl::RowMajor<2, 2>, 32, 64, false>();
     run_test_row_major<float, tl::RowMajor<2, 4>, 32, 128, false>();
+
+    // test swizzled float.
+    run_test_row_major<float, tl::RowMajor<1, 1>, 8, 32, true>();
+    run_test_row_major<float, tl::RowMajor<1, 1>, 16, 64, true>();
+    run_test_row_major<float, tl::RowMajor<1, 4>, 16, 128, true>();
+    run_test_row_major<float, tl::RowMajor<4, 1>, 64, 32, true>();
+    run_test_row_major<float, tl::RowMajor<2, 2>, 32, 64, true>();
+    run_test_row_major<float, tl::RowMajor<2, 4>, 32, 128, true>();
 }
 
 TEST(GlobalToSharedLoad, test_col_major_load) {
