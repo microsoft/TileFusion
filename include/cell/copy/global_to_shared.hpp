@@ -360,6 +360,13 @@ struct GlobalToSharedLoader {
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
 
+    // NOTE: The WarpShape calculated here is for the warp reuse mode `kCont`.
+    // If you use a different mode, update the WarpShape accordingly.
+    static_assert((Shared::kRows % WarpLayout ::kRows == 0) &&
+                      (Shared::kCols % WarpLayout::kCols == 0),
+                  "The shape of SharedTile must be divisible by the shape of "
+                  "WarpLayout.");
+
     using WarpShape = TileShape<Shared::kRows / WarpLayout::kRows,
                                 Shared::kCols / WarpLayout::kCols>;
     using BaseShape = warp::WarpBaseTileShape<DType, WarpShape, Shared::kType>;

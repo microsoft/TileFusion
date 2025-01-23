@@ -5,7 +5,7 @@
 #include "common/test_utils.hpp"
 
 namespace tilefusion::testing {
-using namespace cell;
+
 using namespace cell::copy::warp;
 namespace tl = tile_layout;
 
