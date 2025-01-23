@@ -10,8 +10,6 @@
 namespace tilefusion::cell {
 namespace tl = tile_layout;
 
-using namespace cute;
-
 namespace detail {
 /// @brief Helper for pretty printing a tile iterator's static shape-related
 ///        information. This printer works ONLY on the host.

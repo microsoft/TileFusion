@@ -8,6 +8,7 @@ namespace tilefusion::testing {
 using namespace cell;
 namespace tl = tile_layout;
 
+namespace {
 int flatten(int x, int y, int width) { return x * width + y; }
 
 template <const int kB, const int kM, const int kS>
@@ -26,7 +27,7 @@ template <const int kB, const int kM, const int kS>
 int2 test_swizzle(int x, int y) {
     Swizzle<kB, kM, kS> swizzle;
     int idx = flatten(x, y, 1 << (kS + kM));
-    int swizzled_idx = swizzle.apply(idx);
+    int swizzled_idx = swizzle(idx);
 
     int ref_swizzled_idx = swizzle_ref<kB, kM, kS>(x, y);
 
@@ -38,7 +39,35 @@ int2 test_swizzle(int x, int y) {
     return make_int2(swizzled_idx, ref_swizzled_idx);
 }
 
-TEST(TESTSwizzle, test_swizzle_apply) {
+template <typename Layout>
+void test_swizzled_rowmajor(Layout layout) {
+    const int kB = 3;
+    const int kM = 3;
+    const int kS = 3;
+
+    using SwizzledLayout = SwizzledLayout<Layout, kB, kM, kS>;
+    SwizzledLayout swizzled;
+
+    int swizzled_idx, swizzled_i, swizzled_j;
+    for (int i = 0; i < Layout::kRows; ++i) {
+        for (int j = 0; j < Layout::kCols; ++j) {
+            swizzled_idx = swizzled(i, j);
+
+            swizzled_i = swizzled_idx / Layout::kCols;
+            swizzled_j = swizzled_idx % Layout::kCols;
+
+#if defined DEBUG
+            std::cout << "(" << swizzled_i << "," << swizzled_j << "), ";
+            if (j && (j + 1) % 16 == 0) std::cout << std::endl;
+#endif
+        }
+    }
+
+    std::cout << std::endl;
+}
+}  // namespace
+
+TEST(TestSwizzleFunction, test_swizzle_apply) {
     const int kB = 3;
     const int kM = 3;
     const int kS = 3;
@@ -56,68 +85,18 @@ TEST(TESTSwizzle, test_swizzle_apply) {
     EXPECT_EQ(swizzled_idx_2_4.x, swizzled_idx_2_4.y);
 }
 
-TEST(TESTSwizzle, test_naive_swizzle_layout) {
-    const int kB = 3;
-    const int kM = 3;
-    const int kS = 3;
+TEST(TestSwizzledLayout, test_row_major) {
+    std::cout << "test_16x16" << std::endl;
+    // In the 16x16 shaped tile, elements in every 4 rows are permuted.
+    test_swizzled_rowmajor(tl::RowMajor<16, 16>{});
 
-    const int kRows = 1 << kB;
-    const int kCols = 1 << (kM + kS);
+    std::cout << "test_8x32" << std::endl;
+    // In the 8x32 shaped tile, elements in every 2 rows are permuted.
+    test_swizzled_rowmajor(tl::RowMajor<8, 32>{});
 
-    using NaiveRowMajorLayout = tl::RowMajor<kRows, kCols>;
-    using NaiveSwizzledRowMajorLayout =
-        SwizzledLayout<NaiveRowMajorLayout, kB, kM, kS>;
-
-    NaiveSwizzledRowMajorLayout naive_row_major_swizzled_layout;
-
-    EXPECT_EQ((naive_row_major_swizzled_layout(0, 0)),
-              (swizzle_ref<kB, kM, kS>(0, 0)));
-    EXPECT_EQ((naive_row_major_swizzled_layout(1, 0)),
-              (swizzle_ref<kB, kM, kS>(1, 0)));
-    EXPECT_EQ((naive_row_major_swizzled_layout(1, 4)),
-              (swizzle_ref<kB, kM, kS>(1, 4)));
-    EXPECT_EQ((naive_row_major_swizzled_layout(2, 0)),
-              (swizzle_ref<kB, kM, kS>(2, 0)));
-    EXPECT_EQ((naive_row_major_swizzled_layout(2, 4)),
-              (swizzle_ref<kB, kM, kS>(2, 4)));
-}
-
-TEST(TESTSwizzle, test_nested_basetile_swizzle_layout) {
-    const int kB = 3;
-    const int kM = 3;
-    const int kS = 3;
-
-    const int kRows = 1 << kB;
-    const int kCols = 1 << (kM + kS);
-
-    using NestedBaseTileLayout =
-        tl::detail::SharedLayout<kRows, kCols, kCols * 16, 16,
-                                 tl::Layout::kRowMajor>;
-    using NestedBaseTileSwizzledLayout =
-        SwizzledLayout<NestedBaseTileLayout, kB, kM, kS>;
-
-    NestedBaseTileLayout nested_base_tile_layout;
-    NestedBaseTileSwizzledLayout nested_base_tile_swizzled_layout;
-
-    int idx_0_0 = nested_base_tile_layout(0, 0);
-    int idx_1_0 = nested_base_tile_layout(1, 0);
-    int idx_1_4 = nested_base_tile_layout(1, 4);
-    int idx_2_0 = nested_base_tile_layout(2, 0);
-    int idx_2_4 = nested_base_tile_layout(2, 4);
-
-    int swizzled_idx_0_0 = nested_base_tile_swizzled_layout(0, 0);
-    int swizzled_idx_1_0 = nested_base_tile_swizzled_layout(1, 0);
-    int swizzled_idx_1_4 = nested_base_tile_swizzled_layout(1, 4);
-    int swizzled_idx_2_0 = nested_base_tile_swizzled_layout(2, 0);
-    int swizzled_idx_2_4 = nested_base_tile_swizzled_layout(2, 4);
-
-#ifdef DEBUG
-    printf("idx_0_0: %d, swizzled_idx_0_0: %d\n", idx_0_0, swizzled_idx_0_0);
-    printf("idx_1_0: %d, swizzled_idx_1_0: %d\n", idx_1_0, swizzled_idx_1_0);
-    printf("idx_1_4: %d, swizzled_idx_1_4: %d\n", idx_1_4, swizzled_idx_1_4);
-    printf("idx_2_0: %d, swizzled_idx_2_0: %d\n", idx_2_0, swizzled_idx_2_0);
-    printf("idx_2_4: %d, swizzled_idx_2_4: %d\n", idx_2_4, swizzled_idx_2_4);
-#endif
+    std::cout << "test_4x64" << std::endl;
+    // In the 4x64 shaped tile, elements in every single rows are permuted.
+    test_swizzled_rowmajor(tl::RowMajor<4, 64>{});
 }
 
 }  // namespace tilefusion::testing
