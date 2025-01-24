@@ -86,15 +86,17 @@ TEST(TestSwizzleFunction, test_swizzle_apply) {
 }
 
 TEST(TestSwizzledLayout, test_row_major) {
-    std::cout << "test_16x16" << std::endl;
+    // FIXME(ying): Add meaningful test case instead of printing the result.
+
+    std::cout << "test_16x16_half" << std::endl;
     // In the 16x16 shaped tile, elements in every 4 rows are permuted.
     test_swizzled_rowmajor(tl::RowMajor<16, 16>{});
 
-    std::cout << "test_8x32" << std::endl;
+    std::cout << "test_8x32_half" << std::endl;
     // In the 8x32 shaped tile, elements in every 2 rows are permuted.
     test_swizzled_rowmajor(tl::RowMajor<8, 32>{});
 
-    std::cout << "test_4x64" << std::endl;
+    std::cout << "test_4x64_half" << std::endl;
     // In the 4x64 shaped tile, elements in every single rows are permuted.
     test_swizzled_rowmajor(tl::RowMajor<4, 64>{});
 }

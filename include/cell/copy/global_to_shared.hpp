@@ -11,6 +11,10 @@ namespace tilefusion::cell::copy {
 using namespace atom;
 namespace tl = tile_layout;
 
+namespace {
+constexpr size_t Log2(size_t n) { return ((n < 2) ? 0 : 1 + Log2(n / 2)); }
+}  // namespace
+
 /**
  * @brief Load a warp tile from global memory to shared memory.
  *
@@ -104,7 +108,11 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     GlobalLayout src_in_base_tile_;
 
     using NonSwizzled = tl::RowMajor<BaseShape::kRows, BaseShape::kCols>;
-    using Swizzled = SwizzledLayout<NonSwizzled, 3, 3, 3>;
+
+    static constexpr int kM = Log2(kNumPerAccess);
+    static constexpr int kS = Log2(traits::AccessBase<DType>::kMemTransWidth /
+                                   traits::AccessBase<DType>::kAccessInBits);
+    using Swizzled = SwizzledLayout<NonSwizzled, 3, kM, kS>;
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
@@ -274,15 +282,12 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
                          BaseShape::kCols>;
     DstBaseTilesLayout dst_base_tiles_;
 
-    // NOTE: DO NOT modify `kNumPerAccess` and `kAccessInBits` here.
-    // `kAccessInBits` in the storer is for tensor core's output where only two
-    // numbers are contiguous in memory. This ensures the parameters remain
-    // consistent with those used in `SharedLayoutWrapper` within the
-    // register-to-shared storer.
-    static constexpr int kAccessInBits = 2 * int(sizeof(DType) * 8);
-
     using NonSwizzled = tl::RowMajor<BaseShape::kRows, BaseShape::kCols>;
-    using Swizzled = SwizzledLayout<NonSwizzled, 3, 3, 3>;
+
+    static constexpr int kM = Log2(kNumPerAccess);
+    static constexpr int kS = Log2(traits::AccessBase<DType>::kMemTransWidth /
+                                   traits::AccessBase<DType>::kAccessInBits);
+    using Swizzled = SwizzledLayout<NonSwizzled, 3, kM, kS>;
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
