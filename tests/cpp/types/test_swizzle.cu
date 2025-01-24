@@ -8,6 +8,8 @@ namespace tilefusion::testing {
 using namespace cell;
 namespace tl = tile_layout;
 
+#define DEBUG true
+
 namespace {
 int flatten(int x, int y, int width) { return x * width + y; }
 
@@ -40,7 +42,7 @@ int2 test_swizzle(int x, int y) {
 }
 
 template <typename Layout>
-void test_swizzled_rowmajor(Layout layout) {
+void test_swizzled_layout(Layout layout) {
     const int kB = 3;
     const int kM = 3;
     const int kS = 3;
@@ -58,9 +60,11 @@ void test_swizzled_rowmajor(Layout layout) {
 
 #if defined DEBUG
             std::cout << "(" << swizzled_i << "," << swizzled_j << "), ";
-            if (j && (j + 1) % 16 == 0) std::cout << std::endl;
 #endif
         }
+#if defined DEBUG
+        std::cout << std::endl;
+#endif
     }
 
     std::cout << std::endl;
@@ -90,15 +94,31 @@ TEST(TestSwizzledLayout, test_row_major) {
 
     std::cout << "test_16x16_half" << std::endl;
     // In the 16x16 shaped tile, elements in every 4 rows are permuted.
-    test_swizzled_rowmajor(tl::RowMajor<16, 16>{});
+    test_swizzled_layout(tl::RowMajor<16, 16>{});
 
     std::cout << "test_8x32_half" << std::endl;
     // In the 8x32 shaped tile, elements in every 2 rows are permuted.
-    test_swizzled_rowmajor(tl::RowMajor<8, 32>{});
+    test_swizzled_layout(tl::RowMajor<8, 32>{});
 
     std::cout << "test_4x64_half" << std::endl;
-    // In the 4x64 shaped tile, elements in every single rows are permuted.
-    test_swizzled_rowmajor(tl::RowMajor<4, 64>{});
+    // In the 4x64 shaped tile, elements in every single row are permuted.
+    test_swizzled_layout(tl::RowMajor<4, 64>{});
+}
+
+TEST(TestSwizzledLayout, test_col_major) {
+    // FIXME(ying): Add meaningful test case instead of printing the result.
+
+    std::cout << "test_16x16_half" << std::endl;
+    // In the 16x16 shaped tile, elements in every 4 columns are permuted.
+    test_swizzled_layout(tl::ColMajor<16, 16>{});
+
+    std::cout << "test_32x8_half" << std::endl;
+    // In the 32x8 shaped tile, elements in every 2 columns are permuted.
+    test_swizzled_layout(tl::ColMajor<32, 8>{});
+
+    std::cout << "test_64x4_half" << std::endl;
+    // In the 4x64 shaped tile, elements in every single column are permuted.
+    test_swizzled_layout(tl::ColMajor<64, 4>{});
 }
 
 }  // namespace tilefusion::testing

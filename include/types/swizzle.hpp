@@ -30,8 +30,6 @@ struct Swizzle {
         // | Bbits | Sbits | Mbits |
         // Mbits as mask for the lower bits.
 
-        assert(idx < (1 << (Bbits + Mbits + Sbits)));
-
         int bs = idx >> Mbits;
         // (b, s) as a 2d coordinate.
         int y = bs & ((1 << Sbits) - 1);
@@ -76,7 +74,6 @@ struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kRowMajor> {
     static constexpr int Sbits = kS;
 
     using Layout = Layout_;
-
     using Swizzle = Swizzle<Bbits, Mbits, Sbits>;
 
     static_assert(
@@ -118,28 +115,25 @@ struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kColMajor> {
         (1 << (Bbits + Mbits + Sbits)) >= Layout::kNumel,
         "The number of elements in the swizzled space must be greater than or "
         "equal to the number of elements in the layout space.");
-    static_assert((1 << (Mbits + Sbits)) % Layout::kRows == 0,
+    static_assert((1 << (Mbits + Sbits)) % Layout::kCols == 0,
                   "The number of columns in the swizzle space must be a "
-                  "multiple of the number of rows of the given Layout.");
+                  "multiple of the number of columns of the given Layout.");
 
     /**
-     * @brief Apply the swizzle in a layout.
+     * @brief Apply the swizzle function.
      *
-     * @param x Row dimension index, with a total of 2^B rows.
-     * @param y Column dimension index, with a total of 2^S * 2^M columns.
+     * @param x the row index.
+     * @param y the col index.
      */
-    HOST_DEVICE auto operator()(int x, int y) const {
-        int idx = (x << (Mbits + Sbits)) | y;
+    HOST_DEVICE int operator()(int x, int y) const {
+        int swizzled_idx = swizzle_(layout_(x, y));
 
-        int swizzled_idx = swizzle_(idx);
-        int swizzled_x = swizzled_idx >> (Mbits + Sbits);
-        int swizzled_y = swizzled_idx & ((1 << (Mbits + Sbits)) - 1);
-        return layout_(swizzled_x, swizzled_y);
+        return layout_(swizzled_idx % Layout::kRows,
+                       swizzled_idx / Layout::kRows);
     }
 
   private:
     Swizzle swizzle_;
     Layout layout_;
 };
-
 }  // namespace tilefusion::cell
