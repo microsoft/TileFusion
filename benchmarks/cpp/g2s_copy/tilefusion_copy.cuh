@@ -8,27 +8,22 @@
 using namespace tilefusion::cell;
 
 template <typename Element, typename Global, typename Shared, typename Loader,
-          const int kRepeat>
-__global__ void copy_g2s(const Element* data, Loader& loader) {
+          typename Storer, const int kRepeat>
+__global__ void g2s_data_transfer(const Element* src_ptr, Element* dst_ptr,
+                                  Loader& loader, Storer& storer) {
     extern __shared__ __align__(sizeof(double)) unsigned char buf_[];
     auto* buf = reinterpret_cast<Element*>(buf_);
 
-    Global g_tile(data);
-    Shared s_tile(buf);
+    Global src(src_ptr);
+    Shared inter(buf);
+    Global dst(dst_ptr);  // global memory tile
 
     for (int i = 0; i < kRepeat; ++i) {
-        loader(g_tile, s_tile);
+        loader(src, inter);
         __copy_async();
         __syncthreads();
-    }
 
-#if defined DEBUG
-    if (threadIdx.x == 0) {
-        for (int i = 0; i < kRows * kCols; ++i) {
-            printf("%.0f, ", __half2float(buf[i]));
-
-            if ((i + 1) % 16 == 0) printf("\n");
-        }
+        storer(inter, dst);
+        __syncthreads();
     }
-#endif
 }
