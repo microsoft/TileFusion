@@ -16,6 +16,7 @@ using namespace tilefusion::cell::copy;
 
 int warmup = 20;
 int iters = 100;
+const int kRepeat = 100;
 
 template <typename Element>
 bool check_results(const Element* dst1, const Element* dst2, int64_t numel) {
@@ -121,13 +122,10 @@ void run_test_rowmajor() {
     thrust::fill(d_dst2.begin(), d_dst2.end(), static_cast<Element>(0.));
     Element* dst2 = thrust::raw_pointer_cast(d_dst2.data());
 
-    float t1 = 0., t2 = 0.;
-    const int kRepeat = 100;
-
-    t1 = test_tilefusion<Element, Layout, WarpLayout, kRepeat>(src, dst1);
+    float t1 = test_tilefusion<Element, Layout, WarpLayout, kRepeat>(src, dst1);
     thrust::host_vector<Element> h_dst1 = d_dst1;
 
-    t2 = test_cutlass<Element, Layout, WarpLayout, kRepeat>(src, dst2);
+    float t2 = test_cutlass<Element, Layout, WarpLayout, kRepeat>(src, dst2);
     thrust::host_vector<Element> h_dst2 = d_dst2;
 
     bool passed = check_results(thrust::raw_pointer_cast(h_dst1.data()),

@@ -12,9 +12,13 @@ using namespace cute;
 using namespace tilefusion::cell;
 
 namespace {
+// NOTE: The current implementation of Loader/Storer supports only
+// half-precision (FP16) RowMajor data tiles. It is not implemented for other
+// data types or memory layouts. Be cautious when using it for other cases.
+
 template <typename Element,                  //
           const int kRows, const int kCols,  //
-          const int kWarpRow, const int kWarpCol>
+          const int kWarpRows, const int kWarpCols>
 struct Loader {
     DEVICE void operator()(const Element* src_, Element* dst_) {
         int tid = threadIdx.x;
@@ -49,10 +53,11 @@ struct Loader {
     SharedLayout dst_layout_;
 
     // tiled copy
-    static constexpr int kThreadRow = kWarpRow * 4;
-    static constexpr int kThreadCol = kWarpCol * 8;
-    using ThreadLayout = cute::Layout<Shape<Int<kThreadRow>, Int<kThreadCol>>,
-                                      Stride<Int<kThreadCol>, _1>>;
+    static constexpr int kThreadCols = kCols * 16 / 128;
+    static constexpr int kThreadRows = kWarpRows * kWarpCols * 32 / kThreadCols;
+
+    using ThreadLayout = cute::Layout<Shape<Int<kThreadRows>, Int<kThreadCols>>,
+                                      Stride<Int<kThreadCols>, _1>>;
     using ValueLayout = cute::Layout<Shape<_1, _8>>;
 
     using CopyInst =
@@ -64,13 +69,13 @@ struct Loader {
 
 template <typename Element,                  //
           const int kRows, const int kCols,  //
-          const int kWarpRow, const int kWarpCol>
+          const int kWarpRows, const int kWarpCols>
 struct Storer {
     DEVICE void operator()(const Element* src_, Element* dst_) {
         int tid = threadIdx.x;
 
-        auto stile = make_tensor(make_smem_ptr(src_), src_layout_);
-        auto gtile = make_tensor(make_gmem_ptr(dst_), dst_layout_);
+        auto stile = make_tensor(make_smem_ptr(src_), src_layout_);  // shared
+        auto gtile = make_tensor(make_gmem_ptr(dst_), dst_layout_);  // global
 
         auto loader = tiled_copy_.get_thread_slice(tid);
 
@@ -85,7 +90,7 @@ struct Storer {
     }
 
   private:
-    // source
+    // declare the source layout
     using LayoutAtom =
         decltype(composition(cute::Swizzle<2, 3, 3>{},
                              cute::Layout<Shape<_4, _64>, Stride<_64, _1>>{}));
@@ -93,16 +98,16 @@ struct Storer {
         LayoutAtom{}, Shape<Int<kRows>, Int<kCols>>{}, cute::Step<_2, _1>{}));
     SharedLayout src_layout_;
 
-    // destination
+    // declare the destination layout
     using GlobalLayout =
         cute::Layout<Shape<Int<kRows>, Int<kCols>>, Stride<Int<kCols>, _1>>;
     GlobalLayout dst_layout_;
 
-    // tiled copy
-    static constexpr int kThreadRow = kWarpRow * 4;
-    static constexpr int kThreadCol = kWarpCol * 8;
-    using ThreadLayout = cute::Layout<Shape<Int<kThreadRow>, Int<kThreadCol>>,
-                                      Stride<Int<kThreadCol>, _1>>;
+    // declare the tiled copy
+    static constexpr int kThreadCols = kCols * 16 / 128;
+    static constexpr int kThreadRows = kWarpRows * kWarpCols * 32 / kThreadCols;
+    using ThreadLayout = cute::Layout<Shape<Int<kThreadRows>, Int<kThreadCols>>,
+                                      Stride<Int<kThreadCols>, _1>>;
     using ValueLayout = cute::Layout<Shape<_1, _8>>;
 
     using CopyInst = Copy_Atom<DefaultCopy, Element>;
