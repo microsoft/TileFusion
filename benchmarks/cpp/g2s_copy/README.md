@@ -7,7 +7,7 @@ This preliminary test evaluates the performance of transferring a row-major data
 Performance is assessed based on the total time required to complete the 100 data tile transfers.
 
 ### Implementations
-The test includes implementations using TileFusion and CUTLASS, with no bank conflicts observed in the NVIDIA Compute Utility.
+The test includes implementations using TileFusion and cutlass, with no bank conflicts observed in the NVIDIA Compute Utility. The cutlass implementation utilizes a copy plan that allows for maximal global memory coalescing to optimally utilize the global memory.
 
 ### Test Environment
 - **GPU**: NVIDIA Tesla A100
@@ -15,7 +15,7 @@ The test includes implementations using TileFusion and CUTLASS, with no bank con
 
 ### Results
 
-| Shape               | Warp Layout | TileFusion (ms) | CUTLASS (ms) | Ratio  |
+| Shape               | Warp Layout | TileFusion (ms) | cutlass (ms) | Ratio  |
 |:--------------------|:-----------:|:---------------:|:------------:|:------:|
 | RowMajor (64, 64)   |    (1, 1)   |      0.05044    |    0.05058   | 0.9974 |
 | RowMajor (64, 64)   |    (2, 2)   |      0.05309    |    0.05085   | 1.044  |
