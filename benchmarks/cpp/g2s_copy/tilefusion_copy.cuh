@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "cell/sync.hpp"
+#include "cell/copy/sync.hpp"
 
 using namespace tilefusion::cell;
 
@@ -20,7 +20,7 @@ __global__ void g2s_data_transfer(const Element* src_ptr, Element* dst_ptr,
 
     for (int i = 0; i < kRepeat; ++i) {
         loader(src, inter);
-        __copy_async();
+        copy::__copy_async();
         __syncthreads();
 
         storer(inter, dst);

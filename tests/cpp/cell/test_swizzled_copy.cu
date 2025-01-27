@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 #include "cell/copy/mod.hpp"
-#include "cell/sync.hpp"
 #include "common/test_utils.hpp"
 #include "types/mod.hpp"
 

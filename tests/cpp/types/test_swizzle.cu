@@ -8,8 +8,6 @@ namespace tilefusion::testing {
 using namespace cell;
 namespace tl = tile_layout;
 
-#define DEBUG true
-
 namespace {
 int flatten(int x, int y, int width) { return x * width + y; }
 

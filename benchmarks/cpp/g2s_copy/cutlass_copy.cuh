@@ -3,19 +3,18 @@
 
 #pragma once
 
-#include "cell/sync.hpp"
+#include "cutlass/copy.cuh"
 
 #include <cute/swizzle.hpp>
 #include <cute/tensor.hpp>
 
 using namespace cute;
-using namespace tilefusion::cell;
+using namespace benchmarks;
 
 namespace {
 // NOTE: The current implementation of Loader/Storer supports only
 // half-precision (FP16) RowMajor data tiles. It is not implemented for other
 // data types or memory layouts. Be cautious when using it for other cases.
-
 template <typename Element,                  //
           const int kRows, const int kCols,  //
           const int kWarpRows, const int kWarpCols>
@@ -132,7 +131,7 @@ __global__ void cutlass_g2s_data_transfer(const Element* src, Element* dst) {
     for (int k = 0; k < kRepeat; ++k) {
         loader(src, buf);
 
-        __copy_async();
+        cutlass_wrapper::__copy_async();
         __syncthreads();
 
         storer(buf, dst);

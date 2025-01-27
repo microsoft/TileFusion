@@ -5,7 +5,7 @@
 
 #include "cuda_utils.hpp"
 
-namespace tilefusion::cell {
+namespace tilefusion::cell::copy {
 
 template <int N>
 DEVICE void wait_group() {
@@ -15,10 +15,8 @@ DEVICE void wait_group() {
 }
 
 DEVICE void commit_copy_group() {
-    // FIXME(ying): make the implementation cutlass-independent.
 #if defined(CP_ASYNC_SM80_ENABLED)
-
-    cute::cp_async_fence();
+    asm volatile("cp.async.commit_group;\n" ::);
 #endif
 }
 
@@ -26,4 +24,4 @@ DEVICE void __copy_async() {
     commit_copy_group();
     wait_group<0>();
 }
-}  // namespace tilefusion::cell
+}  // namespace tilefusion::cell::copy
