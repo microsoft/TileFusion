@@ -14,7 +14,8 @@ namespace tilefusion::cell::copy::warp {
 namespace tl = tile_layout;
 using namespace cute;
 
-namespace {
+namespace {  // functions/class/structs that are not exposed to a larger scope
+
 // FIXME(ying): This hotfix addresses the current implementation's inability
 // to explicitly distinguish between shared memory's row-major or
 // column-major layout and global memory's layouts. However, this should be
@@ -53,6 +54,18 @@ struct WarpOffsetHelper<WarpReuse::kRowReuseCont, kRowStride_, kColStride_> {
     static constexpr int kColStride = kColStride_;
 
     DEVICE int operator()(int i, int j) const { return i * kRowStride; }
+};
+
+/// @brief Helper for pretty printing a BaseTile's static shape-related
+///        information. This printer works ONLY on the host.
+struct BaseTilePrettyPrinter {
+    template <typename BaseShape>
+    static HOST void print(std::ostream& out, const BaseShape& tile) {
+        // parameter `tile` here is not used
+        out << "BaseShape = (" << BaseShape::kRows << ", " << BaseShape::kCols
+            << "), Numel = " << BaseShape::kNumel << ", ThreadLayout = ("
+            << BaseShape::kRowThreads << ", " << BaseShape::kColThreads << ")";
+    }
 };
 }  // namespace
 
@@ -260,6 +273,16 @@ struct WarpBaseTileShape<DType, TileLayout, tl::Layout::kColMajor> {
 
     using WarpThreadLayout = tl::ColMajor<kRowThreads, kColThreads>;
 };
+
+/// @brief Pretty printer for the static shape information of a
+///        `WarpBaseTileShape`. Note: This printer function works ONLY on the
+///        host.
+template <typename DType, typename TileShape, const tl::Layout kType>
+static HOST std::ostream& operator<<(
+    std::ostream& out, const WarpBaseTileShape<DType, TileShape, kType>& tile) {
+    BaseTilePrettyPrinter::print(out, tile);
+    return out;
+}
 
 template <typename WarpLayout_, const WarpReuse kMode_>
 struct GlobalOffsetHelper {

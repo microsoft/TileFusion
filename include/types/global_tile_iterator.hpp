@@ -9,19 +9,21 @@
 namespace tilefusion::cell {
 namespace tl = tile_layout;
 
-namespace detail {
+namespace {
 /// @brief Helper for pretty printing a tile iterator's static shape-related
 ///        information. This printer works ONLY on the host.
 struct GTileIteratorPrettyPrinter {
     template <typename TileIterator>
     static HOST void print(std::ostream& out, const TileIterator& itr) {
-        out << "numel = " << TileIterator::Tile::kNumel << ", ChunkShape["
-            << dim_size<0, typename TileIterator::ChunkShape> << ", "
-            << dim_size<1, typename TileIterator::ChunkShape> << "], sc0 = "
-            << TileIterator::sc0 << ", sc1 = " << TileIterator::sc1;
+        size_t size1 = dim_size<0, typename TileIterator::ChunkShape>;
+        size_t size2 = dim_size<1, typename TileIterator::ChunkShape>;
+
+        out << "numel = " << TileIterator::Tile::kNumel << ", ChunkShape = ("
+            << size1 << ", " << size2 << "), stripe count = ("
+            << TileIterator::sc0 << ", " << TileIterator::sc1 << ")";
     }
 };
-}  // namespace detail
+}  // namespace
 
 /// @brief `SharedTileIterator` chunks a shared memory tile into smaller tiles
 ///         and iterates over these smaller sub-tiles.
@@ -158,7 +160,7 @@ class GTileIterator {
 template <typename TileShape, typename ChunkShape>
 static HOST std::ostream& operator<<(
     std::ostream& out, const GTileIterator<TileShape, ChunkShape>& itr) {
-    detail::GTileIteratorPrettyPrinter::print(out, itr);
+    GTileIteratorPrettyPrinter::print(out, itr);
     return out;
 }
 
