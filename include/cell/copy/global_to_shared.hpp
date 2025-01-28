@@ -447,8 +447,11 @@ struct GlobalToSharedLoader {
                   "The shape of SharedTile must be divisible by the shape of "
                   "WarpLayout.");
 
-    using WarpShape = TileShape<Shared::kRows / WarpLayout::kRows,
-                                Shared::kCols / WarpLayout::kCols>;
+    static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
+    using WarpShape = TileShape<
+        warp::warp_tile_rows<Shared::kRows, WarpLayout::kRows, kMode>(),
+        warp::warp_tile_rows<Shared::kCols, WarpLayout::kCols, kMode>()>;
+
     using BaseShape = warp::WarpBaseTileShape<DType, WarpShape, Shared::kType>;
 
     static_assert(Shared::kRows % BaseShape ::kRows == 0,
@@ -456,7 +459,6 @@ struct GlobalToSharedLoader {
     static_assert(Shared::kCols % BaseShape::kCols == 0,
                   "Shared::kCols must be divisible by BaseShape::kCols.");
 
-    static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
     using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
     using SharedOffset =
@@ -501,16 +503,18 @@ struct SharedToGlobalStorer {
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
 
-    using WarpShape = TileShape<Shared::kRows / WarpLayout::kRows,
-                                Shared::kCols / WarpLayout::kCols>;
+    static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
+
+    using WarpShape = TileShape<
+        warp::warp_tile_rows<Shared::kRows, WarpLayout::kRows, kMode>(),
+        warp::warp_tile_rows<Shared::kCols, WarpLayout::kCols, kMode>()>;
+
     using BaseShape = warp::WarpBaseTileShape<DType, WarpShape, Shared::kType>;
 
     static_assert(Shared::kRows % BaseShape::kRows == 0,
                   "Shared::kRows must be divisible by BaseShape::kRows.");
     static_assert(Shared::kCols % BaseShape::kCols == 0,
                   "Shared::kCols must be divisible by BaseShape::kCols.");
-
-    static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
 
     using SharedOffset =
         warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;

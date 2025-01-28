@@ -12,8 +12,10 @@
 #include <sstream>
 
 namespace tilefusion::testing {
+
 using namespace cell;
 using namespace copy;
+
 namespace tl = tile_layout;
 
 namespace {
@@ -91,6 +93,8 @@ __global__ void swizzled_copy(const Element* data, G2S1& g2s,
 
 /// @brief This unit test verifies the correctness of the swizzled row-major
 ///        format for loading operand A in GEMM.
+///        NOTE: This test is specifically for the "kRowReuseCont" warp reuse
+///        mode.
 template <typename WarpLayout, const int kRows, const int kCols,
           const int kShmRows, const int kShmCols, const int kChunkShm>
 void run_test_rowmajor() {
@@ -98,29 +102,46 @@ void run_test_rowmajor() {
 
     using Element = __half;
     const int kThreads = WarpLayout::kNumel * 32;
-    static constexpr int kWarpPerRow = WarpLayout::kRows;
+    static constexpr WarpReuse kMode = WarpReuse::kRowReuseCont;
 
     using Global = GlobalTile<Element, tl::RowMajor<kRows, kCols>>;
-    using GIterator = GTileIterator<Global, TileShape<kRows, kShmCols>>;
-
     // for non-swizzled layout
     using Shared1 =
         SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, false>;
-    using SIterator1 = STileIterator<Shared1, TileShape<kShmRows, kChunkShm>>;
-
     // for swizzled layout
     using Shared2 = SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, true>;
-    using SIterator2 = STileIterator<Shared2, TileShape<kShmRows, kChunkShm>>;
 
-    using BaseShape = traits::BaseTileShape<Element>;
+    using WarpShape =  // automatically infer the BaseTile shape
+        TileShape<warp::warp_tile_rows<kShmRows, WarpLayout::kRows, kMode>(),
+                  warp::warp_tile_cols<kShmCols, WarpLayout::kCols, kMode>()>;
+    using BaseShape =
+        warp::WarpBaseTileShape<Element, WarpShape, Global::kType>;
 
-    const int kSc0 = kShmRows / kWarpPerRow / BaseShape::kRows;
+    // TODO(ying): The user is currently responsible for ensuring the correct
+    // coordination between `BaseShape` and `TileIterator`. However, since
+    // `BaseShape` is intended to be an internal concept, update this to make it
+    // more transparent for the user.
+    static_assert(
+        kShmRows % BaseShape::kRows == 0 && kShmCols % BaseShape::kCols == 0,
+        "kRows and kCols must be multiples of BaseShape::kRows and "
+        "BaseShape::kCols, respectively.");
+    using GIterator = GTileIterator<Global, TileShape<kRows, kShmCols>>;
+
+    using SIterator1 =
+        STileIterator<Shared1, TileShape<kShmRows, kChunkShm>, BaseShape>;
+    using SIterator2 =
+        STileIterator<Shared2, TileShape<kShmRows, kChunkShm>, BaseShape>;
+
+    const int kSc0 = kShmRows / WarpLayout::kRows / BaseShape::kRows;
     const int kSc1 = kChunkShm / BaseShape::kCols;
-
     using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<kSc0, kSc1>>;
 
 #ifdef DEBUG
-    LOG(INFO) << "GIterator: " << GIterator{} << std::endl
+    LOG(INFO) << std::endl
+              << "WarpShape: (" << dim_size<0, WarpShape> << ", "
+              << dim_size<1, WarpShape> << ")" << std::endl
+              << "BaseShape: " << BaseShape{} << std::endl
+              << "GIterator: " << GIterator{} << std::endl
               << "SIterator1: " << SIterator1{} << std::endl
               << "SIterator2: " << SIterator2{} << std::endl
               << "GlobalTile: " << Global{} << std::endl
@@ -130,7 +151,7 @@ void run_test_rowmajor() {
 
     using G2S1 = GlobalToSharedLoader<Shared1, WarpLayout>;
     using G2S2 = GlobalToSharedLoader<Shared2, WarpLayout>;
-    using S2R = SharedToRegLoader<Reg, WarpLayout, WarpReuse::kRowReuseCont>;
+    using S2R = SharedToRegLoader<Reg, WarpLayout, kMode>;
 
     dim3 dim_grid(1, 1, 1);
     dim3 dim_block(kThreads, 1, 1);
@@ -174,34 +195,52 @@ void run_test_rowmajor() {
 template <typename WarpLayout, const int kRows /*K*/, const int kCols /*N*/,
           const int kShmRows, const int kShmCols, const int kChunkShm>
 void run_test_colmajor() {
-    using Element = __half;
-    const int kThreads = tl::get_numel<WarpLayout> * 32;
-    static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
-
     static_assert(kShmCols == kCols, "kShmCols must be equal to kCols.");
 
-    using Global = GlobalTile<Element, tl::ColMajor<kRows, kCols>>;
-    using GIterator = GTileIterator<Global, TileShape<kShmRows, kShmCols>>;
+    using Element = __half;
+    const int kThreads = WarpLayout::kNumel * 32;
+    static constexpr WarpReuse kMode = WarpReuse::kColReuseCont;
 
+    using Global = GlobalTile<Element, tl::ColMajor<kRows, kCols>>;
     // for non-swizzled layout
     using Shared1 = SharedTile<Element, tl::ColMajor<kShmRows, kShmCols>,
                                false /*disable swizzled layout on shared*/>;
-    using SIterator1 = STileIterator<Shared1, TileShape<kChunkShm, kShmCols>>;
-
     // for swizzled layout
     using Shared2 = SharedTile<Element, tl::ColMajor<kShmRows, kShmCols>,
                                true /*enable swizzled layout on shared*/>;
-    using SIterator2 = STileIterator<Shared2, TileShape<kChunkShm, kShmCols>>;
 
-    using BaseShape = traits::BaseTileShape<Element>;
+    using WarpShape =  // automatically infer the BaseTile shape
+        TileShape<warp::warp_tile_rows<kShmRows, WarpLayout::kRows, kMode>(),
+                  warp::warp_tile_cols<kShmCols, WarpLayout::kCols, kMode>()>;
+    using BaseShape =
+        warp::WarpBaseTileShape<Element, WarpShape, Global::kType>;
+
+    // TODO(ying): The user is currently responsible for ensuring the correct
+    // coordination between `BaseShape` and `TileIterator`. However, since
+    // `BaseShape` is intended to be an internal concept, update this to make it
+    // more transparent for the user.
+    static_assert(
+        kShmRows % BaseShape::kRows == 0 && kShmCols % BaseShape::kCols == 0,
+        "kRows and kCols must be multiples of BaseShape::kRows and "
+        "BaseShape::kCols, respectively.");
+    using GIterator = GTileIterator<Global, TileShape<kShmRows, kShmCols>>;
+
+    using SIterator1 =
+        STileIterator<Shared1, TileShape<kChunkShm, kShmCols>, BaseShape>;
+    using SIterator2 =
+        STileIterator<Shared2, TileShape<kChunkShm, kShmCols>, BaseShape>;
 
     const int kSc0 = kChunkShm / BaseShape::kRows;
-    const int kSc1 = kShmCols / BaseShape::kCols / kWarpPerCol;
+    const int kSc1 = kShmCols / BaseShape::kCols / WarpLayout::kCols;
 
     using Reg = RegTile<BaseTileColMajor<Element>, tl::ColMajor<kSc0, kSc1>>;
 
 #ifdef DEBUG
-    LOG(INFO) << "GIterator: " << GIterator{} << std::endl
+    LOG(INFO) << std::endl
+              << "WarpShape: (" << dim_size<0, WarpShape> << ", "
+              << dim_size<1, WarpShape> << ")" << std::endl
+              << "BaseShape: " << BaseShape{} << std::endl
+              << "GIterator: " << GIterator{} << std::endl
               << "SIterator1: " << SIterator1{} << std::endl
               << "SIterator2: " << SIterator2{} << std::endl
               << "GlobalTile: " << Global{} << std::endl
@@ -211,7 +250,7 @@ void run_test_colmajor() {
 
     using G2S1 = GlobalToSharedLoader<Shared1, WarpLayout>;
     using G2S2 = GlobalToSharedLoader<Shared2, WarpLayout>;
-    using S2R = SharedToRegLoader<Reg, WarpLayout, WarpReuse::kColReuseCont>;
+    using S2R = SharedToRegLoader<Reg, WarpLayout, kMode>;
 
     dim3 dim_grid(1, 1, 1);
     dim3 dim_block(kThreads, 1, 1);
@@ -392,7 +431,8 @@ void test_col_major_store() {
 }  // namespace
 
 TEST(TestSwizzledLoad, test_load_row_major) {
-    // run_test_rowmajor<tl::RowMajor<1, 1>, 16, 16, 16, 16, 16>();
+    run_test_rowmajor<tl::RowMajor<1, 1>, 16, 16, 16, 16, 16>();
+
     // run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 16>();
     // run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 32>();
     // run_test_rowmajor<tl::RowMajor<1, 1>, 32, 32, 32, 32, 16>();
@@ -425,7 +465,8 @@ TEST(TestSwizzledLoad, test_load_row_major) {
 }
 
 TEST(TestSwizzledLoad, test_load_col_major) {
-    // run_test_colmajor<tl::RowMajor<1, 1>, 16, 16, 16, 16, 16>();
+    run_test_colmajor<tl::RowMajor<1, 1>, 16, 16, 16, 16, 16>();
+
     // run_test_colmajor<tl::RowMajor<1, 1>, 32, 16, 32, 16, 16>();
     // run_test_colmajor<tl::RowMajor<1, 1>, 32, 16, 32, 16, 32>();
     // run_test_colmajor<tl::RowMajor<1, 1>, 32, 32, 16, 32, 16>();

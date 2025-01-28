@@ -140,6 +140,30 @@ DEVICE int warp_col_id() {
     }
 }
 
+template <const int kSharedRows, const int kWarpRows, const WarpReuse kMode>
+HOST_DEVICE constexpr int warp_tile_rows() {
+    if constexpr (kMode == WarpReuse::kCont) {
+        return kSharedRows / kWarpRows;
+    } else if constexpr (kMode == WarpReuse::kRowReuseCont) {
+        return kSharedRows / kWarpRows;
+    } else if constexpr (kMode == WarpReuse::kColReuseCont) {
+        return kSharedRows;
+    }
+    return -1;
+}
+
+template <const int kSharedCols, const int kWarpCols, const WarpReuse kMode>
+HOST_DEVICE constexpr int warp_tile_cols() {
+    if constexpr (kMode == WarpReuse::kCont) {
+        return kSharedCols / kWarpCols;
+    } else if constexpr (kMode == WarpReuse::kRowReuseCont) {
+        return kSharedCols;
+    } else if constexpr (kMode == WarpReuse::kColReuseCont) {
+        return kSharedCols / kWarpCols;
+    }
+    return -1;
+}
+
 template <typename BaseTile_, typename Tile_, typename WarpLayout_,
           const WarpReuse kMode_>
 struct ExecCounter {
