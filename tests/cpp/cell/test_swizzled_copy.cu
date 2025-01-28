@@ -11,6 +11,8 @@
 
 #include <sstream>
 
+#define DEBUG
+
 namespace tilefusion::testing {
 using namespace cell;
 using namespace copy;
@@ -97,8 +99,8 @@ void run_test_rowmajor() {
     static_assert(kShmRows == kRows, "kShmRows must be equal to kRows");
 
     using Element = __half;
-    const int kThreads = tl::get_numel<WarpLayout> * 32;
-    static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
+    const int kThreads = WarpLayout::kNumel * 32;
+    static constexpr int kWarpPerRow = WarpLayout::kRows;
 
     using Global = GlobalTile<Element, tl::RowMajor<kRows, kCols>>;
     using GIterator = GTileIterator<Global, TileShape<kRows, kShmCols>>;
@@ -123,12 +125,9 @@ void run_test_rowmajor() {
     LOG(INFO) << "GIterator: " << GIterator{} << std::endl
               << "SIterator1: " << SIterator1{} << std::endl
               << "SIterator2: " << SIterator2{} << std::endl
-              << "GlobalTile Shape: [" << kRows << ", " << kCols << "]"
-              << std::endl
-              << "SharedTile Shape: [" << kShmRows << ", " << kShmCols << "]"
-              << std::endl
-              << "sc0: " << kSc0 << ", sc1: " << kSc1 << std::endl
-              << "RegTile Shape: " << Reg{} << std::endl;
+              << "GlobalTile: " << Global{} << std::endl
+              << "SharedTile: " << Shared1{} << std::endl
+              << "RegTile: " << Reg{} << std::endl;
 #endif
 
     using G2S1 = GlobalToSharedLoader<Shared1, WarpLayout>;
@@ -204,16 +203,12 @@ void run_test_colmajor() {
     using Reg = RegTile<BaseTileColMajor<Element>, tl::ColMajor<kSc0, kSc1>>;
 
 #ifdef DEBUG
-    LOG(INFO) << std::endl
-              << "GIterator: " << GIterator{} << std::endl
+    LOG(INFO) << "GIterator: " << GIterator{} << std::endl
               << "SIterator1: " << SIterator1{} << std::endl
               << "SIterator2: " << SIterator2{} << std::endl
-              << "GlobalTile Shape: [" << kRows << ", " << kCols << "]"
-              << std::endl
-              << "SharedTile Shape: [" << kShmRows << ", " << kShmCols << "]"
-              << std::endl
-              << "sc0: " << kSc0 << ", sc1: " << kSc1 << std::endl
-              << "RegTile Shape: " << Reg{} << std::endl;
+              << "GlobalTile: " << Global{} << std::endl
+              << "SharedTile: " << Shared1{} << std::endl
+              << "RegTile: " << Reg{} << std::endl;
 #endif
 
     using G2S1 = GlobalToSharedLoader<Shared1, WarpLayout>;

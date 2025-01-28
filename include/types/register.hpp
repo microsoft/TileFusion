@@ -10,8 +10,6 @@
 namespace tilefusion::cell {
 namespace tl = tile_layout;
 
-namespace detail {
-
 namespace {
 template <typename DType>
 constexpr int get_rows = DType::kRows;
@@ -36,16 +34,15 @@ constexpr int get_cols<__half> = 1;
 
 template <>
 constexpr int get_cols<cutlass::half_t> = 1;
-}  // namespace
 
 /// @brief Helper for pretty printing a register tile's static shape
 ///        information. This printer works ONLY on the host.
 struct RegTilePrettyPrinter {
     template <typename Tile>
     static HOST void print(std::ostream& out, const Tile& tile) {
-        out << layout_type_to_str(Tile::kType) << "["
+        out << layout_type_to_str(Tile::kType) << "("
             << Tile::kRows * get_rows<typename Tile::DType> << ", "
-            << Tile::kCols * get_cols<typename Tile::DType> << "]";
+            << Tile::kCols * get_cols<typename Tile::DType> << ")";
     }
 };
 
@@ -58,12 +55,12 @@ DEVICE void clear(__half* data, int numel) {
 }
 
 template <typename DType>
-DEVICE void clear(DType* data, int numel) {
+DEVICE void clear_impl(DType* data, int numel) {
     for (int i = 0; i < numel; ++i) {
         clear(data[i].mutable_data(), 8);
     }
 }
-}  // namespace detail
+}  // namespace
 
 template <typename Element_, typename Layout_>
 class RegTile {
@@ -101,7 +98,7 @@ class RegTile {
         print_tile(const_cast<DType*>(data_), layout_);
     }
 
-    DEVICE void clear() { detail::clear<DType>(data_, kNumel); }
+    DEVICE void clear() { clear_impl<DType>(data_, kNumel); }
 
   private:
     DType data_[kNumel];
@@ -124,7 +121,7 @@ using BaseTileColMajor = RegTile<Element, tl::ColMajor<4, 2>>;
 template <typename T, typename Layout>
 static HOST std::ostream& operator<<(std::ostream& out,
                                      const RegTile<T, Layout>& tile) {
-    detail::RegTilePrettyPrinter::print(out, tile);
+    RegTilePrettyPrinter::print(out, tile);
     return out;
 }
 
