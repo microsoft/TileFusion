@@ -9,10 +9,11 @@
 
 #include "cell/copy/constants.hpp"
 #include "types/layout.hpp"
+#include "types/tile_shape.hpp"
 
 namespace tilefusion::cell::copy::warp {
+using namespace tilefusion::cell;
 namespace tl = tile_layout;
-using namespace cute;
 
 namespace {  // functions/class/structs that are not exposed to a larger scope
 
@@ -191,12 +192,15 @@ struct ExecCounter {
 /// @brief Determine the automatic shape of a single warp based on the shape of
 ///        the entire tile. The final warp tile shape is multiple of this atomic
 ///        shape.
-template <typename DType, typename TileLayout, const tl::Layout kType>
+template <typename DType, typename TileShape, const tl::Layout kType>
 struct WarpBaseTileShape;
 
-template <typename DType, typename TileLayout>
-struct WarpBaseTileShape<DType, TileLayout, tl::Layout::kRowMajor> {
+template <typename DType, typename TileShape>
+struct WarpBaseTileShape<DType, TileShape, tl::Layout::kRowMajor> {
     using AccessInfo = traits::AccessBase<DType>;
+
+    static constexpr int kTileRows = dim_size<0, TileShape>;
+    static constexpr int kTileCols = dim_size<1, TileShape>;
 
     // In a row-major layout, columns are the contiguous dimension in memory. We
     // enforce the use of 128-bit vectorized instructions for data loading by a
@@ -205,18 +209,17 @@ struct WarpBaseTileShape<DType, TileLayout, tl::Layout::kRowMajor> {
     static constexpr int kMinCols =
         AccessInfo::kAccessInBits / (sizeof(DType) * 8);
 
-    static_assert(TileLayout::kCols >= kMinCols,
-                  "The number of columns is too small.");
+    static_assert(kTileCols >= kMinCols, "The number of columns is too small.");
 
-    static_assert(TileLayout::kCols < AccessInfo::kExpectedSize ||
-                      (TileLayout::kCols >= AccessInfo::kExpectedSize &&
-                       TileLayout::kCols % AccessInfo::kExpectedSize == 0),
+    static_assert(kTileCols < AccessInfo::kExpectedSize ||
+                      (kTileCols >= AccessInfo::kExpectedSize &&
+                       kTileCols % AccessInfo::kExpectedSize == 0),
                   "The current implementation requires that the number of "
                   "columns of the tile be divisible by the cache line width.");
 
-    static constexpr int kCols = TileLayout::kCols >= AccessInfo::kExpectedSize
+    static constexpr int kCols = kTileCols >= AccessInfo::kExpectedSize
                                      ? AccessInfo::kExpectedSize
-                                     : TileLayout::kCols;
+                                     : kTileCols;
 
     // number of columns in a warp
     static constexpr int kColThreads = kCols / AccessInfo::kNumPerAccess;
@@ -225,7 +228,7 @@ struct WarpBaseTileShape<DType, TileLayout, tl::Layout::kRowMajor> {
     static constexpr int kRowThreads = WARP_SIZE / kColThreads;
 
     static constexpr int kRows = kRowThreads;
-    static_assert(TileLayout::kRows % kRowThreads == 0,
+    static_assert(kTileRows % kRowThreads == 0,
                   "The number of rows of the tile isn't evenly divisible by "
                   "the number of threads in a column.");
 
@@ -234,9 +237,12 @@ struct WarpBaseTileShape<DType, TileLayout, tl::Layout::kRowMajor> {
     using WarpThreadLayout = tl::RowMajor<kRowThreads, kColThreads>;
 };
 
-template <typename DType, typename TileLayout>
-struct WarpBaseTileShape<DType, TileLayout, tl::Layout::kColMajor> {
+template <typename DType, typename TileShape>
+struct WarpBaseTileShape<DType, TileShape, tl::Layout::kColMajor> {
     using AccessInfo = traits::AccessBase<DType>;
+
+    static constexpr int kTileRows = dim_size<0, TileShape>;
+    static constexpr int kTileCols = dim_size<1, TileShape>;
 
     // In a column-major layout, columns are the contiguous dimension in memory.
     // We enforce the use of 128-bit vectorized instructions for data loading by
@@ -245,18 +251,17 @@ struct WarpBaseTileShape<DType, TileLayout, tl::Layout::kColMajor> {
     static constexpr int kMinRows =
         AccessInfo::kAccessInBits / (sizeof(DType) * 8);
 
-    static_assert(TileLayout::kRows >= kMinRows,
-                  "The number of rows is too small.");
+    static_assert(kTileRows >= kMinRows, "The number of rows is too small.");
 
-    static_assert(TileLayout::kRows < AccessInfo::kExpectedSize ||
-                      (TileLayout::kRows >= AccessInfo::kExpectedSize &&
-                       TileLayout::kRows % AccessInfo::kExpectedSize == 0),
+    static_assert(kTileRows < AccessInfo::kExpectedSize ||
+                      (kTileRows >= AccessInfo::kExpectedSize &&
+                       kTileRows % AccessInfo::kExpectedSize == 0),
                   "The current implementation requires that the number of "
                   "rows of the tile be divisible by the cache line width.");
 
-    static constexpr int kRows = TileLayout::kRows >= AccessInfo::kExpectedSize
+    static constexpr int kRows = kTileRows >= AccessInfo::kExpectedSize
                                      ? AccessInfo::kExpectedSize
-                                     : TileLayout::kRows;
+                                     : kTileRows;
 
     // number of rows in a warp
     static constexpr int kRowThreads = kRows / AccessInfo::kNumPerAccess;
@@ -265,7 +270,7 @@ struct WarpBaseTileShape<DType, TileLayout, tl::Layout::kColMajor> {
     static constexpr int kColThreads = WARP_SIZE / kRowThreads;
 
     static constexpr int kCols = kColThreads;
-    static_assert(TileLayout::kCols % kColThreads == 0,
+    static_assert(kTileCols % kColThreads == 0,
                   "The number of columns of the tile isn't evenly divisible by "
                   "the number of threads in a row.");
 
