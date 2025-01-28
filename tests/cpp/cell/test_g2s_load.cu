@@ -25,7 +25,7 @@ __global__ void copy_g2s(const Element* src_ptr, Element* dst_ptr,
     SrcTile dst(dst_ptr);  // global memory tile
 
     loader(src, inter);
-    __copy_async();
+    copy::__copy_async();
     __syncthreads();
 
     storer(inter, dst);
