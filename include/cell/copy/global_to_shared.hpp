@@ -544,4 +544,5 @@ struct SharedToGlobalStorer {
     SharedOffset shared_offset_;
     GlobalOffset global_offset_;
 };
+
 }  // namespace tilefusion::cell::copy
