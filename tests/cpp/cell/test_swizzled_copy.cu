@@ -11,8 +11,6 @@
 
 #include <sstream>
 
-#define DEBUG
-
 namespace tilefusion::testing {
 using namespace cell;
 using namespace copy;
