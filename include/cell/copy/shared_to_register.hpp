@@ -7,6 +7,8 @@
 #include "traits/base.hpp"
 #include "types/mod.hpp"
 
+#include <stdint.h>
+
 namespace tilefusion::cell::copy {
 
 using namespace tilefusion::traits;
@@ -29,14 +31,45 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     using DType = Shared::DType;
     using Reg = Reg_;
 
+    static constexpr int SharedRows = Shared::kRows;
+    static constexpr int SharedCols = Shared::kCols;
+
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
     DEVICE SharedToRegLoaderImpl()
-        : base_tiles_(BaseTilesLayout{}),
-          in_base_tile_(BaseTileSharedLayout{}) {}
+        : base_tiles_(BaseTilesLayout{})
+        , in_base_tile_(BaseTileSharedLayout{}) {}
 
-    DEVICE void operator()(const DType* src, Reg& dst) {
+    DEVICE int2 get_base_tile_id(int offset) {
+        // BaseTile is a 16 x 16 block.
+        int base_tile_col = (offset % SharedCols) / 16;
+        int base_tile_row = (offset / SharedCols) / 16;
+        return make_int2(base_tile_row, base_tile_col);
+    }
+
+    DEVICE int2 get_swizzled_tile_id(int offset) {
+        // SwizzleTile is a 8 x 64 block.
+        int swizzle_tile_col = (offset % SharedCols) / 64;
+        int swizzle_tile_row = (offset / SharedCols) / 8;
+        return make_int2(swizzle_tile_row, swizzle_tile_col);
+    }
+
+    DEVICE int2 get_in_swizzle_tile_id(int offset) {
+        // Get id in the swizzle tile.
+        auto swizzled_tile_id = get_swizzled_tile_id(offset);
+        int in_offset = offset - swizzled_tile_id.y * 64 -
+                        swizzled_tile_id.x * 8 * SharedCols;
+        int in_swizzle_tile_col = in_offset % 64;
+        int in_swizzle_tile_row = in_offset / 64;
+        return make_int2(in_swizzle_tile_row, in_swizzle_tile_col);
+    }
+
+    // DEVICE int2 get_swizzle_offset(int offset) {
+    //     auto swizzled_tile_id = get_swizzle_tile_id(offset);
+    // }
+
+    DEVICE void operator()(const DType* src, Reg& dst, int tile_offset) {
         int lane_row = this->lane_row_id();
         int lane_col = this->lane_col_id() * LoadMat::kNumPerAccess;
 
@@ -47,6 +80,22 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
         for (int i = 0; i < kRowExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
+                tile_offset = i * SharedCols * 16 + j * 16;
+                auto base_tile_id = get_base_tile_id(tile_offset);
+                auto swizzled_tile_id = get_swizzled_tile_id(tile_offset);
+                auto in_swizzled_tile_id = get_in_swizzle_tile_id(tile_offset);
+
+                if (thread0()) {
+                    printf("i: %d, j: %d\n", i, j);
+                    printf("SharedRows: %d, SharedCols: %d\n", SharedRows,
+                           SharedCols);
+                    printf("base_tile_id: (%d, %d)\n", base_tile_id.x,
+                           base_tile_id.y);
+                    printf("swizzled_tile_id: (%d, %d)\n", swizzled_tile_id.x,
+                           swizzled_tile_id.y);
+                    printf("in_swizzled_tile_id: (%d, %d)\n",
+                           in_swizzled_tile_id.x, in_swizzled_tile_id.y);
+                }
                 // advance pointer to the 16x16 `BaseTile` indexed by(i, j).
                 offset = base_tiles_(i, j) + lane_offset;
                 // issue the hardware-backed memory access instruction.
@@ -64,6 +113,17 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     using BaseTileSharedLayout =
         tl::SharedLayoutWrapper<Shared, LoadMat::kAccessInBits>::Layout;
     BaseTileSharedLayout in_base_tile_;
+
+    using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
+    static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
+    static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
+    static constexpr int B = SwizzledBaseShape::B;
+    static constexpr int M = SwizzledBaseShape::M;
+    static constexpr int S = SwizzledBaseShape::S;
+
+    using NonSwizzled =
+        tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride, 1>;
+    using Swizzled = SwizzledLayout<NonSwizzled, B, M, S>;
 };
 
 /// @brief partial specialization for column-major shared memory tile.
@@ -81,10 +141,10 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     static constexpr int kColExec = kColExec_;
 
     DEVICE SharedToRegLoaderImpl()
-        : base_tiles_(BaseTilesLayout{}),
-          in_base_tile_(BaseTileSharedLayout{}) {}
+        : base_tiles_(BaseTilesLayout{})
+        , in_base_tile_(BaseTileSharedLayout{}) {}
 
-    DEVICE void operator()(const DType* src, Reg& dst) {
+    DEVICE void operator()(const DType* src, Reg& dst, int tile_offset) {
         // transpose the lane position if the shared memory is in
         // column-major. 16 threads are mapped to the strided dimension
         // of the data while the 2 threads are mapped to the contiguous
@@ -229,7 +289,7 @@ struct SharedToRegLoader {
             detail::SharedToRegLoaderImpl<Shared, Reg, kRowExec, kColExec,
                                           Shared::kType, CopyInst::kLoadMat>;
         Loader loader;
-        loader(src.data() + offset, dst);
+        loader(src.data() + offset, dst, offset);
     }
 };
 
