@@ -69,6 +69,7 @@ __global__ void swizzled_copy(const Element* data, G2S1& g2s,
             s2r(s_tiles(i), r_tile);
             s2r(s_swizzled_tiles(i), r_tile_swizzled);
             __syncthreads();
+
 #ifdef DEBUG
             if (thread(0)) {
                 printf("\niteration [%d, %d]\n", k, i);
@@ -144,7 +145,7 @@ void run_test_rowmajor() {
     using Element = __half;
     thrust::host_vector<Element> hA(numel);
     for (int i = 0; i < hA.size(); ++i) {
-        hA[i] = static_cast<Element>(i % 2048);
+        hA[i] = static_cast<Element>(i);
     }
     thrust::device_vector<Element> dA = hA;
 
@@ -406,6 +407,11 @@ TEST(TestSwizzledLoad, test_load_row_major) {
     // run_test_rowmajor<tl::RowMajor<1, 1>, 32, 32, 32, 32, 16>();
     // run_test_rowmajor<tl::RowMajor<1, 1>, 32, 64, 32, 32, 16>();
 
+    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 64, 32, 64, 64>();
+    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 128, 32, 64, 64>();
+    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 128, 32, 128, 64>();
+    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 256, 32, 256, 64>();
+
     // run_test_rowmajor<tl::RowMajor<1, 2>, 16, 64, 16, 32, 32>();
     // run_test_rowmajor<tl::RowMajor<1, 2>, 16, 128, 16, 64, 32>();
     // run_test_rowmajor<tl::RowMajor<1, 2>, 32, 32, 32, 32, 16>();
@@ -453,7 +459,7 @@ TEST(TestSwizzledLoad, test_load_col_major) {
 }
 
 TEST(TestNonSwizzledStore, test_row_major) {
-    // static constexpr int kSwizzled = false;
+    static constexpr int kSwizzled = false;
 
     // FIXME(ying): temporarily disable the test to refactor the copy.
     // Make sure all the unit tests pass after the refactor.
@@ -468,10 +474,15 @@ TEST(TestNonSwizzledStore, test_row_major) {
     // test_row_major_store<__half, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
     // test_row_major_store<__half, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
     // test_row_major_store<__half, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+
+    test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
+    test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 64, kSwizzled>();
+
+    test_row_major_store<float, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
 }
 
 TEST(TestSwizzledStored, test_row_major) {
-    // static constexpr int kSwizzled = true;
+    static constexpr int kSwizzled = true;
 
     // test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
     // test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
@@ -492,6 +503,11 @@ TEST(TestSwizzledStored, test_row_major) {
     // test_row_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
     // test_row_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
     // test_row_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+
+    test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
+    test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 64, kSwizzled>();
+
+    // test_row_major_store<float, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
 }
 
 TEST(TestNonSwizzledStored, test_col_major) {

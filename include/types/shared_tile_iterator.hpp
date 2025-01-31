@@ -78,9 +78,15 @@ class STileIterator {
 
         using NewTile = SharedTile<DType, TileLayout, Tile::kSwizzled>;
 
+        // int offset1 = x * (kChunkRow * Tile::kRowStride) +
+        //               y * kTilePerChunkCol * BaseShape::kNumel;
+        // int offset2 = x * kTilePerChunkRow * BaseShape::kNumel +
+        //               y * (Tile::kColStride * kChunkCol);
+
+        // TODO(KuangjuX): hotfix for `offset1` and `offset2`.
         int offset1 = x * (kChunkRow * Tile::kRowStride) +
-                      y * kTilePerChunkCol * BaseShape::kNumel;
-        int offset2 = x * kTilePerChunkRow * BaseShape::kNumel +
+                      y * kTilePerChunkCol * BaseShape::kCols;
+        int offset2 = x * kTilePerChunkRow * BaseShape::kRows +
                       y * (Tile::kColStride * kChunkCol);
         int offset = Tile::kType == tl::Layout::kRowMajor ? offset1 : offset2;
 
@@ -120,13 +126,24 @@ class STileIterator {
     // `BaseTile`. DO NOT modify these unless you fully understand how this
     // layout is used with the Shared to Register loader, as changes might
     // cause significant errors.
-    static constexpr int kTileRowStride = Tile::kType == tl::Layout::kRowMajor
-                                              ? kTilePerCol * BaseShape::kNumel
-                                              : BaseShape::kNumel;
+    // static constexpr int kTileRowStride = Tile::kType ==
+    // tl::Layout::kRowMajor
+    //                                           ? kTilePerCol *
+    //                                           BaseShape::kNumel :
+    //                                           BaseShape::kNumel;
 
-    static constexpr int kTileColStride = Tile::kType == tl::Layout::kRowMajor
-                                              ? BaseShape::kNumel
-                                              : kTilePerRow * BaseShape::kNumel;
+    // static constexpr int kTileColStride = Tile::kType ==
+    // tl::Layout::kRowMajor
+    //                                           ? BaseShape::kNumel
+    //                                           : kTilePerRow *
+    //                                           BaseShape::kNumel;
+
+    // TODO(KuangjuX): hotfix for `kTileRowStride` and `kTileColStride`.
+    static constexpr int kTileRowStride =
+        Tile::kType == tl::Layout::kRowMajor ? Tile::kCols : 1;
+
+    static constexpr int kTileColStride =
+        Tile::kType == tl::Layout::kRowMajor ? 1 : Tile::kRows;
 
     DType* data_;
 };

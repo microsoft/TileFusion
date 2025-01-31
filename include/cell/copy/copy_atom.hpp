@@ -231,7 +231,10 @@ struct BaseTileStorer<Shared, tl::Layout::kRowMajor, 16> {
 #pragma unroll
             for (int j = 0; j < kSegCols; ++j) {
                 col = kElemPerSeg * (lane_col + j * tl::num_cols<ThreadLayout>);
-                dst[in_tile_(row, col) / kElemPerSeg] = src[j * kSegCols + i];
+                // dst[in_tile_(row, col) / kElemPerSeg] = src[j * kSegCols +
+                // i];
+                int offset = row * Shared::kRowStride + col;
+                dst[offset / kElemPerSeg] = src[j * kSegCols + i];
             }
         }
     }
@@ -285,7 +288,10 @@ struct BaseTileStorer<Shared, tl::Layout::kRowMajor, 32> {
 #pragma unroll
             for (int j = 0; j < kSegCols; ++j) {
                 col = kElemPerSeg * (lane_col + j * tl::num_cols<ThreadLayout>);
-                dst[in_tile_(row, col) / kElemPerSeg] = src[j * kSegCols + i];
+                // dst[in_tile_(row, col) / kElemPerSeg] = src[j * kSegCols +
+                // i];
+                int offset = row * Shared::kRowStride + col;
+                dst[offset / kElemPerSeg] = src[j * kSegCols + i];
             }
         }
     }
