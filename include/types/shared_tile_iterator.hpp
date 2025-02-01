@@ -31,13 +31,13 @@ struct STileIteratorPrettyPrinter {
 /// @tparam Tile_: The type of the large tile to chunk.
 /// @tparam ChunkShape_: The shape of the smaller tiles into which the large
 ///                      tile is partitioned (chunk shape).
-template <class Tile_, class ChunkShape_>
+template <class Tile_, class ChunkShape_, class BaseShape_>
 class STileIterator {
   public:
     using Tile = Tile_;
     using DType = Tile::DType;
     using ChunkShape = ChunkShape_;
-    using BaseShape = traits::BaseTileShape<DType>;
+    using BaseShape = BaseShape_;
 
     static_assert(Tile::kRows >= dim_size<0, ChunkShape>,
                   "Tile::kRows must be >= dim_size<0, ChunkShape>");
@@ -133,9 +133,10 @@ class STileIterator {
 
 /// @brief Pretty printer for the static shape information of a TileIterator.
 ///        Note: This printer function works ONLY on the host.
-template <typename TileShape, typename ChunkShape>
+template <typename TileShape, typename ChunkShape, typename BaseShape>
 static HOST std::ostream& operator<<(
-    std::ostream& out, const STileIterator<TileShape, ChunkShape>& itr) {
+    std::ostream& out,
+    const STileIterator<TileShape, ChunkShape, BaseShape>& itr) {
     STileIteratorPrettyPrinter::print(out, itr);
     return out;
 }

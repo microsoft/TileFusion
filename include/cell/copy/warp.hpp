@@ -140,6 +140,30 @@ DEVICE int warp_col_id() {
     }
 }
 
+template <const int kSharedRows, const int kWarpRows, const WarpReuse kMode>
+HOST_DEVICE constexpr int warp_tile_rows() {
+    if constexpr (kMode == WarpReuse::kCont) {
+        return kSharedRows / kWarpRows;
+    } else if constexpr (kMode == WarpReuse::kRowReuseCont) {
+        return kSharedRows / kWarpRows;
+    } else if constexpr (kMode == WarpReuse::kColReuseCont) {
+        return kSharedRows;
+    }
+    return -1;
+}
+
+template <const int kSharedCols, const int kWarpCols, const WarpReuse kMode>
+HOST_DEVICE constexpr int warp_tile_cols() {
+    if constexpr (kMode == WarpReuse::kCont) {
+        return kSharedCols / kWarpCols;
+    } else if constexpr (kMode == WarpReuse::kRowReuseCont) {
+        return kSharedCols;
+    } else if constexpr (kMode == WarpReuse::kColReuseCont) {
+        return kSharedCols / kWarpCols;
+    }
+    return -1;
+}
+
 template <typename BaseTile_, typename Tile_, typename WarpLayout_,
           const WarpReuse kMode_>
 struct ExecCounter {
@@ -347,59 +371,63 @@ struct GlobalOffsetHelper {
  * not correctly reveal the physical layout of data in memory. This requires
  * further special treatment.
  */
-template <typename WarpLayout, typename WarpShape, typename Shared,
+template <typename WarpLayout, typename BaseShape, typename Shared,
           const WarpReuse kMode, const tl::Layout kType = Shared::kType,
           const bool kIsSharedLayout = IsSharedLayout<Shared>>
 struct SharedOffsetHelper;
 
-template <typename WarpLayout_, typename WarpShape_, typename Shared_,
+template <typename WarpLayout_, typename BaseShape_, typename Shared_,
           const WarpReuse kMode_>
-struct SharedOffsetHelper<WarpLayout_, WarpShape_, Shared_, kMode_,
+struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
                           tl::Layout::kRowMajor, false> {
     DEVICE int get_warp_offset() {
-        // TODO(KuangjuX): hotfix this.
-        return warp_row_id<WarpLayout>() * kRowStride * WarpShape::kRows *
-                   Shared::kCols +
-               warp_col_id<WarpLayout>() * kColStride * WarpShape::kCols;
+        int tile_id = warp_row_id<WarpLayout>() * kRowStride +
+                      warp_col_id<WarpLayout>() * kColStride;
+        return tile_id * BaseShape::kNumel;
     }
 
   private:
     using Shared = Shared_;
     using WarpLayout = WarpLayout_;
-    using WarpShape = WarpShape_;
+    using BaseShape = BaseShape_;
+
+    // TODO(ying): `WarpReuse` is not considered in the current implementation.
+    // Be cautious to this.
     static constexpr WarpReuse kMode = kMode_;
 
-    constexpr static int kTilePerRow = Shared::kRows / WarpShape::kRows;
-    constexpr static int kTilePerCol = Shared::kCols / WarpShape::kCols;
+    constexpr static int kTilePerRow = Shared::kCols / BaseShape::kCols;
+    constexpr static int kTilePerCol = Shared::kRows / BaseShape::kRows;
 
-    // TODO(KuangjuX): hotfix this.
-    constexpr static int kRowStride = kTilePerRow / tl::num_rows<WarpLayout>;
-    constexpr static int kColStride = kTilePerCol / tl::num_cols<WarpLayout>;
+    constexpr static int kRowStride =
+        kTilePerRow * kTilePerCol / WarpLayout::kRows;
+    constexpr static int kColStride = kTilePerRow / WarpLayout::kCols;
 };
 
-template <typename WarpLayout_, typename WarpShape_, typename Shared_,
+template <typename WarpLayout_, typename BaseShape, typename Shared_,
           const WarpReuse kMode_>
-struct SharedOffsetHelper<WarpLayout_, WarpShape_, Shared_, kMode_,
+struct SharedOffsetHelper<WarpLayout_, BaseShape, Shared_, kMode_,
                           tl::Layout::kColMajor, false> {
     DEVICE int get_warp_offset() {
         int tile_id = warp_row_id<WarpLayout>() * kRowStride +
                       warp_col_id<WarpLayout>() * kColStride;
 
-        return tile_id * WarpShape::kNumel;
+        return tile_id * BaseShape::kNumel;
     }
 
   private:
     using Shared = Shared_;
     using WarpLayout = WarpLayout_;
-    using WarpShape = WarpShape_;
+
+    // TODO(ying): `WarpReuse` is not considered in the current implementation.
+    // Be cautious to this.
     static constexpr WarpReuse kMode = kMode_;
 
-    constexpr static int kTilePerRow = Shared::kRows / WarpShape::kRows;
-    constexpr static int kTilePerCol = Shared::kCols / WarpShape::kCols;
+    constexpr static int kTilePerRow = Shared::kCols / BaseShape::kCols;
+    constexpr static int kTilePerCol = Shared::kRows / BaseShape::kRows;
 
-    constexpr static int kRowStride = kTilePerRow / tl::num_rows<WarpLayout>;
+    constexpr static int kRowStride = kTilePerCol / WarpLayout::kRows;
     constexpr static int kColStride =
-        kTilePerCol / tl::num_cols<WarpLayout> * kTilePerRow;
+        kTilePerCol * kTilePerRow / WarpLayout::kCols;
 };
 
 template <typename WarpLayout_, typename WarpShape_, typename Shared_,

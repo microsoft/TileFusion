@@ -36,7 +36,7 @@ __global__ void copy_g2s(const Element* src_ptr, Element* dst_ptr,
         printf("\nshared\n");
         inter.dump_value();
 
-        printf("\nglobal\n");
+        printf("\nglobal-dst\n");
         dst.dump_value();
         printf("\n");
     }
@@ -67,7 +67,6 @@ void run_test_row_major() {
     Storer storer;
 
     auto copy_kernel = copy_g2s<Element, SrcTile, DstTile, Loader, Storer>;
-
     int shm_size = kRows * kCols * sizeof(Element);
     if (shm_size > 48 * 1024) {
         cudaFuncSetAttribute(
@@ -91,7 +90,7 @@ void run_test_row_major() {
 }
 
 template <typename Element, typename WarpLayout, const int kRows,
-          const int kCols>
+          const int kCols, const bool kSwizzled = false>
 void run_test_col_major() {
     static const int kThreads = tl::get_numel<WarpLayout> * 32;
 
@@ -104,7 +103,6 @@ void run_test_col_major() {
     thrust::fill(d_B.begin(), d_B.end(), static_cast<Element>(0.));
     thrust::device_vector<Element> d_A = h_A;
 
-    static const bool kSwizzled = false;
     using SrcTile = GlobalTile<Element, tl::ColMajor<kRows, kCols>>;
     using DstTile = SharedTile<Element, tl::ColMajor<kRows, kCols>, kSwizzled>;
 
@@ -117,10 +115,16 @@ void run_test_col_major() {
     dim3 dim_grid(1, 1);
     dim3 dim_block(kThreads);
 
-    copy_g2s<Element, SrcTile, DstTile, Loader, Storer>
-        <<<dim_grid, dim_block, kRows * kCols * sizeof(Element)>>>(
-            thrust::raw_pointer_cast(d_A.data()),
-            thrust::raw_pointer_cast(d_B.data()), loader, storer);
+    auto kernel = copy_g2s<Element, SrcTile, DstTile, Loader, Storer>;
+    int shm_size = kRows * kCols * sizeof(Element);
+    if (shm_size > 48 * 1024) {
+        cudaFuncSetAttribute(
+            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
+    }
+
+    kernel<<<dim_grid, dim_block, shm_size>>>(
+        thrust::raw_pointer_cast(d_A.data()),
+        thrust::raw_pointer_cast(d_B.data()), loader, storer);
     cudaDeviceSynchronize();
 
     thrust::host_vector<Element> h_B(numel);
@@ -133,56 +137,163 @@ void run_test_col_major() {
 }
 }  // namespace
 
-TEST(GlobalToSharedLoad, test_row_major_load) {
-    // test non-swizzled __half.
-    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 64, false>();
-    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 256, false>();
-    run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, false>();
-    run_test_row_major<__half, tl::RowMajor<4, 1>, 64, 64, false>();
-    run_test_row_major<__half, tl::RowMajor<2, 2>, 32, 128, false>();
-    run_test_row_major<__half, tl::RowMajor<2, 4>, 32, 256, false>();
-    run_test_row_major<__half, tl::RowMajor<2, 4>, 64, 512, false>();
+TEST(GlobalToSharedLoad, test_row_major_half) {
+    using DType = __half;
+    {
+        const bool kSwizzled = false;
 
-    // test swizzled __half.
-    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 64, true>();
-    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 256, true>();
-    run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, true>();
-    run_test_row_major<__half, tl::RowMajor<4, 1>, 64, 64, true>();
-    run_test_row_major<__half, tl::RowMajor<2, 2>, 32, 128, true>();
-    run_test_row_major<__half, tl::RowMajor<2, 4>, 32, 256, true>();
-    run_test_row_major<__half, tl::RowMajor<2, 4>, 64, 512, true>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 4, 64, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 8, 32, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
 
-    // test non-swizzled float.
-    run_test_row_major<float, tl::RowMajor<1, 1>, 8, 32, false>();
-    run_test_row_major<float, tl::RowMajor<1, 1>, 16, 64, false>();
-    run_test_row_major<float, tl::RowMajor<1, 4>, 16, 128, false>();
-    run_test_row_major<float, tl::RowMajor<4, 1>, 64, 32, false>();
-    run_test_row_major<float, tl::RowMajor<2, 2>, 32, 64, false>();
-    run_test_row_major<float, tl::RowMajor<2, 4>, 32, 128, false>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 16, 256, kSwizzled>();
 
-    // test swizzled float.
-    run_test_row_major<float, tl::RowMajor<1, 1>, 8, 32, true>();
-    run_test_row_major<float, tl::RowMajor<1, 1>, 16, 64, true>();
-    run_test_row_major<float, tl::RowMajor<1, 4>, 16, 128, true>();
-    run_test_row_major<float, tl::RowMajor<4, 1>, 64, 32, true>();
-    run_test_row_major<float, tl::RowMajor<2, 2>, 32, 64, true>();
-    run_test_row_major<float, tl::RowMajor<2, 4>, 32, 128, true>();
+        run_test_row_major<DType, tl::RowMajor<1, 4>, 16, 256, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 4>, 32, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<4, 1>, 64, 64, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<4, 1>, 192, 32, kSwizzled>();
+
+        run_test_row_major<DType, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 2>, 32, 128, kSwizzled>();
+
+        run_test_row_major<DType, tl::RowMajor<2, 4>, 32, 256, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 4>, 64, 512, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 4>, 96, 128, kSwizzled>();
+    }
+
+    {
+        const bool kSwizzled = true;
+
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 4, 64, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 8, 32, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 16, 256, kSwizzled>();
+
+        run_test_row_major<DType, tl::RowMajor<1, 4>, 16, 256, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 4>, 32, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<4, 1>, 64, 64, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<4, 1>, 192, 32, kSwizzled>();
+
+        run_test_row_major<DType, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 2>, 32, 128, kSwizzled>();
+
+        run_test_row_major<DType, tl::RowMajor<2, 4>, 32, 256, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 4>, 64, 512, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 4>, 96, 128, kSwizzled>();
+    }
 }
 
-TEST(GlobalToSharedLoad, test_col_major_load) {
-    // FIXME(ying): temporarily disable the test to refactor the copy.
-    // Make sure all the unit tests pass after the refactor.
+TEST(GlobalToSharedLoad, test_row_major_float) {
+    using DType = float;
+    {
+        const bool kSwizzled = false;
 
-    // run_test_col_major<__half, tl::RowMajor<1, 1>, 16, 16>();
-    // run_test_col_major<__half, tl::RowMajor<1, 4>, 32, 128>();
-    // run_test_col_major<__half, tl::RowMajor<4, 1>, 192, 32>();
-    // run_test_col_major<__half, tl::RowMajor<2, 2>, 64, 128>();
-    // run_test_col_major<__half, tl::RowMajor<2, 4>, 96, 128>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 8, 32, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
 
-    // run_test_col_major<float, tl::RowMajor<1, 1>, 16, 16>();
-    // run_test_col_major<float, tl::RowMajor<1, 4>, 32, 128>();
-    // run_test_col_major<float, tl::RowMajor<4, 1>, 192, 32>();
-    // run_test_col_major<float, tl::RowMajor<2, 2>, 64, 128>();
-    // run_test_col_major<float, tl::RowMajor<2, 4>, 96, 128>();
+        run_test_row_major<DType, tl::RowMajor<1, 2>, 32, 64, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 4>, 32, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 4>, 16, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<4, 1>, 192, 32, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<4, 1>, 64, 32, kSwizzled>();
+
+        run_test_row_major<DType, tl::RowMajor<2, 2>, 32, 64, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 4>, 96, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 4>, 32, 128, kSwizzled>();
+    }
+
+    {
+        const bool kSwizzled = true;
+
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 8, 32, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
+
+        run_test_row_major<DType, tl::RowMajor<1, 2>, 32, 64, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 4>, 32, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<1, 4>, 16, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<4, 1>, 192, 32, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<4, 1>, 64, 32, kSwizzled>();
+
+        run_test_row_major<DType, tl::RowMajor<2, 2>, 32, 64, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 4>, 96, 128, kSwizzled>();
+        run_test_row_major<DType, tl::RowMajor<2, 4>, 32, 128, kSwizzled>();
+    }
+}
+
+TEST(GlobalToSharedLoad, test_col_major_half) {
+    using DType = __half;
+    {
+        const bool kSwizzled = false;
+
+        // BaseShape = (16x16), threads = (2x16)
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+        // BaseShape = (32x8), threads = (4x8)
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 32, 8, kSwizzled>();
+        // BaseShape = (64x4), threads = (8x4)
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 64, 4, kSwizzled>();
+        // BaseShape = (32x4), threads = (8x4)
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 64, 128, kSwizzled>();
+
+        run_test_col_major<DType, tl::RowMajor<1, 4>, 32, 128, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<4, 1>, 256, 32, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<2, 4>, 128, 128, kSwizzled>();
+    }
+
+    {
+        const bool kSwizzled = true;
+
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 32, 8, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 64, 4, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 64, 128, kSwizzled>();
+
+        run_test_col_major<DType, tl::RowMajor<1, 4>, 32, 128, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<4, 1>, 256, 32, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<2, 4>, 128, 128, kSwizzled>();
+    }
+}
+
+TEST(GlobalToSharedLoad, test_col_major_float) {
+    using DType = float;
+    {
+        const bool kSwizzled = false;
+
+        // BaseShape = (8x16), threads = (16x2)
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 8, 16, kSwizzled>();
+        // BaseShape = (16x8), threads = (4x8)
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 16, 8, kSwizzled>();
+        // BaseShape = (32x4), threads = (8x4)
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 32, 4, kSwizzled>();
+        // BaseShape = (32x4), threads = (8x4)
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 64, 128, kSwizzled>();
+
+        run_test_col_major<DType, tl::RowMajor<1, 4>, 32, 128, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<4, 1>, 256, 32, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<2, 4>, 128, 128, kSwizzled>();
+    }
+
+    {
+        const bool kSwizzled = true;
+
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 8, 16, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 16, 8, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 32, 4, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<1, 1>, 64, 128, kSwizzled>();
+
+        run_test_col_major<DType, tl::RowMajor<1, 4>, 32, 128, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<4, 1>, 256, 32, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+        run_test_col_major<DType, tl::RowMajor<2, 4>, 128, 128, kSwizzled>();
+    }
 }
 }  // namespace tilefusion::testing
