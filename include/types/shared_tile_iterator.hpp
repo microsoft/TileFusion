@@ -4,6 +4,7 @@
 #pragma once
 
 #include "traits/base.hpp"
+#include "types/layout.hpp"
 #include "types/shared.hpp"
 #include "types/tile_shape.hpp"
 
@@ -16,11 +17,8 @@ namespace {
 struct STileIteratorPrettyPrinter {
     template <typename TileIterator>
     static HOST void print(std::ostream& out, const TileIterator& itr) {
-        size_t size1 = dim_size<0, typename TileIterator::ChunkShape>;
-        size_t size2 = dim_size<1, typename TileIterator::ChunkShape>;
-
-        out << "numel = " << TileIterator::Tile::kNumel << ", ChunkShape = ("
-            << size1 << ", " << size2 << "), stripe count = ("
+        out << "ChunkShape = (" << TileIterator::kChunkRows << ", "
+            << TileIterator::kChunkCols << "), stripe count = ("
             << TileIterator::sc0 << ", " << TileIterator::sc1 << ")";
     }
 };
@@ -38,18 +36,16 @@ class STileIterator {
     using DType = Tile::DType;
     using ChunkShape = ChunkShape_;
 
-    using BaseShape = typename Tile::BaseShape;
+    static constexpr int kChunkRows = dim_size<0, ChunkShape>;
+    static constexpr int kChunkCols = dim_size<1, ChunkShape>;
 
-    static_assert(Tile::kRows >= dim_size<0, ChunkShape>,
+    static_assert(Tile::kRows >= kChunkRows,
                   "Tile::kRows must be >= dim_size<0, ChunkShape>");
-    static_assert(Tile::kCols >= dim_size<1, ChunkShape>,
+    static_assert(Tile::kCols >= kChunkCols,
                   "Tile::kCols must be >= dim_size<1, ChunkShape>");
 
-    static constexpr int kChunkRow = dim_size<0, ChunkShape>;
-    static constexpr int kChunkCol = dim_size<1, ChunkShape>;
-
-    static constexpr int sc0 = Tile::kRows / kChunkRow;
-    static constexpr int sc1 = Tile::kCols / kChunkCol;
+    static constexpr int sc0 = Tile::kRows / kChunkRows;
+    static constexpr int sc1 = Tile::kCols / kChunkCols;
 
     HOST_DEVICE STileIterator() : data_(nullptr) {}
 
@@ -72,21 +68,21 @@ class STileIterator {
         int x = sc0 == 1 ? 0 : i;
         int y = sc0 == 1 ? i : 0;
 
-        using TileLayout =
-            decltype(tl::make_shared_tile_layout<kChunkRow, kChunkCol,
-                                                 kTileRowStride, kTileColStride,
-                                                 Tile::kType>());
+        // FIXME(ying): Experimental implementation of the shared layout.
+        // Note: `BaseShape` is repeatedly passed. Consider unifying the
+        // implementation in the future.
+        using TiledLayout = tl::TiledMatrixLayout<typename Tile::Layout,
+                                                  BaseShape, Tile::kType>;
+        using NewSharedTile =
+            SharedTile<DType, TiledLayout, Tile::kSwizzled, BaseShape>;
 
-        using NewTile =
-            SharedTile<DType, TileLayout, Tile::kSwizzled, BaseShape>;
-
-        int offset1 = x * (kChunkRow * Tile::kRowStride) +
-                      y * kTilePerChunkCol * BaseShape::kNumel;
-        int offset2 = x * kTilePerChunkRow * BaseShape::kNumel +
-                      y * (Tile::kColStride * kChunkCol);
+        int offset1 = x * (kChunkRows * Tile::kRowStride) +
+                      y * kTileChunkCols * BaseShape::kNumel;
+        int offset2 = x * kTileChunkRows * BaseShape::kNumel +
+                      y * (Tile::kColStride * kChunkCols);
         int offset = Tile::kType == tl::Layout::kRowMajor ? offset1 : offset2;
 
-        NewTile tile(data_ + offset);
+        NewSharedTile tile(data_ + offset);
         return tile;
     }
 
@@ -111,24 +107,10 @@ class STileIterator {
     }
 
   private:
-    static constexpr int kTilePerRow = Tile::kRows / BaseShape::kRows;
-    static constexpr int kTilePerCol = Tile::kCols / BaseShape::kCols;
+    using BaseShape = typename Tile::BaseShape;
 
-    static constexpr int kTilePerChunkRow = kChunkRow / BaseShape::kRows;
-    static constexpr int kTilePerChunkCol = kChunkCol / BaseShape::kCols;
-
-    // The shared memory tile iterator creates a sub-tile that spans multiple
-    // `BaseTile`s. The row and column strides are used to address a single
-    // `BaseTile`. DO NOT modify these unless you fully understand how this
-    // layout is used with the Shared to Register loader, as changes might
-    // cause significant errors.
-    static constexpr int kTileRowStride = Tile::kType == tl::Layout::kRowMajor
-                                              ? kTilePerCol * BaseShape::kNumel
-                                              : BaseShape::kNumel;
-
-    static constexpr int kTileColStride = Tile::kType == tl::Layout::kRowMajor
-                                              ? BaseShape::kNumel
-                                              : kTilePerRow * BaseShape::kNumel;
+    static constexpr int kTileChunkRows = kChunkRows / BaseShape::kRows;
+    static constexpr int kTileChunkCols = kChunkCols / BaseShape::kCols;
 
     DType* data_;
 };

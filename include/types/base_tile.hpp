@@ -66,6 +66,7 @@ struct WarpBaseTileShape<DType, TileShape, tl::Layout::kRowMajor> {
                   "The number of rows of the tile isn't evenly divisible by "
                   "the number of threads in a column.");
 
+    static constexpr tl::Layout kType = tl::Layout::kRowMajor;
     static constexpr int kNumel = kRows * kCols;
 
     using WarpThreadLayout = tl::RowMajor<kRowThreads, kColThreads>;
@@ -108,6 +109,7 @@ struct WarpBaseTileShape<DType, TileShape, tl::Layout::kColMajor> {
                   "The number of columns of the tile isn't evenly divisible by "
                   "the number of threads in a row.");
 
+    static constexpr tl::Layout kType = tl::Layout::kColMajor;
     static constexpr int kNumel = kRows * kCols;
 
     using WarpThreadLayout = tl::ColMajor<kRowThreads, kColThreads>;

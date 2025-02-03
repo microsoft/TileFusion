@@ -11,7 +11,6 @@ namespace tilefusion::cell {
 namespace tl = tile_layout;
 
 namespace {
-
 /// @brief Helper for pretty printing a SharedTile's static shape-related
 ///        information. This printer works ONLY on the host.
 struct SharedTilePrettyPrinter {
@@ -21,16 +20,15 @@ struct SharedTilePrettyPrinter {
 
         auto swizzled = Shared::kSwizzled ? "swizzled" : "non-swizzled";
 
-        out << layout_type_to_str(Shared::kType) << "(" << Shared::kRows << ", "
-            << Shared::kCols << ", " << Shared::kRowStride << ", "
-            << Shared::kColStride << "), numel = " << Shared::kNumel
-            << ", swizzled = " << swizzled
-            << ", BaseShape = " << typename Shared::BaseShape{};
+        out << "\t" << typename Shared::Layout{} << ", Swizzled = " << swizzled
+            << ", " << std::endl
+            << "\t" << typename Shared::BaseShape{};
     }
 };
 }  // namespace
 
-template <typename Element_, typename Layout_, const bool kSwizzled_ = false,
+// TODO(ying): Make siwzzling a layout function instead of a boolean value.
+template <typename Element_, typename Layout_, const bool kSwizzled_ = true,
           typename BaseShape_ = DefaultBaseTile<Element_, Layout_::kType>>
 class SharedTile {
   public:
@@ -38,10 +36,15 @@ class SharedTile {
     using Layout = Layout_;
     using BaseShape = BaseShape_;
 
-    static constexpr int kNumel = tl::get_numel<Layout>;
+    static constexpr int kNumel = Layout::kNumel;
 
-    static constexpr int kRows = tl::num_rows<Layout>;
-    static constexpr int kCols = tl::num_cols<Layout>;
+    static constexpr int kRows = Layout::kRows;
+    static constexpr int kCols = Layout::kCols;
+    static constexpr int kRowStride = Layout::kRowStride;
+    static constexpr int kColStride = Layout::kColStride;
+
+    static constexpr tl::Layout kType = Layout::kType;
+    static constexpr bool kSwizzled = kSwizzled_;
 
     static_assert(kRows % BaseShape::kRows == 0,
                   "The number of shared memory rows must be divisible by "
@@ -49,12 +52,6 @@ class SharedTile {
     static_assert(kCols % BaseShape::kCols == 0,
                   "The number of shared memory columns must be divisible "
                   "by the base tile column.");
-
-    static constexpr int kRowStride = tl::row_stride<Layout>;
-    static constexpr int kColStride = tl::col_stride<Layout>;
-
-    static constexpr tl::Layout kType = tl::layout_type<Layout>;
-    static constexpr bool kSwizzled = kSwizzled_;
 
     // This Ctor is to enable the use of the pretty printer of SharedTile in the
     // host code.
