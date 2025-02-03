@@ -115,10 +115,10 @@ void run_test_rowmajor() {
         warp::warp_tile_rows<kShmRows, WarpLayout::kRows, kMode>();
     static constexpr int kWarpShapeCols =
         warp::warp_tile_cols<kShmCols, WarpLayout::kCols, kMode>();
-    using WarpShape =  // automatically infer the BaseTile shape
-        TileShape<kWarpShapeRows, kWarpShapeCols>;
-    using BaseShape =
-        warp::WarpBaseTileShape<Element, WarpShape, tl::Layout::kRowMajor>;
+
+    using BaseShape =  // automatically infer the BaseTile shape
+        WarpBaseTileShape<Element, TileShape<kWarpShapeRows, kWarpShapeCols>,
+                          tl::Layout::kRowMajor>;
 
     // TODO(ying): The user is currently responsible for ensuring the correct
     // coordination between `BaseShape` and `TileIterator`. However, since
@@ -134,14 +134,13 @@ void run_test_rowmajor() {
 
     // for non-swizzled layout
     using Shared1 =
-        SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, false>;
-    using SIterator1 =
-        STileIterator<Shared1, TileShape<kShmRows, kChunkShm>, BaseShape>;
+        SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, false, BaseShape>;
+    using SIterator1 = STileIterator<Shared1, TileShape<kShmRows, kChunkShm>>;
 
     // for swizzled layout
-    using Shared2 = SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, true>;
-    using SIterator2 =
-        STileIterator<Shared2, TileShape<kShmRows, kChunkShm>, BaseShape>;
+    using Shared2 =
+        SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, true, BaseShape>;
+    using SIterator2 = STileIterator<Shared2, TileShape<kShmRows, kChunkShm>>;
 
     const int kSc0 = kWarpShapeRows / BaseShape::kRows;
     const int kSc1 = kWarpShapeCols / BaseShape::kCols;
@@ -149,14 +148,12 @@ void run_test_rowmajor() {
 
 #ifdef DEBUG
     LOG(INFO) << std::endl
-              << "WarpShape: (" << dim_size<0, WarpShape> << ", "
-              << dim_size<1, WarpShape> << ")" << std::endl
-              << "BaseShape: " << BaseShape{} << std::endl
-              << "GIterator: " << GIterator{} << std::endl
-              << "SIterator1: " << SIterator1{} << std::endl
-              << "SIterator2: " << SIterator2{} << std::endl
+              << "WarpShape: (" << kWarpShapeRows << ", " << kWarpShapeCols
+              << ")" << std::endl
               << "GlobalTile: " << Global{} << std::endl
+              << "GIterator: " << GIterator{} << std::endl
               << "SharedTile: " << Shared1{} << std::endl
+              << "SIterator1: " << SIterator1{} << std::endl
               << "RegTile: " << Reg{} << std::endl;
 #endif
 
@@ -206,25 +203,21 @@ void run_test_rowmajor() {
 template <typename WarpLayout, const int kRows /*K*/, const int kCols /*N*/,
           const int kShmRows, const int kChunkShm>
 void run_test_colmajor() {
+    /// ====== constants for the tests.
     static constexpr int kShmCols = kCols;
-
     using Element = __half;
     const int kThreads = WarpLayout::kNumel * 32;
     static constexpr WarpReuse kMode = WarpReuse::kColReuseCont;
+    ///
 
-    using Global = GlobalTile<Element, tl::ColMajor<kRows, kCols>>;
-    // for non-swizzled layout
-    using Shared1 = SharedTile<Element, tl::ColMajor<kShmRows, kShmCols>,
-                               false /*disable swizzled layout on shared*/>;
-    // for swizzled layout
-    using Shared2 = SharedTile<Element, tl::ColMajor<kShmRows, kShmCols>,
-                               true /*enable swizzled layout on shared*/>;
+    static constexpr int kWarpShapeRows =
+        warp::warp_tile_rows<kShmRows, WarpLayout::kRows, kMode>();
+    static constexpr int kWarpShapeCols =
+        warp::warp_tile_cols<kShmCols, WarpLayout::kCols, kMode>();
 
-    using WarpShape =  // automatically infer the BaseTile shape
-        TileShape<warp::warp_tile_rows<kShmRows, WarpLayout::kRows, kMode>(),
-                  warp::warp_tile_cols<kShmCols, WarpLayout::kCols, kMode>()>;
-    using BaseShape =
-        warp::WarpBaseTileShape<Element, WarpShape, Global::kType>;
+    using BaseShape =  // automatically infer the BaseTile shape
+        WarpBaseTileShape<Element, TileShape<kWarpShapeRows, kWarpShapeCols>,
+                          tl::Layout::kRowMajor>;
 
     // TODO(ying): The user is currently responsible for ensuring the correct
     // coordination between `BaseShape` and `TileIterator`. However, since
@@ -234,12 +227,19 @@ void run_test_colmajor() {
         kShmRows % BaseShape::kRows == 0 && kShmCols % BaseShape::kCols == 0,
         "kRows and kCols must be multiples of BaseShape::kRows and "
         "BaseShape::kCols, respectively.");
+
+    using Global = GlobalTile<Element, tl::ColMajor<kRows, kCols>>;
     using GIterator = GTileIterator<Global, TileShape<kShmRows, kShmCols>>;
 
-    using SIterator1 =
-        STileIterator<Shared1, TileShape<kChunkShm, kShmCols>, BaseShape>;
-    using SIterator2 =
-        STileIterator<Shared2, TileShape<kChunkShm, kShmCols>, BaseShape>;
+    // for non-swizzled layout
+    using Shared1 =
+        SharedTile<Element, tl::ColMajor<kShmRows, kShmCols>, false, BaseShape>;
+    using SIterator1 = STileIterator<Shared1, TileShape<kChunkShm, kShmCols>>;
+
+    // for swizzled layout
+    using Shared2 =
+        SharedTile<Element, tl::ColMajor<kShmRows, kShmCols>, true, BaseShape>;
+    using SIterator2 = STileIterator<Shared2, TileShape<kChunkShm, kShmCols>>;
 
     const int kSc0 = kChunkShm / BaseShape::kRows;
     const int kSc1 = kShmCols / BaseShape::kCols / WarpLayout::kCols;
@@ -248,14 +248,12 @@ void run_test_colmajor() {
 
 #ifdef DEBUG
     LOG(INFO) << std::endl
-              << "WarpShape: (" << dim_size<0, WarpShape> << ", "
-              << dim_size<1, WarpShape> << ")" << std::endl
-              << "BaseShape: " << BaseShape{} << std::endl
-              << "GIterator: " << GIterator{} << std::endl
-              << "SIterator1: " << SIterator1{} << std::endl
-              << "SIterator2: " << SIterator2{} << std::endl
+              << "WarpShape: (" << kWarpShapeRows << ", " << kWarpShapeCols
+              << ")" << std::endl
               << "GlobalTile: " << Global{} << std::endl
+              << "GIterator: " << GIterator{} << std::endl
               << "SharedTile: " << Shared1{} << std::endl
+              << "SIterator1: " << SIterator1{} << std::endl
               << "RegTile: " << Reg{} << std::endl;
 #endif
 

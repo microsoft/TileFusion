@@ -22,24 +22,22 @@ constexpr size_t Log2(size_t n) { return ((n < 2) ? 0 : 1 + Log2(n / 2)); }
  *
  * @tparam Global The type of the global memory tile.
  * @tparam Shared The type of the shared memory tile.
- * @tparam BaseShape The shape of the base tile.
  * @tparam kRowExec The number of rows to execute.
  * @tparam kColExec The number of columns to execute.
  * @tparam kType The type of Global and Shared memory layout.
  */
-template <typename Global, typename Shared, typename BaseShape,
-          const int kRowExec, const int kColExec,
-          const tl::Layout kType = Shared::kType>
+template <typename Global, typename Shared, const int kRowExec,
+          const int kColExec, const tl::Layout kType = Shared::kType>
 struct GlobalToSharedLoaderImpl;
 
-template <typename Global_, typename Shared_, typename BaseShape_,
-          const int kRowExec_, const int kColExec_>
-struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
-                                kColExec_, tl::Layout::kRowMajor> {
+template <typename Global_, typename Shared_, const int kRowExec_,
+          const int kColExec_>
+struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
+                                tl::Layout::kRowMajor> {
     using Global = Global_;
     using Shared = Shared_;
     using DType = Global::DType;
-    using BaseShape = BaseShape_;
+    using BaseShape = Shared::BaseShape;
 
     static_assert(Global::kRows == Shared::kRows &&
                       Global::kCols == Shared::kCols,
@@ -137,14 +135,14 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     }
 };
 
-template <typename Global_, typename Shared_, typename BaseShape_,
-          const int kRowExec_, const int kColExec_>
-struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
-                                kColExec_, tl::Layout::kColMajor> {
+template <typename Global_, typename Shared_, const int kRowExec_,
+          const int kColExec_>
+struct GlobalToSharedLoaderImpl<Global_, Shared_, kRowExec_, kColExec_,
+                                tl::Layout::kColMajor> {
     using Global = Global_;
     using Shared = Shared_;
     using DType = Global::DType;
-    using BaseShape = BaseShape_;
+    using BaseShape = Shared::BaseShape;
 
     static_assert(Global::kRows == Shared::kRows &&
                       Global::kCols == Shared::kCols,
@@ -239,17 +237,17 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     }
 };
 
-template <typename Shared, typename Global, typename BaseShape,
-          const int kRowExec, const int kColExec,
-          const tl::Layout kType = Shared::kType>
+template <typename Shared, typename Global, const int kRowExec,
+          const int kColExec, const tl::Layout kType = Shared::kType>
 struct SharedToGlobalStorerImpl;
 
-template <typename Shared_, typename Global_, typename BaseShape,
-          const int kRowExec_, const int kColExec_>
-struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
-                                kColExec_, tl::Layout::kRowMajor> {
+template <typename Shared_, typename Global_, const int kRowExec_,
+          const int kColExec_>
+struct SharedToGlobalStorerImpl<Shared_, Global_, kRowExec_, kColExec_,
+                                tl::Layout::kRowMajor> {
     using Shared = Shared_;
     using Global = Global_;
+    using BaseShape = Shared::BaseShape;
     using DType = Shared::DType;
 
     static_assert(Global::kRows == Shared::kRows &&
@@ -338,12 +336,13 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
     }
 };
 
-template <typename Shared_, typename Global_, typename BaseShape,
-          const int kRowExec_, const int kColExec_>
-struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
-                                kColExec_, tl::Layout::kColMajor> {
+template <typename Shared_, typename Global_, const int kRowExec_,
+          const int kColExec_>
+struct SharedToGlobalStorerImpl<Shared_, Global_, kRowExec_, kColExec_,
+                                tl::Layout::kColMajor> {
     using Shared = Shared_;
     using Global = Global_;
+    using BaseShape = Shared::BaseShape;
     using DType = Shared::DType;
 
     static_assert(Global::kRows == Shared::kRows &&
@@ -448,21 +447,9 @@ struct GlobalToSharedLoader {
                   "WarpLayout.");
 
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
-    using WarpShape = TileShape<
-        warp::warp_tile_rows<Shared::kRows, WarpLayout::kRows, kMode>(),
-        warp::warp_tile_rows<Shared::kCols, WarpLayout::kCols, kMode>()>;
-
-    using BaseShape = warp::WarpBaseTileShape<DType, WarpShape, Shared::kType>;
-
-    static_assert(Shared::kRows % BaseShape ::kRows == 0,
-                  "Shared::kRows must be divisible by BaseShape::kRows.");
-    static_assert(Shared::kCols % BaseShape::kCols == 0,
-                  "Shared::kCols must be divisible by BaseShape::kCols.");
-
-    using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
+    using ExecCounter = warp::ExecCounter<Shared, WarpLayout, kMode>;
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
-    using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;
+    using SharedOffset = warp::SharedOffsetHelper<WarpLayout, Shared, kMode>;
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
@@ -485,8 +472,8 @@ struct GlobalToSharedLoader {
         int offset_dst = shared_offset_.get_warp_offset();
 
         // Load a single warp tile from global memory to shared memory
-        using Loader = GlobalToSharedLoaderImpl<Global, Shared, BaseShape,
-                                                kRowExec, kColExec>;
+        using Loader =
+            GlobalToSharedLoaderImpl<Global, Shared, kRowExec, kColExec>;
 
         Loader loader;
         loader(src_ptr + offset_src, dst_ptr + offset_dst);
@@ -504,23 +491,9 @@ struct SharedToGlobalStorer {
     using WarpLayout = WarpLayout_;
 
     static const WarpReuse kMode = WarpReuse::kCont;  // warp reuse mode
-
-    using WarpShape = TileShape<
-        warp::warp_tile_rows<Shared::kRows, WarpLayout::kRows, kMode>(),
-        warp::warp_tile_rows<Shared::kCols, WarpLayout::kCols, kMode>()>;
-
-    using BaseShape = warp::WarpBaseTileShape<DType, WarpShape, Shared::kType>;
-
-    static_assert(Shared::kRows % BaseShape::kRows == 0,
-                  "Shared::kRows must be divisible by BaseShape::kRows.");
-    static_assert(Shared::kCols % BaseShape::kCols == 0,
-                  "Shared::kCols must be divisible by BaseShape::kCols.");
-
-    using SharedOffset =
-        warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;
+    using SharedOffset = warp::SharedOffsetHelper<WarpLayout, Shared, kMode>;
     using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, kMode>;
-
-    using ExecCounter = warp::ExecCounter<BaseShape, Shared, WarpLayout, kMode>;
+    using ExecCounter = warp::ExecCounter<Shared, WarpLayout, kMode>;
 
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
@@ -537,8 +510,8 @@ struct SharedToGlobalStorer {
         int offset_src = shared_offset_.get_warp_offset();
         int offset_dst = global_offset_.template get_warp_offset<Global>();
 
-        using Storer = SharedToGlobalStorerImpl<Shared, Global, BaseShape,
-                                                kRowExec, kColExec>;
+        using Storer =
+            SharedToGlobalStorerImpl<Shared, Global, kRowExec, kColExec>;
 
         Storer storer;
         storer(src + offset_src, dst + offset_dst);

@@ -4,6 +4,7 @@
 #include "cell/mod.hpp"
 #include "common/test_utils.hpp"
 #include "cuda_utils.hpp"
+#include "types/base_tile.hpp"
 #include "util/debug.hpp"
 
 #include <glog/logging.h>
@@ -129,11 +130,11 @@ struct TestTraits {
     static constexpr int kWarpColsA =
         warp::warp_tile_cols<kK, WarpLayout::kCols, kModeA>();
     using BaseShapeA =
-        warp::WarpBaseTileShape<Element, TileShape<kWarpRowsA, kWarpColsA>,
-                                tl::Layout::kRowMajor>;
+        WarpBaseTileShape<Element, TileShape<kWarpRowsA, kWarpColsA>,
+                          tl::Layout::kRowMajor>;
 
-    using SharedA = SharedTile<Element, tl::RowMajor<kM, kK>>;
-    using TileIteratorA = STileIterator<SharedA, TileShape<kM, kK>, BaseShapeA>;
+    using SharedA = SharedTile<Element, tl::RowMajor<kM, kK>, true, BaseShapeA>;
+    using TileIteratorA = STileIterator<SharedA, TileShape<kM, kK>>;
 
     static constexpr int kMs = kWarpRowsA / BaseShapeA::kRows;
     static constexpr int kAKs = kWarpColsA / BaseShapeA::kCols;
@@ -147,11 +148,11 @@ struct TestTraits {
     static constexpr int kWarpColsB =
         warp::warp_tile_cols<kN, WarpLayout::kCols, kModeB>();
     using BaseShapeB =
-        warp::WarpBaseTileShape<Element, TileShape<kWarpRowsB, kWarpColsB>,
-                                tl::Layout::kColMajor>;
+        WarpBaseTileShape<Element, TileShape<kWarpRowsB, kWarpColsB>,
+                          tl::Layout::kColMajor>;
 
-    using SharedB = SharedTile<Element, tl::ColMajor<kK, kN>>;
-    using TileIteratorB = STileIterator<SharedB, TileShape<kK, kN>, BaseShapeB>;
+    using SharedB = SharedTile<Element, tl::ColMajor<kK, kN>, true, BaseShapeB>;
+    using TileIteratorB = STileIterator<SharedB, TileShape<kK, kN>>;
 
     static constexpr int kBKs = kWarpRowsB / BaseShapeB::kRows;
     static constexpr int kNs = kWarpColsB / BaseShapeB::kCols;

@@ -57,8 +57,14 @@ void run_test_row_major() {
     thrust::fill(d_B.begin(), d_B.end(), static_cast<Element>(0.));
     thrust::device_vector<Element> d_A = h_A;
 
+    using WarpShape = TileShape<warp_tile_rows<kRows, WarpLayout::kRows>(),
+                                warp_tile_cols<kCols, WarpLayout::kCols>()>;
+    using BaseShape =
+        WarpBaseTileShape<Element, WarpShape, tl::Layout::kRowMajor>;
+
     using SrcTile = GlobalTile<Element, tl::RowMajor<kRows, kCols>>;
-    using DstTile = SharedTile<Element, tl::RowMajor<kRows, kCols>, kSwizzled>;
+    using DstTile =
+        SharedTile<Element, tl::RowMajor<kRows, kCols>, kSwizzled, BaseShape>;
 
     using Loader = copy::GlobalToSharedLoader<DstTile, WarpLayout>;
     Loader loader;
@@ -103,8 +109,14 @@ void run_test_col_major() {
     thrust::fill(d_B.begin(), d_B.end(), static_cast<Element>(0.));
     thrust::device_vector<Element> d_A = h_A;
 
+    using WarpShape = TileShape<warp_tile_rows<kRows, WarpLayout::kRows>(),
+                                warp_tile_cols<kCols, WarpLayout::kCols>()>;
+    using BaseShape =
+        WarpBaseTileShape<Element, WarpShape, tl::Layout::kColMajor>;
+
     using SrcTile = GlobalTile<Element, tl::ColMajor<kRows, kCols>>;
-    using DstTile = SharedTile<Element, tl::ColMajor<kRows, kCols>, kSwizzled>;
+    using DstTile =
+        SharedTile<Element, tl::ColMajor<kRows, kCols>, kSwizzled, BaseShape>;
 
     using Loader = copy::GlobalToSharedLoader<DstTile, WarpLayout>;
     Loader loader;

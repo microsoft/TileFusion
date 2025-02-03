@@ -31,13 +31,14 @@ struct STileIteratorPrettyPrinter {
 /// @tparam Tile_: The type of the large tile to chunk.
 /// @tparam ChunkShape_: The shape of the smaller tiles into which the large
 ///                      tile is partitioned (chunk shape).
-template <class Tile_, class ChunkShape_, class BaseShape_>
+template <class Tile_, class ChunkShape_>
 class STileIterator {
   public:
     using Tile = Tile_;
     using DType = Tile::DType;
     using ChunkShape = ChunkShape_;
-    using BaseShape = BaseShape_;
+
+    using BaseShape = typename Tile::BaseShape;
 
     static_assert(Tile::kRows >= dim_size<0, ChunkShape>,
                   "Tile::kRows must be >= dim_size<0, ChunkShape>");
@@ -76,7 +77,8 @@ class STileIterator {
                                                  kTileRowStride, kTileColStride,
                                                  Tile::kType>());
 
-        using NewTile = SharedTile<DType, TileLayout, Tile::kSwizzled>;
+        using NewTile =
+            SharedTile<DType, TileLayout, Tile::kSwizzled, BaseShape>;
 
         int offset1 = x * (kChunkRow * Tile::kRowStride) +
                       y * kTilePerChunkCol * BaseShape::kNumel;
@@ -133,10 +135,9 @@ class STileIterator {
 
 /// @brief Pretty printer for the static shape information of a TileIterator.
 ///        Note: This printer function works ONLY on the host.
-template <typename TileShape, typename ChunkShape, typename BaseShape>
+template <typename TileShape, typename ChunkShape>
 static HOST std::ostream& operator<<(
-    std::ostream& out,
-    const STileIterator<TileShape, ChunkShape, BaseShape>& itr) {
+    std::ostream& out, const STileIterator<TileShape, ChunkShape>& itr) {
     STileIteratorPrettyPrinter::print(out, itr);
     return out;
 }
