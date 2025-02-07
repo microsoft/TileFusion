@@ -75,10 +75,6 @@ __global__ void run_test_load(Copy& copy) {
         r_tile.dump_value();
     }
 #endif
-
-    if (threadIdx.x == 4) {
-        r_tile.dump_value();
-    }
 }
 
 template <typename Shared, typename Reg, typename Loader, typename Storer>

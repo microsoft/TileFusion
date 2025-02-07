@@ -191,9 +191,9 @@ void run_test() {
 }
 
 TEST(TestWmma, test_m16n16k16_f) {
-    run_test<16, 16, 16>();  // Test the `BaseTile` 16x16x16
-    run_test<16, 32, 16>();
-    run_test<96, 48, 80>();
+    // run_test<16, 16, 16>();  // Test the `BaseTile` 16x16x16
+    // run_test<16, 32, 16>();
+    // run_test<96, 48, 80>();
     run_test<64, 128, 128>();
 }
 

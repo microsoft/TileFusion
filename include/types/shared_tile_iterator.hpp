@@ -38,14 +38,22 @@ class STileIterator {
     using DType = Tile::DType;
     using ChunkShape = ChunkShape_;
     using BaseShape = traits::BaseTileShape<DType>;
+    using SwizzleBaseShape = traits::SwizzleBaseTileShape<DType>;
+
+    static constexpr int kChunkRow = dim_size<0, ChunkShape>;
+    static constexpr int kChunkCol = dim_size<1, ChunkShape>;
 
     static_assert(Tile::kRows >= dim_size<0, ChunkShape>,
                   "Tile::kRows must be >= dim_size<0, ChunkShape>");
     static_assert(Tile::kCols >= dim_size<1, ChunkShape>,
                   "Tile::kCols must be >= dim_size<1, ChunkShape>");
 
-    static constexpr int kChunkRow = dim_size<0, ChunkShape>;
-    static constexpr int kChunkCol = dim_size<1, ChunkShape>;
+    static_assert(kChunkRow % SwizzleBaseShape::kRows == 0,
+                  "kChunkRow must be divisible by "
+                  "SwizzleBaseShape::kRows");
+    static_assert(kChunkCol % SwizzleBaseShape::kCols == 0,
+                  "kChunkCol must be divisible by "
+                  "SwizzleBaseShape::kCols");
 
     static constexpr int sc0 = Tile::kRows / kChunkRow;
     static constexpr int sc1 = Tile::kCols / kChunkCol;
