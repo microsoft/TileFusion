@@ -181,35 +181,35 @@ TEST(TestShared2Reg, operand_A) {  // load mode for loading operand A in gemm
     cudaDeviceSynchronize();
 }
 
-// TEST(TestShared2Reg, operand_B) {  // load mode for loading operand B in gemm
-//     using Element = __half;
+TEST(TestShared2Reg, operand_B) {  // load mode for loading operand B in gemm
+    using Element = __half;
 
-//     using WarpLayout = tl::RowMajor<2, 2>;
-//     const int kThreads = tl::get_numel<WarpLayout> * 32;
+    // using WarpLayout = tl::RowMajor<2, 2>;
+    using WarpLayout = tl::RowMajor<1, 1>;
+    const int kThreads = tl::get_numel<WarpLayout> * 32;
 
-//     // a 32x64 row-major shared tile is equivalent to a 64x32 col-major tile
-//     using Shared = SharedTile<Element, tl::RowMajor<32, 64>>;
+    // a 32x64 row-major shared tile is equivalent to a 64x32 col-major tile
+    // using Shared = SharedTile<Element, tl::RowMajor<32, 64>>;
+    using Shared = SharedTile<Element, tl::ColMajor<64, 32>>;
 
-//     // Each thread accesses 4x2 elements (the shape of
-//     `BaseHalfTileRowMajor`)
-//     // within a 16x16 `BaseTile`. These 4x2 elements are accessed 2x2 times
-//     // along each dimension, contributing to the final register tile handled
-//     by
-//     // a single thread.
-//     using Reg = RegTile<BaseTileColMajor<Element>, tl::ColMajor<2, 2>>;
-//     // In the `ColReuseCont` mode, warps in the same column repeatedly access
-//     // the same data.
-//     using Copy = SharedToRegLoader<Reg, WarpLayout,
-//     WarpReuse::kColReuseCont>; Copy copy;
+    // Each thread accesses 4x2 elements (the shape of `BaseHalfTileRowMajor`)
+    // within a 16x16 `BaseTile`. These 4x2 elements are accessed 2x2 times
+    // along each dimension, contributing to the final register tile handled by
+    // a single thread.
+    using Reg = RegTile<BaseTileColMajor<Element>, tl::ColMajor<2, 2>>;
+    // In the `ColReuseCont` mode, warps in the same column repeatedly access
+    // the same data.
+    using Copy = SharedToRegLoader<Reg, WarpLayout, WarpReuse::kColReuseCont>;
+    Copy copy;
 
-//     dim3 dim_grid(1, 1, 1);
-//     dim3 dim_block(kThreads, 1, 1);
-//     int shm_size = Shared::kNumel * sizeof(Element);
+    dim3 dim_grid(1, 1, 1);
+    dim3 dim_block(kThreads, 1, 1);
+    int shm_size = Shared::kNumel * sizeof(Element);
 
-//     run_test_load<Element, Shared, Reg, Copy>
-//         <<<dim_grid, dim_block, shm_size>>>(copy);
-//     cudaDeviceSynchronize();
-// }
+    run_test_load<Element, Shared, Reg, Copy>
+        <<<dim_grid, dim_block, shm_size>>>(copy);
+    cudaDeviceSynchronize();
+}
 
 TEST(TestReg2Shared, operand_C_half) {
     using Element = __half;

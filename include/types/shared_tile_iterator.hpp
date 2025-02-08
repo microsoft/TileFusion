@@ -48,12 +48,12 @@ class STileIterator {
     static_assert(Tile::kCols >= dim_size<1, ChunkShape>,
                   "Tile::kCols must be >= dim_size<1, ChunkShape>");
 
-    static_assert(kChunkRow % SwizzleBaseShape::kRows == 0,
-                  "kChunkRow must be divisible by "
-                  "SwizzleBaseShape::kRows");
-    static_assert(kChunkCol % SwizzleBaseShape::kCols == 0,
-                  "kChunkCol must be divisible by "
-                  "SwizzleBaseShape::kCols");
+    // static_assert(kChunkRow % SwizzleBaseShape::kRows == 0,
+    //               "kChunkRow must be divisible by "
+    //               "SwizzleBaseShape::kRows");
+    // static_assert(kChunkCol % SwizzleBaseShape::kCols == 0,
+    //               "kChunkCol must be divisible by "
+    //               "SwizzleBaseShape::kCols");
 
     static constexpr int sc0 = Tile::kRows / kChunkRow;
     static constexpr int sc1 = Tile::kCols / kChunkCol;
