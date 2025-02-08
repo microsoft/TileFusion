@@ -26,10 +26,12 @@ template <typename Element>
 struct AccessBase {
     // the maximal width of vectorized access.
     static constexpr int kAccessInBits = 128;
-    static constexpr int kElementBits = cutlass::sizeof_bits<Element>::value;
+    static constexpr int kAccessInBytes = kAccessInBits / 8;
+
+    static constexpr int kElementBits = sizeof(Element) * 8;
     static constexpr int kNumPerAccess = kAccessInBits / kElementBits;
 
-    // the width of memory transaction
+    // the width of memory transaction, Shared memory cacheline width.
     static constexpr int kMemTransWidth = 1024;  // 1024 bits, 128 bytes
 
     // The ideal number of columns for a single warp to load.
@@ -48,39 +50,6 @@ struct BaseTileShape {
     static constexpr int kRows = kTileSize;
     static constexpr int kCols = kTileSize;
     static constexpr int kNumel = kRows * kCols;
-};
-
-/**
- * @brief The base tile shape for Swizzle<3, 3, 3>.
- */
-template <typename Element>
-    requires BaseType<Element>
-struct SwizzleBaseTileShape;
-
-template <>
-struct SwizzleBaseTileShape<__half> {
-    using DType = __half;
-
-    static constexpr int kRows = 8;
-    static constexpr int kCols = 64;
-    static constexpr int kNumel = kRows * kCols;
-
-    static constexpr int B = 3;
-    static constexpr int M = 3;
-    static constexpr int S = 3;
-};
-
-template <>
-struct SwizzleBaseTileShape<float> {
-    using DType = float;
-
-    static constexpr int kRows = 8;
-    static constexpr int kCols = 32;
-    static constexpr int kNumel = kRows * kCols;
-
-    static constexpr int B = 3;
-    static constexpr int M = 2;
-    static constexpr int S = 3;
 };
 
 }  // namespace tilefusion::traits
