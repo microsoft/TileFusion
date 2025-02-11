@@ -196,5 +196,7 @@ TEST(GlobalToSharedLoad, test_col_major_load) {
     run_test_col_major<float, tl::RowMajor<1, 4>, 64, 64, false>();
     run_test_col_major<float, tl::RowMajor<4, 1>, 128, 32, false>();
     run_test_col_major<float, tl::RowMajor<2, 2>, 64, 64, false>();
+
+    run_test_col_major<float, tl::RowMajor<1, 1>, 128, 128, true>();
 }
 }  // namespace tilefusion::testing

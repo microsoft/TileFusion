@@ -2,6 +2,9 @@
 *.ii
 *.gpu
 *.ptx
+*.sass
+*.S
+*.log
 *.cubin
 *.fatbin
 

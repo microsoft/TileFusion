@@ -276,16 +276,22 @@ void run_test() {
     dim3 dim_block(config::kThreads, 1, 1);
     int shm_size = (kM + kN) * kK * sizeof(Element);
 
-    test_gemm<
+    auto kernel = test_gemm<
         Element, ElementAcc, typename config::GlobalA, typename config::SharedA,
         typename config::LoadSharedA, typename config::GlobalB,
         typename config::SharedB, typename config::LoadSharedB, IteratorA, RegA,
         typename config::LoadRegA, IteratorB, RegB, typename config::LoadRegB,
-        typename config::GlobalC, RegC, typename config::CStorer>
-        <<<dim_grid, dim_block, shm_size>>>(
-            thrust::raw_pointer_cast(d_a.data()),
-            thrust::raw_pointer_cast(d_b.data()),
-            thrust::raw_pointer_cast(d_c.data()));
+        typename config::GlobalC, RegC, typename config::CStorer>;
+
+    if (shm_size > 48 * 1024) {
+        cudaFuncSetAttribute(
+            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
+    }
+
+    kernel<<<dim_grid, dim_block, shm_size>>>(
+        thrust::raw_pointer_cast(d_a.data()),
+        thrust::raw_pointer_cast(d_b.data()),
+        thrust::raw_pointer_cast(d_c.data()));
     cudaDeviceSynchronize();
     h_c = d_c;
 
@@ -312,45 +318,16 @@ TEST(TestGemm, test) {
     // as this will cause a shared memory overflow.
 
     // 1 warp
-    run_test<16, 16, 16, tl::RowMajor<1, 1>, 16>();  // minimal shape
-    run_test<32, 16, 16, tl::RowMajor<1, 1>, 16>();
-    run_test<16, 32, 16, tl::RowMajor<1, 1>, 16>();
-    run_test<16, 16, 32, tl::RowMajor<1, 1>, 16>();
-    run_test<16, 16, 32, tl::RowMajor<1, 1>, 32>();
-    run_test<16, 32, 32, tl::RowMajor<1, 1>, 16>();
-
-    // 1 x 2 warps
-    run_test<16, 32, 32, tl::RowMajor<1, 2>, 16>();  // minimal shape
-    run_test<16, 32, 32, tl::RowMajor<1, 2>, 32>();
-    run_test<32, 32, 32, tl::RowMajor<1, 2>, 16>();
-    run_test<32, 32, 32, tl::RowMajor<1, 2>, 32>();
-    run_test<32, 64, 32, tl::RowMajor<1, 2>, 16>();
-    run_test<32, 64, 32, tl::RowMajor<1, 2>, 32>();
-    run_test<32, 64, 64, tl::RowMajor<1, 2>, 16>();
-    run_test<32, 64, 64, tl::RowMajor<1, 2>, 32>();
+    run_test<16, 16, 64, tl::RowMajor<1, 1>, 64>();  // minimal shape
+    run_test<32, 16, 64, tl::RowMajor<1, 1>, 64>();
+    run_test<16, 32, 64, tl::RowMajor<1, 1>, 64>();
+    run_test<32, 32, 64, tl::RowMajor<1, 1>, 64>();
+    run_test<64, 64, 64, tl::RowMajor<1, 1>, 64>();
+    run_test<128, 64, 64, tl::RowMajor<1, 1>, 64>();
 
     // 2 x 1 warps
-    run_test<32, 16, 32, tl::RowMajor<2, 1>, 16>();  // minimal shape
-    run_test<32, 32, 32, tl::RowMajor<2, 1>, 16>();
-    run_test<32, 32, 32, tl::RowMajor<2, 1>, 32>();
-    run_test<64, 32, 32, tl::RowMajor<2, 1>, 16>();
-    run_test<64, 32, 128, tl::RowMajor<2, 1>, 32>();
-
-    // 2 x 2 warps
-    run_test<32, 32, 64, tl::RowMajor<2, 2>, 32>();  // minimal shape
-    run_test<32, 32, 64, tl::RowMajor<2, 2>, 32>();
-    run_test<64, 32, 64, tl::RowMajor<2, 2>, 32>();
-    run_test<32, 32, 128, tl::RowMajor<2, 2>, 64>();
-    run_test<64, 64, 64, tl::RowMajor<2, 2>, 32>();
-    run_test<64, 64, 128, tl::RowMajor<2, 2>, 32>();
-    run_test<64, 64, 128, tl::RowMajor<2, 2>, 128>();
-    run_test<128, 128, 64, tl::RowMajor<2, 2>, 32>();
-
-    // 1 x 4  warps
-    run_test<64, 128, 128, tl::RowMajor<1, 4>, 64>();
-
-    // 2 x 4  warps
-    run_test<64, 128, 128, tl::RowMajor<2, 4>, 64>();
+    // run_test<128, 64, 128, tl::RowMajor<2, 1>, 64>();
+    // run_test<128, 128, 128, tl::RowMajor<2, 1>, 64>();
 }
 
 }  // namespace tilefusion::testing

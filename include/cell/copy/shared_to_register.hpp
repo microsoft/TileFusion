@@ -29,13 +29,13 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     using DType = Shared::DType;
     using Reg = Reg_;
 
-    static constexpr int SharedRows = Shared::kRows;
-    static constexpr int SharedCols = Shared::kCols;
+    static constexpr int kSharedRows = Shared::kRows;
+    static constexpr int kSharedCols = Shared::kCols;
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
-    DEVICE void operator()(const DType* src, Reg& dst, int tile_offset) {
+    DEVICE void operator()(const DType* src, Reg& dst, int start_offset) {
         int lane_row = this->lane_row_id();
         int lane_col = this->lane_col_id() * LoadMat::kNumPerAccess;
 
@@ -43,9 +43,10 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
         for (int i = 0; i < kRowExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
-                int thrd_offset = tile_offset + i * SharedCols * 16 + j * 16 +
-                                  lane_row * SharedCols + lane_col;
-                int offset = get_swizzle_offset(thrd_offset);
+                int tile_offset =
+                    start_offset + i * kSharedCols * BaseShape::kRows +
+                    j * BaseShape::kCols + lane_row * kSharedCols + lane_col;
+                int offset = get_swizzle_offset(tile_offset);
 
                 // advance pointer to the 16x16 `BaseTile` indexed by(i, j).
                 // issue the hardware-backed memory access instruction.
@@ -82,8 +83,8 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
 
     DEVICE int2 get_swizzled_tile_id(int offset) {
         // SwizzleTile is a 8 x 64 block.
-        int swizzle_tile_col = (offset % SharedCols) / kSwizzledCols;
-        int swizzle_tile_row = (offset / SharedCols) / kSwizzledRows;
+        int swizzle_tile_col = (offset % kSharedCols) / kSwizzledCols;
+        int swizzle_tile_row = (offset / kSharedCols) / kSwizzledRows;
         return make_int2(swizzle_tile_row, swizzle_tile_col);
     }
 
@@ -91,8 +92,8 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
         // Get id in the swizzle tile.
         auto swizzled_tile_id = get_swizzled_tile_id(offset);
 
-        int row = offset / SharedCols;
-        int col = offset % SharedCols;
+        int row = offset / kSharedCols;
+        int col = offset % kSharedCols;
 
         int in_swizzle_tile_col = col % kSwizzledCols;
         int in_swizzle_tile_row = row % kSwizzledRows;
@@ -146,8 +147,9 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
         for (int i = 0; i < kColExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kRowExec; ++j) {
-                int tile_offset = start_offset + i * kSharedRows * 16 + j * 16 +
-                                  lane_col * kSharedRows + lane_row;
+                int tile_offset =
+                    start_offset + i * kSharedRows * BaseShape::kCols +
+                    j * BaseShape::kRows + lane_col * kSharedRows + lane_row;
                 int offset = get_swizzle_offset(tile_offset);
 
                 // issue the hardware-backed memory access instruction
