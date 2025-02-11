@@ -72,8 +72,9 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
 
     using NonSwizzled =
         tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride, 1>;
-    using Swizzled = SwizzledLayout<NonSwizzled, SwizzledBaseShape::B,
-                                    SwizzledBaseShape::M, SwizzledBaseShape::S>;
+    using Swizzled =
+        SwizzledLayout<NonSwizzled, SwizzledBaseShape::B, SwizzledBaseShape::M,
+                       SwizzledBaseShape::S, tl::Layout::kRowMajor>;
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
@@ -187,8 +188,9 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
 
     using NonSwizzled =
         tl::MatrixLayout<kSwizzleRows, kSwizzleCols, 1, Shared::kColStride>;
-    using Swizzled = SwizzledLayout<NonSwizzled, SwizzleBaseShape::B,
-                                    SwizzleBaseShape::M, SwizzleBaseShape::S>;
+    using Swizzled =
+        SwizzledLayout<NonSwizzled, SwizzleBaseShape::B, SwizzleBaseShape::M,
+                       SwizzleBaseShape::S, tl::Layout::kColMajor>;
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
@@ -322,8 +324,9 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 
     using NonSwizzled =
         tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride, 1>;
-    using Swizzled = SwizzledLayout<NonSwizzled, SwizzledBaseShape::B,
-                                    SwizzledBaseShape::M, SwizzledBaseShape::S>;
+    using Swizzled =
+        SwizzledLayout<NonSwizzled, SwizzledBaseShape::B, SwizzledBaseShape::M,
+                       SwizzledBaseShape::S, tl::Layout::kRowMajor>;
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
@@ -429,6 +432,11 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     static constexpr int kSwizzleRows = SwizzledBaseShape::kCols;
     static constexpr int kSwizzleCols = SwizzledBaseShape::kRows;
 
+    static constexpr int kSwizzleBlockRows =
+        kRowExec * BaseShape::kRows / kSwizzleRows;
+    static constexpr int kSwizzleBlockCols =
+        kColExec * BaseShape::kCols / kSwizzleCols;
+
     static constexpr int kRowStride = BaseShape::kRows;
     static constexpr int kColStride = BaseShape::kCols * Shared::kColStride;
 
@@ -446,6 +454,21 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     static constexpr int kElemPerSeg = 2;
 
     using PackedType = typename Packing<DType, kElemPerSeg>::PackedType;
+
+    using DstLayout =
+        tl::MatrixLayout<kSwizzleBlockRows, kSwizzleBlockCols, kSwizzleRows,
+                         kSwizzleCols * Shared::kColStride>;
+    DstLayout dst_tile_;
+
+    using NonSwizzled =
+        tl::MatrixLayout<kSwizzleRows, kSwizzleCols, 1, Shared::kColStride>;
+    using Swizzled =
+        SwizzledLayout<NonSwizzled, SwizzledBaseShape::B, SwizzledBaseShape::M,
+                       SwizzledBaseShape::S, tl::Layout::kColMajor>;
+
+    using SharedLayout =
+        std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
+    SharedLayout in_dst_tile_;
 
     DEVICE int2 get_swizzled_tile_id(int offset) {
         // SwizzleTile is a 8 x 64 block.

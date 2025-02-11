@@ -4,10 +4,13 @@
 #pragma once
 
 #include "cuda_utils.hpp"
+#include "types/layout.hpp"
 
 #include <cassert>
 
 namespace tilefusion::cell {
+
+namespace tl = tile_layout;
 /**
  * @brief A swizzle functor.
  * A Swizzle can handle 2^B * 2^S * 2^M elements.
@@ -23,7 +26,7 @@ struct Swizzle {
      * @param idx The index in a swizzle chunk of 2^B * 2^S * 2^M elements.
      * @return The swizzled index.
      */
-    HOST_DEVICE int apply(int idx) const {
+    HOST_DEVICE int operator()(int idx) const {
         // | Bbits | Sbits | Mbits |
         // Mbits as mask for the lower bits.
 
@@ -50,15 +53,23 @@ struct Swizzle {
  * @tparam kM The number of bits for M.
  * @tparam kS The number of bits for S.
  */
-template <typename Layout_, const int kB = 3, const int kM = 3,
-          const int kS = 3>
-struct SwizzledLayout {
+template <typename Layout_, const int kB, const int kM, const int kS,
+          const tl::Layout kType>
+struct SwizzledLayout;
+
+template <typename Layout_, const int kB, const int kM, const int kS>
+struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kRowMajor> {
     static constexpr int Bbits = kB;
     static constexpr int Mbits = kM;
     static constexpr int Sbits = kS;
 
     using Layout = Layout_;
     using Swizzle = Swizzle<Bbits, Mbits, Sbits>;
+
+    static_assert(Layout::kRows == (1 << Bbits),
+                  "The number of rows in the layout should be 2^B.");
+    static_assert(Layout::kCols == (1 << (Mbits + Sbits)),
+                  "The number of columns in the layout should be 2^S * 2^M.");
 
     /**
      * @brief Apply the swizzle in a layout.
@@ -68,17 +79,52 @@ struct SwizzledLayout {
      */
     HOST_DEVICE auto operator()(int x, int y) const {
         int idx = (x << (Mbits + Sbits)) | y;
-
         assert(idx < (1 << (Bbits + Mbits + Sbits)));
 
-        int swizzled_idx = swizzle_.apply(idx);
+        int swizzled_idx = swizzle_(idx);
         int swizzled_x = swizzled_idx >> (Mbits + Sbits);
         int swizzled_y = swizzled_idx & ((1 << (Mbits + Sbits)) - 1);
-        return Layout{}(swizzled_x, swizzled_y);
+        return layout_(swizzled_x, swizzled_y);
     }
 
   private:
     Swizzle swizzle_;
+    Layout layout_;
+};
+
+template <typename Layout_, const int kB, const int kM, const int kS>
+struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kColMajor> {
+    static constexpr int Bbits = kB;
+    static constexpr int Mbits = kM;
+    static constexpr int Sbits = kS;
+
+    using Layout = Layout_;
+    using Swizzle = Swizzle<Bbits, Mbits, Sbits>;
+
+    static_assert(Layout::kRows == (1 << (Mbits + Sbits)),
+                  "The number of rows in the layout should be 2^S * 2^M.");
+    static_assert(Layout::kCols == (1 << Bbits),
+                  "The number of columns in the layout should be 2^B.");
+
+    /**
+     * @brief Apply the swizzle in a layout.
+     *
+     * @param x Row dimension index, with a total of 2^B rows.
+     * @param y Column dimension index, with a total of 2^S * 2^M columns.
+     */
+    HOST_DEVICE auto operator()(int x, int y) const {
+        int idx = (y << (Bbits + Mbits)) | x;
+        assert(idx < (1 << (Bbits + Mbits + Sbits)));
+
+        int swizzled_idx = swizzle_(idx);
+        int swizzled_y = swizzled_idx >> (Mbits + Sbits);
+        int swizzled_x = swizzled_idx & ((1 << (Mbits + Sbits)) - 1);
+        return layout_(swizzled_x, swizzled_y);
+    }
+
+  private:
+    Swizzle swizzle_;
+    Layout layout_;
 };
 
 }  // namespace tilefusion::cell
