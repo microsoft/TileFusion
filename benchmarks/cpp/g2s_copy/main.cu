@@ -148,17 +148,19 @@ int main() {
 
     using DType = __half;
 
+    run_test_rowmajor<DType, tl::RowMajor<16, 64>, tl::RowMajor<1, 1>>();
     run_test_rowmajor<DType, tl::RowMajor<64, 64>, tl::RowMajor<1, 1>>();
-    run_test_rowmajor<DType, tl::RowMajor<64, 64>, tl::RowMajor<2, 2>>();
-    run_test_rowmajor<DType, tl::RowMajor<64, 64>, tl::RowMajor<2, 4>>();
+    run_test_rowmajor<DType, tl::RowMajor<64, 64>, tl::RowMajor<2, 1>>();
+    run_test_rowmajor<DType, tl::RowMajor<64, 64>, tl::RowMajor<4, 1>>();
 
     run_test_rowmajor<DType, tl::RowMajor<128, 128>, tl::RowMajor<1, 1>>();
     run_test_rowmajor<DType, tl::RowMajor<128, 128>, tl::RowMajor<2, 2>>();
-    run_test_rowmajor<DType, tl::RowMajor<128, 128>, tl::RowMajor<2, 4>>();
+    run_test_rowmajor<DType, tl::RowMajor<128, 128>, tl::RowMajor<4, 2>>();
 
     run_test_rowmajor<DType, tl::RowMajor<128, 256>, tl::RowMajor<1, 1>>();
     run_test_rowmajor<DType, tl::RowMajor<128, 256>, tl::RowMajor<2, 2>>();
     run_test_rowmajor<DType, tl::RowMajor<128, 256>, tl::RowMajor<2, 4>>();
+    run_test_rowmajor<DType, tl::RowMajor<128, 256>, tl::RowMajor<4, 4>>();
 
     return 0;
 }
