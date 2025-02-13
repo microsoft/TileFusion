@@ -243,16 +243,12 @@ TEST(TestShared2Reg, operand_A_swizzle) {
     using WarpLayout = tl::RowMajor<1, 1>;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
-    // const int kRows = 64;
-    // const int kCols = 32;
-
     const int kRows = 16;
     const int kCols = 64;
 
     using SharedLayout = tl::RowMajor<kRows, kCols>;
     const bool kUseSwizzledLayout = true;
     using Shared = SharedTile<Element, SharedLayout, kUseSwizzledLayout>;
-    // using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<2, 2>>;
     using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<1, 4>>;
 
     using Copy = SharedToRegLoader<Reg, WarpLayout, WarpReuse::kRowReuseCont>;
@@ -273,13 +269,8 @@ TEST(TestReg2Shared, operand_C_float) {
 
     const int kRowRepeats = 4;
     const int kColRepeats = 8;
-    // const int kRowRepeats = 1;
-    // const int kColRepeats = 4;
     const int kRows = 16 * kRowRepeats;
     const int kCols = 16 * kColRepeats;
-
-    // const int kWarpPerRow = 2;
-    // const int kWarpPerCol = 2;
 
     const int kWarpPerRow = 1;
     const int kWarpPerCol = 1;

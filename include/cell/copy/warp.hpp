@@ -396,10 +396,6 @@ struct SharedOffsetHelper<WarpLayout_, WarpShape_, Shared_, kMode_,
     constexpr static int kTilePerRow = Shared::kRows / WarpShape::kRows;
     constexpr static int kTilePerCol = Shared::kCols / WarpShape::kCols;
 
-    // constexpr static int kRowStride = kTilePerRow / tl::num_rows<WarpLayout>;
-    // constexpr static int kColStride =
-    //     kTilePerCol / tl::num_cols<WarpLayout> * kTilePerRow;
-
     constexpr static int kRowStride = kTilePerRow / tl::num_rows<WarpLayout>;
     constexpr static int kColStride = kTilePerCol / tl::num_cols<WarpLayout>;
 };
