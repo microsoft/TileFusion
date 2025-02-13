@@ -1,12 +1,12 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#include "cell/copy/warp.hpp"
 #include "common/test_utils.hpp"
+#include "types/base_tile.hpp"
 
 namespace tilefusion::testing {
 
-using namespace cell::copy::warp;
+using namespace tilefusion::cell;
 namespace tl = tile_layout;
 
 TEST(InferAtomicWarpTile, test1_half_row_major) {
