@@ -14,15 +14,14 @@ namespace tl = tile_layout;
 /**
  * @brief Load a warp tile from global memory to shared memory.
  *
- * This function loads a warp tile whose shape is specified by `BaseShape`
- * from global memory to shared memory.
+ * This function loads a data tile from global to shared memory.
  *
- * @tparam Global_   The type of the global memory pointer.
- * @tparam Shared_   The type of the shared memory pointer.
- * @tparam BaseShape_ The shape of the warp tile.
- * @tparam kRowExec_ The number of rows to execute.
- * @tparam kColExec_ The number of columns to execute.
- * @tparam kType     The type of the elements to be loaded.
+ * @tparam Global The type of the global memory tile.
+ * @tparam Shared The type of the shared memory tile.
+ * @tparam BaseShape The shape of the base tile.
+ * @tparam kRowExec The number of rows to execute.
+ * @tparam kColExec The number of columns to execute.
+ * @tparam kType The type of Global and Shared memory layout.
  */
 template <typename Global, typename Shared, typename BaseShape,
           const int kRowExec, const int kColExec,
@@ -496,8 +495,16 @@ struct GlobalToSharedLoader {
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
 
-    using BaseShape =
-        warp::WarpBaseTileShape<DType, typename Shared::Layout, Shared::kType>;
+    // NOTE: The WarpShape calculated here is for the warp reuse mode `kCont`.
+    // If you use a different mode, update the WarpShape accordingly.
+    static_assert((Shared::kRows % WarpLayout ::kRows == 0) &&
+                      (Shared::kCols % WarpLayout::kCols == 0),
+                  "The shape of SharedTile must be divisible by the shape of "
+                  "WarpLayout.");
+
+    using WarpShape = TileShape<Shared::kRows / WarpLayout::kRows,
+                                Shared::kCols / WarpLayout::kCols>;
+    using BaseShape = warp::WarpBaseTileShape<DType, WarpShape, Shared::kType>;
 
     static_assert(Shared::kRows % BaseShape ::kRows == 0,
                   "Shared::kRows must be divisible by BaseShape::kRows.");
@@ -549,8 +556,9 @@ struct SharedToGlobalStorer {
     using DType = Shared::DType;
     using WarpLayout = WarpLayout_;
 
-    using BaseShape =
-        warp::WarpBaseTileShape<DType, typename Shared::Layout, Shared::kType>;
+    using WarpShape = TileShape<Shared::kRows / WarpLayout::kRows,
+                                Shared::kCols / WarpLayout::kCols>;
+    using BaseShape = warp::WarpBaseTileShape<DType, WarpShape, Shared::kType>;
 
     static_assert(Shared::kRows % BaseShape::kRows == 0,
                   "Shared::kRows must be divisible by BaseShape::kRows.");
@@ -590,4 +598,5 @@ struct SharedToGlobalStorer {
     SharedOffset shared_offset_;
     GlobalOffset global_offset_;
 };
+
 }  // namespace tilefusion::cell::copy

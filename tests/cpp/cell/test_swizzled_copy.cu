@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 #include "cell/copy/mod.hpp"
-#include "cell/sync.hpp"
 #include "common/test_utils.hpp"
 #include "types/mod.hpp"
 
@@ -129,12 +128,9 @@ void run_test_rowmajor() {
     LOG(INFO) << "GIterator: " << GIterator{} << std::endl
               << "SIterator1: " << SIterator1{} << std::endl
               << "SIterator2: " << SIterator2{} << std::endl
-              << "GlobalTile Shape: [" << kRows << ", " << kCols << "]"
-              << std::endl
-              << "SharedTile Shape: [" << kShmRows << ", " << kShmCols << "]"
-              << std::endl
-              << "sc0: " << kSc0 << ", sc1: " << kSc1 << std::endl
-              << "RegTile Shape: " << Reg{} << std::endl;
+              << "GlobalTile: " << Global{} << std::endl
+              << "SharedTile: " << Shared1{} << std::endl
+              << "RegTile: " << Reg{} << std::endl;
 #endif
 
     using G2S1 = GlobalToSharedLoader<Shared1, WarpLayout>;
@@ -214,16 +210,12 @@ void run_test_colmajor() {
     using Reg = RegTile<BaseTileColMajor<Element>, tl::ColMajor<kSc0, kSc1>>;
 
 #ifdef DEBUG
-    LOG(INFO) << std::endl
-              << "GIterator: " << GIterator{} << std::endl
+    LOG(INFO) << "GIterator: " << GIterator{} << std::endl
               << "SIterator1: " << SIterator1{} << std::endl
               << "SIterator2: " << SIterator2{} << std::endl
-              << "GlobalTile Shape: [" << kRows << ", " << kCols << "]"
-              << std::endl
-              << "SharedTile Shape: [" << kShmRows << ", " << kShmCols << "]"
-              << std::endl
-              << "sc0: " << kSc0 << ", sc1: " << kSc1 << std::endl
-              << "RegTile Shape: " << Reg{} << std::endl;
+              << "GlobalTile: " << Global{} << std::endl
+              << "SharedTile: " << Shared1{} << std::endl
+              << "RegTile: " << Reg{} << std::endl;
 #endif
 
     using G2S1 = GlobalToSharedLoader<Shared1, WarpLayout>;

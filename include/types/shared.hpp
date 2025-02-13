@@ -9,6 +9,26 @@
 namespace tilefusion::cell {
 namespace tl = tile_layout;
 
+namespace {
+
+/// @brief Helper for pretty printing a SharedTile's static shape-related
+///        information. This printer works ONLY on the host.
+struct SharedTilePrettyPrinter {
+    template <typename Shared>
+    static HOST void print(std::ostream& out, const Shared& tile) {
+        // parameter `tile` here is not used
+
+        auto swizzled = Shared::kSwizzled ? "swizzled" : "non-swizzled";
+
+        out << layout_type_to_str(Shared::kType) << "(" << Shared::kRows << ", "
+            << Shared::kCols << ", " << Shared::kRowStride << ", "
+            << Shared::kColStride << "), numel = " << Shared::kNumel
+            << ", swizzled = " << swizzled;
+    }
+};
+
+}  // namespace
+
 template <typename Element_, typename Layout_, const bool kSwizzled_ = false>
 class SharedTile {
   public:
@@ -25,6 +45,10 @@ class SharedTile {
 
     static constexpr tl::Layout kType = tl::layout_type<Layout>;
     static constexpr bool kSwizzled = kSwizzled_;
+
+    // This Ctor is to enable the use of the pretty printer of SharedTile in the
+    // host code.
+    HOST SharedTile() : data_(nullptr), layout_(Layout{}) {}
 
     DEVICE SharedTile(DType* data) : data_(data), layout_(Layout{}) {}
 
@@ -47,5 +71,14 @@ class SharedTile {
     DType* data_;
     Layout layout_;
 };
+
+/// @brief Pretty printer for the static shape information of a SharedTile.
+///        Note: This printer function works ONLY on the host.
+template <typename Element, typename Layout, const bool kSwizzled>
+static HOST std::ostream& operator<<(
+    std::ostream& out, const SharedTile<Element, Layout, kSwizzled>& tile) {
+    SharedTilePrettyPrinter::print(out, tile);
+    return out;
+}
 
 }  // namespace tilefusion::cell

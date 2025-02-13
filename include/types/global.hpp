@@ -9,6 +9,22 @@
 namespace tilefusion::cell {
 namespace tl = tile_layout;
 
+namespace {
+
+/// @brief Helper for pretty printing a GlobalTile's static shape-related
+///        information. This printer works ONLY on the host.
+struct GlobalTilePrettyPrinter {
+    template <typename Global>
+    static HOST void print(std::ostream& out, const Global& tile) {
+        // parameter `tile` here is not used
+        out << layout_type_to_str(Global::kType) << "(" << Global::kRows << ", "
+            << Global::kCols << ", " << Global::kRowStride << ", "
+            << Global::kColStride << "), numel = " << Global::kNumel;
+    }
+};
+
+}  // namespace
+
 template <typename Element_, typename Layout_>
 struct GlobalTile {
     using DType = Element_;
@@ -23,6 +39,10 @@ struct GlobalTile {
     static constexpr int kColStride = tl::col_stride<Layout>;
 
     static constexpr tl::Layout kType = tl::layout_type<Layout>;
+
+    // This Ctor is to enable the use of the pretty printer of SharedTile in the
+    // host code.
+    HOST GlobalTile() : data_(nullptr), layout_(Layout{}) {}
 
     DEVICE GlobalTile(DType* data) : data_(data), layout_(Layout{}) {}
 
@@ -48,4 +68,14 @@ struct GlobalTile {
     DType* data_;
     Layout layout_;
 };
+
+/// @brief Pretty printer for the static shape information of a SharedTile.
+///        Note: This printer function works ONLY on the host.
+template <typename Element, typename Layout>
+static HOST std::ostream& operator<<(std::ostream& out,
+                                     const GlobalTile<Element, Layout>& tile) {
+    GlobalTilePrettyPrinter::print(out, tile);
+    return out;
+}
+
 }  // namespace tilefusion::cell
