@@ -64,21 +64,17 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
         for (int i = 0; i < kRowExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
-                int tile_i =
-                    (i * BaseShape::kRows + row) / SwizzledBaseShape::kRows;
-                int tile_j =
-                    (j * BaseShape::kCols + col) / SwizzledBaseShape::kCols;
-                int tile_row =
-                    (i * BaseShape::kRows + row) % SwizzledBaseShape::kRows;
-                int tile_col =
-                    (j * BaseShape::kCols + col) % SwizzledBaseShape::kCols;
+                int tile_i = (i * BaseShape::kRows + row) / kSwizzleRows;
+                int tile_j = (j * BaseShape::kCols + col) / kSwizzleCols;
+                int tile_row = (i * BaseShape::kRows + row) % kSwizzleRows;
+                int tile_col = (j * BaseShape::kCols + col) % kSwizzleCols;
 
                 /// the pointer offset inside a warp tile.
-                int src_lane_offset = src_tile_(row, col);
-                int dst_tile_offset = dst_tile_(tile_row, tile_col);
+                int src_lane_offset = in_src_tile_(row, col);
+                int dst_lane_offset = in_dst_tile_(tile_row, tile_col);
 
-                src_offset = src_base_tiles_(i, j) + src_lane_offset;
-                dst_offset = dst_base_tiles_(tile_i, tile_j) + dst_tile_offset;
+                src_offset = src_tile_(i, j) + src_lane_offset;
+                dst_offset = dst_tile_(tile_i, tile_j) + dst_lane_offset;
 
                 copy(src + src_offset, dst + dst_offset);
             }
@@ -89,28 +85,25 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     static constexpr int kNumPerAccess =
         traits::AccessBase<DType>::kNumPerAccess;
 
-    using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
-    static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
-    static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
-    static constexpr int B = SwizzledBaseShape::B;
-    static constexpr int M = SwizzledBaseShape::M;
-    static constexpr int S = SwizzledBaseShape::S;
+    using SwizzleBaseShape = traits::SwizzleBaseTileShape<DType>;
+    static constexpr int kSwizzleRows = SwizzleBaseShape::kRows;
+    static constexpr int kSwizzleCols = SwizzleBaseShape::kCols;
 
-    static constexpr int kSwizzledRowExec =
-        kRowExec / (kSwizzledRows / BaseShape::kRows);
-    static constexpr int kSwizzledColExec =
-        kColExec / (kSwizzledCols / BaseShape::kCols);
+    static constexpr int kSwizzleRowExec =
+        kRowExec / (kSwizzleRows / BaseShape::kRows);
+    static constexpr int kSwizzleColExec =
+        kColExec / (kSwizzleCols / BaseShape::kCols);
 
     using SrcBaseTilesLayout =
         tl::MatrixLayout<kRowExec, kColExec,
                          BaseShape::kRows * Global::kRowStride,
                          BaseShape::kCols>;
-    SrcBaseTilesLayout src_base_tiles_;
+    SrcBaseTilesLayout src_tile_;
 
     using DstSwizzledLayout =
-        tl::MatrixLayout<kSwizzledRowExec, kSwizzledColExec,
-                         kSwizzledRows * Shared::kRowStride, kSwizzledCols>;
-    DstSwizzledLayout dst_base_tiles_;
+        tl::MatrixLayout<kSwizzleRowExec, kSwizzleColExec,
+                         kSwizzleRows * Shared::kRowStride, kSwizzleCols>;
+    DstSwizzledLayout dst_tile_;
 
     // Given a thread index, the GlobalLayout and SharedLayout below return the
     // data offset from which the thread should load from the global memory tile
@@ -118,16 +111,18 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     using GlobalLayout = tl::MatrixLayout<BaseShape::kRows, BaseShape::kCols,
                                           Global::kRowStride, 1>;
 
-    // `src_tile_` is a basetile handled by a single warp.
-    GlobalLayout src_tile_;
+    // `in_src_tile_` is a basetile handled by a single warp.
+    GlobalLayout in_src_tile_;
 
     using NonSwizzled =
-        tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride, 1>;
-    using Swizzled = SwizzledLayout<NonSwizzled, B, M, S>;
+        tl::MatrixLayout<kSwizzleRows, kSwizzleCols, Shared::kRowStride, 1>;
+    using Swizzled =
+        SwizzledLayout<NonSwizzled, SwizzleBaseShape::B, SwizzleBaseShape::M,
+                       SwizzleBaseShape::S, tl::Layout::kRowMajor>;
 
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
-    SharedLayout dst_tile_;
+    SharedLayout in_dst_tile_;
 
     DEVICE void copy(const DType* src, DType* dst) {
         // a single memory access access 16 bytes
@@ -155,12 +150,11 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
 template <typename Global_, typename Shared_, typename BaseShape_,
           const int kRowExec_, const int kColExec_>
 struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
-                                kColExec_, tl::Layout::kColMajor>
-    : public GlobalToSharedBaseTileLoader<Global_, Shared_, BaseShape_,
-                                          tl::Layout::kColMajor> {
+                                kColExec_, tl::Layout::kColMajor> {
     using Global = Global_;
     using Shared = Shared_;
     using DType = Global::DType;
+    using BaseShape = BaseShape_;
 
     using LoadBase = GlobalToSharedBaseTileLoader<Global, Shared, BaseShape_,
                                                   tl::Layout::kColMajor>;
@@ -185,43 +179,86 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
         int lane_row = this->lane_row_id() * kNumPerAccess;
         int lane_col = this->lane_col_id();
 
-        int src_lane_offset = src_layout_(lane_row, lane_col);
-        int dst_lane_offset = dst_layout_(lane_row, lane_col);
-
-        // In the column-major layout, rows are contiguous in memory, we
-        // made the inner loop iterate over rows
-        int src_offset = 0, dst_offset = 0;
 #pragma unroll
-        for (int i = 0; i < kColExec; ++i) {
+        for (int j = 0; j < kColExec; ++j) {
 #pragma unroll
-            for (int j = 0; j < kRowExec; ++j) {
-                // NOTE: DO NOT change the order of `i` and `j` in the following
-                // two lines
-                src_offset = src_base_tiles_(j, i) + src_lane_offset;  // global
-                dst_offset = dst_base_tiles_(j, i) + dst_lane_offset;  // shared
+            for (int i = 0; i < kRowExec; ++i) {
+                int tile_i = (i * BaseShape::kRows + lane_row) / kSwizzleRows;
+                int tile_j = (j * BaseShape::kCols + lane_col) / kSwizzleCols;
+                int tile_row = (i * BaseShape::kRows + lane_row) % kSwizzleRows;
+                int tile_col = (j * BaseShape::kCols + lane_col) % kSwizzleCols;
 
-                this->copy(src + src_offset, dst + dst_offset);
+                /// the pointer offset inside a warp tile.
+                int src_lane_offset = in_src_tile_(lane_row, lane_col);
+                int dst_lane_offset = in_dst_tile_(tile_row, tile_col);
+
+                int src_offset = src_tile_(i, j) + src_lane_offset;
+                int dst_offset = dst_tile_(tile_i, tile_j) + dst_lane_offset;
+
+                copy(src + src_offset, dst + dst_offset);
             }
         }
     }
 
   private:
-    using BaseShape = traits::BaseTileShape<DType>;
     static constexpr int kNumPerAccess = LoadBase::kNumPerAccess;
 
-    using SrcBaseTilesLayout =  // global
+    // Swap the row and column of the `SwizzleBaseShape` in column-major layout.
+    using SwizzleBaseShape = traits::SwizzleBaseTileShape<DType>;
+    static constexpr int kSwizzleRows = SwizzleBaseShape::kCols;
+    static constexpr int kSwizzleCols = SwizzleBaseShape::kRows;
+
+    static constexpr int kSwizzleRowExec =
+        kRowExec / (kSwizzleRows / BaseShape::kRows);
+    static constexpr int kSwizzleColExec =
+        kColExec / (kSwizzleCols / BaseShape::kCols);
+
+    using SrcBaseTilesLayout =
         tl::MatrixLayout<kRowExec, kColExec, BaseShape::kRows,
                          BaseShape::kCols * Global::kColStride>;
-    SrcBaseTilesLayout src_base_tiles_;
+    SrcBaseTilesLayout src_tile_;
 
-    // a BaseTile is contiguously stored in shared memory
-    using DstBaseTilesLayout =  // shared
-        tl::MatrixLayout<kRowExec, kColExec, BaseShape::kNumel,
-                         BaseShape::kCols * Shared::kColStride>;
-    DstBaseTilesLayout dst_base_tiles_;
+    using DstSwizzledLayout =
+        tl::MatrixLayout<kSwizzleRowExec, kSwizzleColExec, kSwizzleRows,
+                         kSwizzleCols * Shared::kColStride>;
+    DstSwizzledLayout dst_tile_;
 
-    typename LoadBase::BaseTileGlobalLayout src_layout_;
-    typename LoadBase::BaseTileSharedLayout dst_layout_;
+    // Given a thread index, the GlobalLayout and SharedLayout below return the
+    // data offset from which the thread should load from the global memory tile
+    // and where to store it in the shared memory tile, respectively.
+    using GlobalLayout = tl::MatrixLayout<BaseShape::kRows, BaseShape::kCols, 1,
+                                          Global::kColStride>;
+
+    // `src_tile_` is a basetile handled by a single warp.
+    GlobalLayout in_src_tile_;
+
+    using NonSwizzled =
+        tl::MatrixLayout<kSwizzleRows, kSwizzleCols, 1, Shared::kColStride>;
+    using Swizzled =
+        SwizzledLayout<NonSwizzled, SwizzleBaseShape::B, SwizzleBaseShape::M,
+                       SwizzleBaseShape::S, tl::Layout::kColMajor>;
+
+    using SharedLayout =
+        std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
+    SharedLayout in_dst_tile_;
+
+    DEVICE void copy(const DType* src, DType* dst) {
+        // a single memory access access 16 bytes
+        ld_global_st_shared<16>(
+            static_cast<uint32_t>(__cvta_generic_to_shared(dst)), src);
+    }
+
+    /// @brief returns the lane row of the current thread within a warp.
+    DEVICE int lane_row_id() {
+        int lane_id = threadIdx.x % WARP_SIZE;
+        return lane_id / BaseShape::kColThreads;
+    }
+
+    /// @brief returns the lane col of the current thread within a warp.
+    DEVICE int lane_col_id() {
+        int lane_id = threadIdx.x % WARP_SIZE;
+        return lane_id % BaseShape::kColThreads;
+    }
 };
 
 template <typename Shared, typename Global, typename BaseShape,
@@ -256,7 +293,6 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
         int row = lane_row_id();
         int col = lane_col_id() * kNumPerAccess;
 
-        int src_offset = 0, dst_offset = 0;
 #pragma unroll
         for (int i = 0; i < kRowExec; ++i) {
 #pragma unroll
@@ -273,8 +309,9 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
                 int src_tile_offset = src_tile_(tile_row, tile_col);
                 int dst_lane_offset = dst_tile_(row, col);
 
-                src_offset = src_base_tiles_(tile_i, tile_j) + src_tile_offset;
-                dst_offset = dst_base_tiles_(i, j) + dst_lane_offset;
+                int src_offset =
+                    src_base_tiles_(tile_i, tile_j) + src_tile_offset;
+                int dst_offset = dst_base_tiles_(i, j) + dst_lane_offset;
 
                 copy(src + src_offset, dst + dst_offset);
             }
@@ -316,7 +353,8 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
 
     using NonSwizzled =
         tl::MatrixLayout<kSwizzledRows, kSwizzledCols, Shared::kRowStride, 1>;
-    using Swizzled = SwizzledLayout<NonSwizzled, B, M, S>;
+    using Swizzled =
+        SwizzledLayout<NonSwizzled, B, M, S, tl::Layout::kRowMajor>;
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
     SharedLayout src_tile_;
@@ -344,13 +382,11 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
 template <typename Shared_, typename Global_, typename BaseShape_,
           const int kRowExec_, const int kColExec_>
 struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape_, kRowExec_,
-                                kColExec_, tl::Layout::kColMajor>
-    : public SharedToGlobalBaseTileStorer<Shared_, Global_, BaseShape_,
-                                          tl::Layout::kColMajor> {
+                                kColExec_, tl::Layout::kColMajor> {
     using Shared = Shared_;
     using Global = Global_;
     using DType = Shared::DType;
-    using BaseShape = traits::BaseTileShape<DType>;
+    using BaseShape = BaseShape_;
 
     static_assert(Global::kRows == Shared::kRows &&
                       Global::kCols == Shared::kCols,
@@ -367,25 +403,86 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape_, kRowExec_,
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
-    // strides to iterate over each 16x16 `BaseTile` in the shared memory
-    static constexpr int kSrcColStride = BaseShape::kCols * Shared::kColStride;
-
-    static constexpr int kDstRowStride = BaseShape::kRows;
-    static constexpr int kDstColStride = BaseShape::kCols * Global::kColStride;
-
     DEVICE void operator()(const DType* src, DType* dst) {
-        int src_offset = 0, dst_offset = 0;
+        int lane_row = this->lane_row_id() * kNumPerAccess;
+        int lane_col = this->lane_col_id();
 
 #pragma unroll
         for (int i = 0; i < kRowExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
-                src_offset = i * BaseShape::kNumel + j * kSrcColStride;
-                dst_offset = i * kDstRowStride + j * kDstColStride;
+                int tile_i = (i * BaseShape::kRows + lane_row) / kSwizzleRows;
+                int tile_j = (j * BaseShape::kCols + lane_col) / kSwizzleCols;
+                int tile_row = (i * BaseShape::kRows + lane_row) % kSwizzleRows;
+                int tile_col = (j * BaseShape::kCols + lane_col) % kSwizzleCols;
 
-                this->copy(src + src_offset, dst + dst_offset);
+                int src_tile_offset = in_src_tile_(tile_row, tile_col);
+                int dst_lane_offset = in_dst_tile_(lane_row, lane_col);
+
+                int src_offset = src_tile_(tile_i, tile_j) + src_tile_offset;
+                int dst_offset = dst_tile_(i, j) + dst_lane_offset;
+
+                copy(src + src_offset, dst + dst_offset);
             }
         }
+    }
+
+  private:
+    // Swap the row and column of the `SwizzleBaseShape` in column-major layout.
+    using SwizzleBaseShape = traits::SwizzleBaseTileShape<DType>;
+    static constexpr int kSwizzleRows = SwizzleBaseShape::kCols;
+    static constexpr int kSwizzleCols = SwizzleBaseShape::kRows;
+
+    static constexpr int kSwizzleRowExec =
+        kRowExec / (kSwizzleRows / BaseShape::kRows);
+    static constexpr int kSwizzleColExec =
+        kColExec / (kSwizzleCols / BaseShape::kCols);
+
+    using SrcSwizzledLayout =
+        tl::MatrixLayout<kSwizzleRowExec, kSwizzleColExec, kSwizzleRows,
+                         kSwizzleCols * Shared::kColStride>;
+    SrcSwizzledLayout src_tile_;
+
+    using DstBaseTilesLayout =
+        tl::MatrixLayout<kRowExec, kColExec, BaseShape::kRows,
+                         BaseShape::kCols * Global::kColStride>;
+    DstBaseTilesLayout dst_tile_;
+
+    // NOTE: DO NOT modify `kNumPerAccess` and `kAccessInBits` here.
+    // `kAccessInBits` in the storer is for tensor core's output where only two
+    // numbers are contiguous in memory. This ensures the parameters remain
+    // consistent with those used in `SharedLayoutWrapper` within the
+    // register-to-shared storer.
+    static constexpr int kAccessInBits = 2 * int(sizeof(DType) * 8);
+    static constexpr int kNumPerAccess =
+        traits::AccessBase<DType>::kNumPerAccess;
+
+    using NonSwizzled =
+        tl::MatrixLayout<kSwizzleRows, kSwizzleCols, 1, Shared::kColStride>;
+    using Swizzled =
+        SwizzledLayout<NonSwizzled, SwizzleBaseShape::B, SwizzleBaseShape::M,
+                       SwizzleBaseShape::S, tl::Layout::kColMajor>;
+    using SharedLayout =
+        std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
+    SharedLayout in_src_tile_;
+
+    using GlobalLayout = tl::MatrixLayout<BaseShape::kRows, BaseShape::kCols, 1,
+                                          Global::kColStride>;
+    GlobalLayout in_dst_tile_;
+
+    /// @brief returns the lane col of the current thread within a warp.
+    DEVICE int lane_row_id() {
+        return (threadIdx.x % WARP_SIZE) / BaseShape::kColThreads;
+    }
+
+    /// @brief returns the lane col of the current thread within a warp.
+    DEVICE int lane_col_id() {
+        return (threadIdx.x % WARP_SIZE) % BaseShape::kColThreads;
+    }
+
+    DEVICE void copy(const DType* src, DType* dst) {
+        ld_shared_st_global<16>(
+            dst, static_cast<uint32_t>(__cvta_generic_to_shared(src)));
     }
 };
 
@@ -493,7 +590,6 @@ struct SharedToGlobalStorer {
 
         using Storer = SharedToGlobalStorerImpl<Shared, Global, BaseShape,
                                                 kRowExec, kColExec>;
-
         Storer storer;
         storer(src + offset_src, dst + offset_dst);
     }

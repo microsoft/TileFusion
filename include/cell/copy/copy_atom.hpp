@@ -205,40 +205,19 @@ struct LoadMatBase {
     }
 };
 
-template <typename Shared, const tl::Layout kType, const size_t kElemBits>
-struct BaseTileStorer;
+template <typename Shared, const tl::Layout kType>
+struct StoreMatBase;
 
 /// TODO(haruhi): try to reduece reusable codes.
 template <typename Shared>
-struct BaseTileStorer<Shared, tl::Layout::kRowMajor, 16> {
+struct StoreMatBase<Shared, tl::Layout::kRowMajor> {
     using DType = Shared::DType;
 
-    DEVICE void store(const DType* src_, DType* dst_) {
-        const int* src = reinterpret_cast<const int*>(src_);
-        int* dst = reinterpret_cast<int*>(dst_);
-
-        int lane_row = lane_row_id();
-        int lane_col = lane_col_id();
-
-        // A base tile has a fixed shape of 16x16 (a 16x16 2D coordinate space
-        // with integer indices ranging from 0 to 255). `row` and `col` are used
-        // to calculate the index of an element within this 16x16 coordinate
-        // space.
-        int row = 0, col = 0;
-#pragma unroll
-        for (int i = 0; i < kSegRows; ++i) {
-            row = lane_row + i * tl::num_rows<ThreadLayout>;
-#pragma unroll
-            for (int j = 0; j < kSegCols; ++j) {
-                col = kElemPerSeg * (lane_col + j * tl::num_cols<ThreadLayout>);
-                dst[in_tile_(row, col) / kElemPerSeg] = src[j * kSegCols + i];
-            }
-        }
-    }
-
-  private:
     // the thread layout for wmma's output tile.
     using ThreadLayout = tile_layout::RowMajor<8, 4>;
+
+    static constexpr int kThreadRows = tl::num_rows<ThreadLayout>;
+    static constexpr int kThreadCols = tl::num_cols<ThreadLayout>;
 
     // in the output of a wmma tile, each thread stores four segments in 2x2
     // layout, and each fragment contains 2 elements regardless of the data
@@ -264,145 +243,18 @@ struct BaseTileStorer<Shared, tl::Layout::kRowMajor, 16> {
 
 /// TODO(haruhi): try to reduece reusable codes.
 template <typename Shared>
-struct BaseTileStorer<Shared, tl::Layout::kRowMajor, 32> {
+struct StoreMatBase<Shared, tl::Layout::kColMajor> {
     using DType = Shared::DType;
 
-    DEVICE void store(const DType* src_, DType* dst_) {
-        const int2* src = reinterpret_cast<const int2*>(src_);
-        int2* dst = reinterpret_cast<int2*>(dst_);
-
-        int lane_row = lane_row_id();
-        int lane_col = lane_col_id();
-
-        // A base tile has a fixed shape of 16x16 (a 16x16 2D coordinate space
-        // with integer indices ranging from 0 to 255). `row` and `col` are used
-        // to calculate the index of an element within this 16x16 coordinate
-        // space.
-        int row = 0, col = 0;
-#pragma unroll
-        for (int i = 0; i < kSegRows; ++i) {
-            row = lane_row + i * tl::num_rows<ThreadLayout>;
-#pragma unroll
-            for (int j = 0; j < kSegCols; ++j) {
-                col = kElemPerSeg * (lane_col + j * tl::num_cols<ThreadLayout>);
-                dst[in_tile_(row, col) / kElemPerSeg] = src[j * kSegCols + i];
-            }
-        }
-    }
-
-  private:
     // the thread layout for wmma's output tile.
-    using ThreadLayout = tile_layout::RowMajor<8, 4>;
+    using ThreadLayout = tile_layout::ColMajor<4, 8>;
+
+    static constexpr int kThreadRows = tl::num_rows<ThreadLayout>;
+    static constexpr int kThreadCols = tl::num_cols<ThreadLayout>;
 
     // in the output of a wmma tile, each thread stores four segments in 2x2
     // layout, and each fragment contains 2 elements regardless of the data
     // type
-    static constexpr int kSegRows = 2;
-    static constexpr int kSegCols = 2;
-
-    // the number of elements per segment, vectorized instruction are used to
-    // access `kElemPerSeg` elements.
-    static constexpr int kElemPerSeg = 2;
-
-    static constexpr int kAccessInBits = kElemPerSeg * int(sizeof(DType) * 8);
-    typename tl::SharedLayoutWrapper<Shared, kAccessInBits>::Layout in_tile_;
-
-    DEVICE int lane_row_id() {
-        return (threadIdx.x % WARP_SIZE) / tl::num_cols<ThreadLayout>;
-    }
-
-    DEVICE int lane_col_id() {
-        return (threadIdx.x % WARP_SIZE) % tl::num_cols<ThreadLayout>;
-    }
-};
-
-/// TODO(haruhi): try to reduece reusable codes.
-template <typename Shared>
-struct BaseTileStorer<Shared, tl::Layout::kColMajor, 16> {
-    using DType = Shared::DType;
-
-    DEVICE void store(const DType* src_, DType* dst_) {
-        const int* src = reinterpret_cast<const int*>(src_);
-        int* dst = reinterpret_cast<int*>(dst_);
-
-        int lane_row = lane_row_id();
-        int lane_col = lane_col_id();
-
-        // A base tile has a fixed shape of 16x16 (a 16x16 2D coordinate space
-        // with integer indices ranging from 0 to 255). `row` and `col` are used
-        // to calculate the index of an element within this 16x16 coordinate
-        // space.
-        int row = 0, col = 0;
-#pragma unroll
-        for (int i = 0; i < kSegRows; ++i) {
-            row = kElemPerSeg * (lane_row + i * tl::num_rows<ThreadLayout>);
-#pragma unroll
-            for (int j = 0; j < kSegCols; ++j) {
-                col = lane_col + j * tl::num_cols<ThreadLayout>;
-                dst[in_tile_(row, col) / kElemPerSeg] = src[i * kSegRows + j];
-            }
-        }
-    }
-
-  private:
-    // the thread layout for wmma's output tile.
-    using ThreadLayout = tile_layout::ColMajor<4, 8>;
-
-    // in the output of a wmma tile, each thread stores four segments in 2x2
-    // layout, and each fragment contains 2 elements regardless of the data
-    // type
-    static constexpr int kSegRows = 2;
-    static constexpr int kSegCols = 2;
-
-    // the number of elements per segment, vectorized instruction are used to
-    // access `kElemPerSeg` elements.
-    static constexpr int kElemPerSeg = 2;
-
-    static constexpr int kAccessInBits = kElemPerSeg * int(sizeof(DType) * 8);
-    typename tl::SharedLayoutWrapper<Shared, kAccessInBits>::Layout in_tile_;
-
-    DEVICE int lane_row_id() {
-        return (threadIdx.x % WARP_SIZE) % tl::num_rows<ThreadLayout>;
-    }
-
-    DEVICE int lane_col_id() {
-        return (threadIdx.x % WARP_SIZE) / tl::num_rows<ThreadLayout>;
-    }
-};
-
-/// TODO(haruhi): try to reduece reusable codes.
-template <typename Shared>
-struct BaseTileStorer<Shared, tl::Layout::kColMajor, 32> {
-    using DType = Shared::DType;
-
-    DEVICE void store(const DType* src_, DType* dst_) {
-        const int2* src = reinterpret_cast<const int2*>(src_);
-        int2* dst = reinterpret_cast<int2*>(dst_);
-
-        int lane_row = lane_row_id();
-        int lane_col = lane_col_id();
-
-        // A base tile has a fixed shape of 16x16. Each thread accesses elements
-        // within this 16x16 coordinate space using `row` and `col` indices to
-        // calculate the appropriate memory offsets.
-        int row = 0, col = 0;
-#pragma unroll
-        for (int i = 0; i < kSegRows; ++i) {
-            row = kElemPerSeg * (lane_row + i * tl::num_rows<ThreadLayout>);
-#pragma unroll
-            for (int j = 0; j < kSegCols; ++j) {
-                col = lane_col + j * tl::num_cols<ThreadLayout>;
-                dst[in_tile_(row, col) / kElemPerSeg] = src[i * kSegRows + j];
-            }
-        }
-    }
-
-  private:
-    // the thread layout for wmma's output tile.
-    using ThreadLayout = tile_layout::ColMajor<4, 8>;
-
-    // Each thread stores four segments in a 2x2 layout in the WMMA output tile.
-    // Each segment contains 2 elements, regardless of the data type.
     static constexpr int kSegRows = 2;
     static constexpr int kSegCols = 2;
 
@@ -456,21 +308,6 @@ struct GlobalToSharedBaseTileLoader<Global, Shared, BaseShape_,
     using BaseTileSharedLayout = tl::SharedLayoutWrapper<
         Shared, traits::AccessBase<DType>::kAccessInBits>::Layout;
 
-    DEVICE void copy(const DType* src, DType* dst) {
-        int offset = 0;
-#pragma unroll
-        for (int i = 0; i < kExecCount; ++i) {
-            auto src_tensor =
-                make_tensor(make_gmem_ptr(src + offset), data_layout_);
-            auto dst_tensor =
-                make_tensor(make_smem_ptr(dst + offset), data_layout_);
-
-            cute::copy(tiled_copy_, src_tensor, dst_tensor);
-
-            offset += kRowStride;
-        }
-    }
-
     /// @brief returns the lane row of the current thread within a warp.
     DEVICE int lane_row_id() {
         int lane_id = threadIdx.x % WARP_SIZE;
@@ -482,106 +319,6 @@ struct GlobalToSharedBaseTileLoader<Global, Shared, BaseShape_,
         int lane_id = threadIdx.x % WARP_SIZE;
         return lane_id % tl::num_cols<ThreadLayout>;
     }
-
-  private:
-    using DataPerThread = cute::Layout<Shape<Int<kNumPerAccess>, _1>,
-                                       Stride<_1, Int<kNumPerAccess>>>;
-
-    DataPerThread data_layout_;
-
-#ifdef CP_ASYNC_SM80_ENABLED
-    using CopyInst =
-        Copy_Atom<SM80_CP_ASYNC_CACHEGLOBAL<cute::uint128_t>, DType>;
-#else
-    using CopyInst = Copy_Atom<DefaultCopy, DType>;
-#endif
-    using TiledCopy = decltype(make_tiled_copy(
-        CopyInst{},
-        cute::Layout<Shape<Int<kThreadsPerRow>, Int<kThreadsPerCol>>,
-                     Stride<Int<kThreadsPerCol>, _1>>{},
-        data_layout_));
-
-    TiledCopy tiled_copy_;
 };
 
-template <class Shared, class Global, typename BaseShape,
-          const tl::Layout kType>
-struct SharedToGlobalBaseTileStorer;
-
-template <typename Shared, typename Global, typename BaseShape_>
-struct SharedToGlobalBaseTileStorer<Shared, Global, BaseShape_,
-                                    tl::Layout::kColMajor> {
-    using DType = Shared::DType;
-
-    using ThreadLayout = tile_layout::RowMajor<2, 16>;
-    static constexpr int kThreadsPerRow = tl::num_rows<ThreadLayout>;
-    static constexpr int kThreadsPerCol = tl::num_cols<ThreadLayout>;
-
-    static constexpr int kNumPerAccess =
-        traits::AccessBase<DType>::kNumPerAccess;
-
-    using BaseShape = traits::BaseTileShape<DType>;
-
-    static constexpr int kRowStride = kThreadsPerRow * kNumPerAccess;
-    static constexpr int kExecCount = BaseShape::kRows / kRowStride;
-
-    // NOTE: Do not modify `kAccessInBits` here to ensure the parameters remain
-    // consistent with those used in `SharedLayoutWrapper` within
-    // register-to-shared-storer.
-    static constexpr int kAccessInBits = 2 * int(sizeof(DType) * 8);
-    typename tl::SharedLayoutWrapper<Shared, kAccessInBits>::Layout in_tile_;
-    using BaseTileSharedLayout =
-        tl::SharedLayoutWrapper<Shared, kAccessInBits>::Layout;
-
-    using BaseTileGlobalLayout =
-        cute::Layout<Shape<Int<BaseShape::kRows>, Int<BaseShape::kCols>>,
-                     Stride<_1, Int<Global::kColStride>>>;
-
-    using TiledCopy = decltype(make_tiled_copy(
-        Copy_Atom<DefaultCopy, DType>{},
-        cute::Layout<Shape<Int<kThreadsPerRow>, Int<kThreadsPerCol>>,
-                     Stride<Int<kThreadsPerCol>, _1>>{},
-        cute::Layout<Shape<_1, Int<kNumPerAccess>>>{}));
-
-    using DataLayoutPerThread = cute::Layout<Shape<Int<kNumPerAccess>, _1>,
-                                             Stride<_1, Int<kNumPerAccess>>>;
-
-    DEVICE SharedToGlobalBaseTileStorer() : tiled_copy_(TiledCopy{}) {}
-
-    DEVICE void copy(const DType* src_, DType* dst_) {
-        int lane_row = this->lane_row_id() * kNumPerAccess;
-        int lane_col = this->lane_col_id();
-
-        DType *src, *dst;
-#pragma unroll
-        for (int i = 0; i < kExecCount; ++i) {
-            src = const_cast<DType*>(src_) +
-                  src_in_tile_(lane_row + i * kRowStride, lane_col);
-            dst = dst_ + dst_in_tile_(lane_row, lane_col) + i * kRowStride;
-
-            auto src_tensor = make_tensor(make_smem_ptr(src), data_layout_);
-            auto dst_tensor = make_tensor(make_gmem_ptr(dst), data_layout_);
-
-            cute::copy(tiled_copy_, src_tensor, dst_tensor);
-        }
-    }
-
-    DEVICE int lane_row_id() {
-        int lane_id = threadIdx.x % warpSize;
-        return lane_id / tl::num_cols<ThreadLayout>;
-    }
-
-    /// @brief returns the lane col of the current thread within a warp.
-    DEVICE int lane_col_id() {
-        int lane_id = threadIdx.x % warpSize;
-        return lane_id % tl::num_cols<ThreadLayout>;
-    }
-
-  private:
-    BaseTileSharedLayout src_in_tile_;
-    BaseTileGlobalLayout dst_in_tile_;
-
-    DataLayoutPerThread data_layout_;
-    TiledCopy tiled_copy_;
-};
 }  // namespace tilefusion::cell::copy::atom

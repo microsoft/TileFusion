@@ -71,6 +71,19 @@ struct SwizzleBaseTileShape<__half> {
 };
 
 template <>
+struct SwizzleBaseTileShape<cutlass::half_t> {
+    using DType = cutlass::half_t;
+
+    static constexpr int kRows = 8;
+    static constexpr int kCols = 64;
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 3;
+    static constexpr int M = 3;
+    static constexpr int S = 3;
+};
+
+template <>
 struct SwizzleBaseTileShape<float> {
     using DType = float;
 

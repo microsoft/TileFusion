@@ -91,7 +91,7 @@ void run_test_row_major() {
 }
 
 template <typename Element, typename WarpLayout, const int kRows,
-          const int kCols>
+          const int kCols, const bool kSwizzled = false>
 void run_test_col_major() {
     static const int kThreads = tl::get_numel<WarpLayout> * 32;
 
@@ -104,7 +104,6 @@ void run_test_col_major() {
     thrust::fill(d_B.begin(), d_B.end(), static_cast<Element>(0.));
     thrust::device_vector<Element> d_A = h_A;
 
-    static const bool kSwizzled = false;
     using SrcTile = GlobalTile<Element, tl::ColMajor<kRows, kCols>>;
     using DstTile = SharedTile<Element, tl::ColMajor<kRows, kCols>, kSwizzled>;
 
@@ -117,10 +116,17 @@ void run_test_col_major() {
     dim3 dim_grid(1, 1);
     dim3 dim_block(kThreads);
 
-    copy_g2s<Element, SrcTile, DstTile, Loader, Storer>
-        <<<dim_grid, dim_block, kRows * kCols * sizeof(Element)>>>(
-            thrust::raw_pointer_cast(d_A.data()),
-            thrust::raw_pointer_cast(d_B.data()), loader, storer);
+    auto copy_kernel = copy_g2s<Element, SrcTile, DstTile, Loader, Storer>;
+
+    int shm_size = kRows * kCols * sizeof(Element);
+    if (shm_size > 48 * 1024) {
+        cudaFuncSetAttribute(
+            copy_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
+    }
+
+    copy_kernel<<<dim_grid, dim_block, shm_size>>>(
+        thrust::raw_pointer_cast(d_A.data()),
+        thrust::raw_pointer_cast(d_B.data()), loader, storer);
     cudaDeviceSynchronize();
 
     thrust::host_vector<Element> h_B(numel);
@@ -173,16 +179,24 @@ TEST(GlobalToSharedLoad, test_col_major_load) {
     // FIXME(ying): temporarily disable the test to refactor the copy.
     // Make sure all the unit tests pass after the refactor.
 
-    // run_test_col_major<__half, tl::RowMajor<1, 1>, 16, 16>();
-    // run_test_col_major<__half, tl::RowMajor<1, 4>, 32, 128>();
-    // run_test_col_major<__half, tl::RowMajor<4, 1>, 192, 32>();
-    // run_test_col_major<__half, tl::RowMajor<2, 2>, 64, 128>();
-    // run_test_col_major<__half, tl::RowMajor<2, 4>, 96, 128>();
+    run_test_col_major<__half, tl::RowMajor<1, 1>, 64, 16, false>();
+    run_test_col_major<__half, tl::RowMajor<1, 1>, 128, 16, false>();
+    run_test_col_major<__half, tl::RowMajor<1, 4>, 64, 128, false>();
+    run_test_col_major<__half, tl::RowMajor<4, 1>, 256, 16, false>();
+    run_test_col_major<__half, tl::RowMajor<2, 2>, 128, 32, false>();
 
-    // run_test_col_major<float, tl::RowMajor<1, 1>, 16, 16>();
-    // run_test_col_major<float, tl::RowMajor<1, 4>, 32, 128>();
-    // run_test_col_major<float, tl::RowMajor<4, 1>, 192, 32>();
-    // run_test_col_major<float, tl::RowMajor<2, 2>, 64, 128>();
-    // run_test_col_major<float, tl::RowMajor<2, 4>, 96, 128>();
+    run_test_col_major<__half, tl::RowMajor<1, 1>, 64, 16, true>();
+    run_test_col_major<__half, tl::RowMajor<1, 1>, 128, 16, true>();
+    run_test_col_major<__half, tl::RowMajor<1, 4>, 64, 128, true>();
+    run_test_col_major<__half, tl::RowMajor<4, 1>, 256, 32, true>();
+    run_test_col_major<__half, tl::RowMajor<2, 2>, 128, 32, true>();
+
+    run_test_col_major<float, tl::RowMajor<1, 1>, 32, 16, false>();
+    run_test_col_major<float, tl::RowMajor<1, 1>, 64, 16, false>();
+    run_test_col_major<float, tl::RowMajor<1, 4>, 64, 64, false>();
+    run_test_col_major<float, tl::RowMajor<4, 1>, 128, 32, false>();
+    run_test_col_major<float, tl::RowMajor<2, 2>, 64, 64, false>();
+
+    run_test_col_major<float, tl::RowMajor<1, 1>, 128, 128, true>();
 }
 }  // namespace tilefusion::testing

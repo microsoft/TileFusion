@@ -26,7 +26,7 @@ template <const int kB, const int kM, const int kS>
 int2 test_swizzle(int x, int y) {
     Swizzle<kB, kM, kS> swizzle;
     int idx = flatten(x, y, 1 << (kS + kM));
-    int swizzled_idx = swizzle.apply(idx);
+    int swizzled_idx = swizzle(idx);
 
     int ref_swizzled_idx = swizzle_ref<kB, kM, kS>(x, y);
 
@@ -66,7 +66,7 @@ TEST(TESTSwizzle, test_naive_swizzle_layout) {
 
     using NaiveRowMajorLayout = tl::RowMajor<kRows, kCols>;
     using NaiveSwizzledRowMajorLayout =
-        SwizzledLayout<NaiveRowMajorLayout, kB, kM, kS>;
+        SwizzledLayout<NaiveRowMajorLayout, kB, kM, kS, tl::Layout::kRowMajor>;
 
     NaiveSwizzledRowMajorLayout naive_row_major_swizzled_layout;
 
@@ -94,7 +94,7 @@ TEST(TESTSwizzle, test_nested_basetile_swizzle_layout) {
         tl::detail::SharedLayout<kRows, kCols, kCols * 16, 16,
                                  tl::Layout::kRowMajor>;
     using NestedBaseTileSwizzledLayout =
-        SwizzledLayout<NestedBaseTileLayout, kB, kM, kS>;
+        SwizzledLayout<NestedBaseTileLayout, kB, kM, kS, tl::Layout::kRowMajor>;
 
     NestedBaseTileLayout nested_base_tile_layout;
     NestedBaseTileSwizzledLayout nested_base_tile_swizzled_layout;

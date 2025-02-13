@@ -79,6 +79,8 @@ __global__ void test_wmma(LoadRegA& load_rA, LoadRegB& load_rB,
     auto* shared_b = shared_a + TileIteratorA::Tile::kNumel;
     auto* shared_c =
         reinterpret_cast<ElementAcc*>(shared_b + TileIteratorB::Tile::kNumel);
+    auto shared_ref =
+        shared_c + TileIteratorA::Tile::kRows * TileIteratorB::Tile::kCols;
 
     init_values<Element, ElementAcc>(shared_a, shared_b, shared_c, M, N, K);
 
@@ -107,7 +109,7 @@ __global__ void test_wmma(LoadRegA& load_rA, LoadRegB& load_rB,
     if (thread0()) {
         __half* dA = reinterpret_cast<__half*>(shared_a);
         __half* dB = reinterpret_cast<__half*>(shared_b);
-        float* dC = reinterpret_cast<float*>(shared_c);
+        float* dC = reinterpret_cast<float*>(shared_ref);
         naive_gemm(M, N, K, dA, dB, dC);
 
         check_results(dC, shared_c, M * N);
@@ -191,10 +193,11 @@ void run_test() {
 }
 
 TEST(TestWmma, test_m16n16k16_f) {
-    run_test<16, 16, 16>();  // Test the `BaseTile` 16x16x16
-    run_test<16, 32, 16>();
-    run_test<96, 48, 80>();
+    run_test<16, 16, 64>();
+    run_test<32, 32, 64>();
+    run_test<64, 64, 64>();
     run_test<64, 128, 128>();
+    run_test<128, 128, 128>();
 }
 
 }  // namespace tilefusion::testing

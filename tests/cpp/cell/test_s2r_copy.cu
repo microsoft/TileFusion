@@ -154,15 +154,16 @@ __global__ void run_test_store_float(ConvertHalf& convert, Loader& loader,
 TEST(TestShared2Reg, operand_A) {  // load mode for loading operand A in gemm
     using Element = __half;
 
-    using WarpLayout = tl::RowMajor<2, 2>;
+    using WarpLayout = tl::RowMajor<1, 1>;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
-    using Shared = SharedTile<Element, tl::RowMajor<64, 32>>;
+    using Shared = SharedTile<Element, tl::RowMajor<64, 64>>;
     // Each thread accesses 2x4 elements (the shape of `BaseHalfTileRowMajor`)
     // within a 16x16 `BaseTile`. These 2x4 elements are accessed 2x2 times
     // along each dimension, contributing to the final register tile handled by
     // a single thread.
-    using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<2, 2>>;
+    // using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<1, 4>>;
+    using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<4, 4>>;
 
     // In the `RowReuseCont` mode, warps in the same row repeatedly access the
     // same data.
@@ -181,11 +182,12 @@ TEST(TestShared2Reg, operand_A) {  // load mode for loading operand A in gemm
 TEST(TestShared2Reg, operand_B) {  // load mode for loading operand B in gemm
     using Element = __half;
 
-    using WarpLayout = tl::RowMajor<2, 2>;
+    using WarpLayout = tl::RowMajor<1, 1>;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
     // a 32x64 row-major shared tile is equivalent to a 64x32 col-major tile
-    using Shared = SharedTile<Element, tl::RowMajor<32, 64>>;
+    // using Shared = SharedTile<Element, tl::RowMajor<32, 64>>;
+    using Shared = SharedTile<Element, tl::ColMajor<64, 32>>;
 
     // Each thread accesses 4x2 elements (the shape of `BaseHalfTileRowMajor`)
     // within a 16x16 `BaseTile`. These 4x2 elements are accessed 2x2 times
@@ -212,8 +214,8 @@ TEST(TestReg2Shared, operand_C_half) {
     using WarpLayout = tl::RowMajor<1, 1>;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
-    using Shared = SharedTile<Element, tl::RowMajor<16, 16>>;
-    using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<1, 1>>;
+    using Shared = SharedTile<Element, tl::RowMajor<64, 128>>;
+    using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<4, 8>>;
 
     using Loader = SharedToRegLoader<Reg, WarpLayout, WarpReuse::kCont>;
     Loader loader;
@@ -236,13 +238,13 @@ TEST(TestShared2Reg, operand_A_swizzle) {
     using WarpLayout = tl::RowMajor<1, 1>;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
-    const int kRows = 64;
-    const int kCols = 32;
+    const int kRows = 16;
+    const int kCols = 64;
 
     using SharedLayout = tl::RowMajor<kRows, kCols>;
     const bool kUseSwizzledLayout = true;
     using Shared = SharedTile<Element, SharedLayout, kUseSwizzledLayout>;
-    using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<2, 2>>;
+    using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<1, 4>>;
 
     using Copy = SharedToRegLoader<Reg, WarpLayout, WarpReuse::kRowReuseCont>;
     Copy copy;
@@ -265,8 +267,8 @@ TEST(TestReg2Shared, operand_C_float) {
     const int kRows = 16 * kRowRepeats;
     const int kCols = 16 * kColRepeats;
 
-    const int kWarpPerRow = 2;
-    const int kWarpPerCol = 2;
+    const int kWarpPerRow = 1;
+    const int kWarpPerCol = 1;
     using WarpLayout = tl::RowMajor<kWarpPerRow, kWarpPerCol>;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
