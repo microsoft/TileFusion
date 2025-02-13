@@ -154,11 +154,9 @@ __global__ void run_test_store_float(ConvertHalf& convert, Loader& loader,
 TEST(TestShared2Reg, operand_A) {  // load mode for loading operand A in gemm
     using Element = __half;
 
-    // using WarpLayout = tl::RowMajor<2, 2>;
     using WarpLayout = tl::RowMajor<1, 1>;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
-    // using Shared = SharedTile<Element, tl::RowMajor<64, 32>>;
     using Shared = SharedTile<Element, tl::RowMajor<64, 64>>;
     // Each thread accesses 2x4 elements (the shape of `BaseHalfTileRowMajor`)
     // within a 16x16 `BaseTile`. These 2x4 elements are accessed 2x2 times
@@ -184,7 +182,6 @@ TEST(TestShared2Reg, operand_A) {  // load mode for loading operand A in gemm
 TEST(TestShared2Reg, operand_B) {  // load mode for loading operand B in gemm
     using Element = __half;
 
-    // using WarpLayout = tl::RowMajor<2, 2>;
     using WarpLayout = tl::RowMajor<1, 1>;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
@@ -217,9 +214,7 @@ TEST(TestReg2Shared, operand_C_half) {
     using WarpLayout = tl::RowMajor<1, 1>;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
-    // using Shared = SharedTile<Element, tl::RowMajor<16, 16>>;
     using Shared = SharedTile<Element, tl::RowMajor<64, 128>>;
-    // using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<1, 1>>;
     using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<4, 8>>;
 
     using Loader = SharedToRegLoader<Reg, WarpLayout, WarpReuse::kCont>;
