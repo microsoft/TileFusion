@@ -54,7 +54,6 @@ set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 # FIXME(haruhi): -std=c++20 has to be set explicitly here, Otherwise, linking
 # against torchlibs will raise errors. it seems that the host compilation
 # options are not passed to torchlibs.
-# set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++20 -G -g)
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++20)
 set(CUDA_NVCC_FLAGS_DEBUG ${CUDA_NVCC_FLAGS_DEBUG} -std=c++20 -O0)
 set(CUDA_NVCC_FLAGS_RELEASE ${CUDA_NVCC_FLAGS_RELEASE} -std=c++20 -O3)

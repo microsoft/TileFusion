@@ -48,13 +48,6 @@ class STileIterator {
     static_assert(Tile::kCols >= dim_size<1, ChunkShape>,
                   "Tile::kCols must be >= dim_size<1, ChunkShape>");
 
-    // static_assert(kChunkRow % SwizzleBaseShape::kRows == 0,
-    //               "kChunkRow must be divisible by "
-    //               "SwizzleBaseShape::kRows");
-    // static_assert(kChunkCol % SwizzleBaseShape::kCols == 0,
-    //               "kChunkCol must be divisible by "
-    //               "SwizzleBaseShape::kCols");
-
     static constexpr int sc0 = Tile::kRows / kChunkRow;
     static constexpr int sc1 = Tile::kCols / kChunkCol;
 
@@ -85,11 +78,6 @@ class STileIterator {
                                                  Tile::kType>());
 
         using NewTile = SharedTile<DType, TileLayout, Tile::kSwizzled>;
-
-        // int offset1 = x * (kChunkRow * Tile::kRowStride) +
-        //               y * kTilePerChunkCol * BaseShape::kNumel;
-        // int offset2 = x * kTilePerChunkRow * BaseShape::kNumel +
-        //               y * (Tile::kColStride * kChunkCol);
 
         // TODO(KuangjuX): hotfix for `offset1` and `offset2`.
         int offset1 = x * (kChunkRow * Tile::kRowStride) +
@@ -128,23 +116,6 @@ class STileIterator {
 
     static constexpr int kTilePerChunkRow = kChunkRow / BaseShape::kRows;
     static constexpr int kTilePerChunkCol = kChunkCol / BaseShape::kCols;
-
-    // The shared memory tile iterator creates a sub-tile that spans multiple
-    // `BaseTile`s. The row and column strides are used to address a single
-    // `BaseTile`. DO NOT modify these unless you fully understand how this
-    // layout is used with the Shared to Register loader, as changes might
-    // cause significant errors.
-    // static constexpr int kTileRowStride = Tile::kType ==
-    // tl::Layout::kRowMajor
-    //                                           ? kTilePerCol *
-    //                                           BaseShape::kNumel :
-    //                                           BaseShape::kNumel;
-
-    // static constexpr int kTileColStride = Tile::kType ==
-    // tl::Layout::kRowMajor
-    //                                           ? BaseShape::kNumel
-    //                                           : kTilePerRow *
-    //                                           BaseShape::kNumel;
 
     // TODO(KuangjuX): hotfix for `kTileRowStride` and `kTileColStride`.
     static constexpr int kTileRowStride =
