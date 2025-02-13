@@ -140,18 +140,44 @@ DEVICE int warp_col_id() {
     }
 }
 
-template <typename BaseTile_, typename Tile_, typename WarpLayout_,
+template <const int kSharedRows, const int kWarpRows,
+          const WarpReuse kMode = WarpReuse::kCont>
+HOST_DEVICE constexpr int warp_tile_rows() {
+    if constexpr (kMode == WarpReuse::kCont) {
+        return kSharedRows / kWarpRows;
+    } else if constexpr (kMode == WarpReuse::kRowReuseCont) {
+        return kSharedRows / kWarpRows;
+    } else if constexpr (kMode == WarpReuse::kColReuseCont) {
+        return kSharedRows;
+    }
+    return -1;
+}
+
+template <const int kSharedCols, const int kWarpCols,
+          const WarpReuse kMode = WarpReuse::kCont>
+HOST_DEVICE constexpr int warp_tile_cols() {
+    if constexpr (kMode == WarpReuse::kCont) {
+        return kSharedCols / kWarpCols;
+    } else if constexpr (kMode == WarpReuse::kRowReuseCont) {
+        return kSharedCols;
+    } else if constexpr (kMode == WarpReuse::kColReuseCont) {
+        return kSharedCols / kWarpCols;
+    }
+    return -1;
+}
+
+template <typename BaseShape_, typename Tile_, typename WarpLayout_,
           const WarpReuse kMode_>
 struct ExecCounter {
-    using BaseTile = BaseTile_;
+    using BaseShape = BaseShape_;
     using Tile = Tile_;
 
     static_assert(
-        Tile::kCols % BaseTile::kCols == 0,
+        Tile::kCols % BaseShape::kCols == 0,
         "The number of shared memory columns must be divisible by the base "
         "tile column.\n");
     static_assert(
-        Tile::kRows % BaseTile::kRows == 0,
+        Tile::kRows % BaseShape::kRows == 0,
         "The current implementation requires that the number of shared "
         "memory rows be divisible by the base tile row.\n");
 
@@ -167,9 +193,9 @@ struct ExecCounter {
             // load the shared memory rows. Therefore, `row_exec` is not divided
             // by warps_per_row.
             case WarpReuse::kColReuseCont:
-                return Tile::kRows / BaseTile::kRows;
+                return Tile::kRows / BaseShape::kRows;
             default:  // Cont, RowReuseCont hit this case.
-                return Tile::kRows / BaseTile::kRows / kWarpsPerRow;
+                return Tile::kRows / BaseShape::kRows / kWarpsPerRow;
         }
     }
 
@@ -179,115 +205,15 @@ struct ExecCounter {
             // the shared memory columns. Therefore, `col_exec` is not divided
             // by `warps_per_col`.
             case WarpReuse::kRowReuseCont:
-                return Tile::kCols / BaseTile::kCols;
+                return Tile::kCols / BaseShape::kCols;
             default:  // Cont, ColReuseCont hit this case.
-                return Tile::kCols / BaseTile::kCols / kWarpsPerCol;
+                return Tile::kCols / BaseShape::kCols / kWarpsPerCol;
         }
     }
 
     static constexpr int kRowExec = row_exec_count();
     static constexpr int kColExec = col_exec_count();
 };
-
-/// @brief Determine the automatic shape of a single warp based on the shape of
-///        the entire tile. The final warp tile shape is multiple of this atomic
-///        shape.
-template <typename DType, typename TileShape, const tl::Layout kType>
-struct WarpBaseTileShape;
-
-template <typename DType, typename TileShape>
-struct WarpBaseTileShape<DType, TileShape, tl::Layout::kRowMajor> {
-    using AccessInfo = traits::AccessBase<DType>;
-
-    static constexpr int kTileRows = dim_size<0, TileShape>;
-    static constexpr int kTileCols = dim_size<1, TileShape>;
-
-    // In a row-major layout, columns are the contiguous dimension in memory. We
-    // enforce the use of 128-bit vectorized instructions for data loading by a
-    // single thread. This implies that the minimum number of columns should be
-    // at least 128 bits.
-    static constexpr int kMinCols =
-        AccessInfo::kAccessInBits / (sizeof(DType) * 8);
-
-    static_assert(kTileCols >= kMinCols, "The number of columns is too small.");
-
-    static_assert(kTileCols < AccessInfo::kExpectedSize ||
-                      (kTileCols >= AccessInfo::kExpectedSize &&
-                       kTileCols % AccessInfo::kExpectedSize == 0),
-                  "The current implementation requires that the number of "
-                  "columns of the tile be divisible by the cache line width.");
-
-    static constexpr int kCols = kTileCols >= AccessInfo::kExpectedSize
-                                     ? AccessInfo::kExpectedSize
-                                     : kTileCols;
-
-    // number of columns in a warp
-    static constexpr int kColThreads = kCols / AccessInfo::kNumPerAccess;
-    static_assert(WARP_SIZE % kColThreads == 0,
-                  "Fail to infer warp thread layout.");
-    static constexpr int kRowThreads = WARP_SIZE / kColThreads;
-
-    static constexpr int kRows = kRowThreads;
-    static_assert(kTileRows % kRowThreads == 0,
-                  "The number of rows of the tile isn't evenly divisible by "
-                  "the number of threads in a column.");
-
-    static constexpr int kNumel = kRows * kCols;
-
-    using WarpThreadLayout = tl::RowMajor<kRowThreads, kColThreads>;
-};
-
-template <typename DType, typename TileShape>
-struct WarpBaseTileShape<DType, TileShape, tl::Layout::kColMajor> {
-    using AccessInfo = traits::AccessBase<DType>;
-
-    static constexpr int kTileRows = dim_size<0, TileShape>;
-    static constexpr int kTileCols = dim_size<1, TileShape>;
-
-    // In a column-major layout, columns are the contiguous dimension in memory.
-    // We enforce the use of 128-bit vectorized instructions for data loading by
-    // a single thread. This implies that the minimum number of columns should
-    // be at least 128 bits.
-    static constexpr int kMinRows =
-        AccessInfo::kAccessInBits / (sizeof(DType) * 8);
-
-    static_assert(kTileRows >= kMinRows, "The number of rows is too small.");
-
-    static_assert(kTileRows < AccessInfo::kExpectedSize ||
-                      (kTileRows >= AccessInfo::kExpectedSize &&
-                       kTileRows % AccessInfo::kExpectedSize == 0),
-                  "The current implementation requires that the number of "
-                  "rows of the tile be divisible by the cache line width.");
-
-    static constexpr int kRows = kTileRows >= AccessInfo::kExpectedSize
-                                     ? AccessInfo::kExpectedSize
-                                     : kTileRows;
-
-    // number of rows in a warp
-    static constexpr int kRowThreads = kRows / AccessInfo::kNumPerAccess;
-    static_assert(WARP_SIZE % kRowThreads == 0,
-                  "Fail to infer warp thread layout.");
-    static constexpr int kColThreads = WARP_SIZE / kRowThreads;
-
-    static constexpr int kCols = kColThreads;
-    static_assert(kTileCols % kColThreads == 0,
-                  "The number of columns of the tile isn't evenly divisible by "
-                  "the number of threads in a row.");
-
-    static constexpr int kNumel = kRows * kCols;
-
-    using WarpThreadLayout = tl::ColMajor<kRowThreads, kColThreads>;
-};
-
-/// @brief Pretty printer for the static shape information of a
-///        `WarpBaseTileShape`. Note: This printer function works ONLY on the
-///        host.
-template <typename DType, typename TileShape, const tl::Layout kType>
-static HOST std::ostream& operator<<(
-    std::ostream& out, const WarpBaseTileShape<DType, TileShape, kType>& tile) {
-    BaseTilePrettyPrinter::print(out, tile);
-    return out;
-}
 
 template <typename WarpLayout_, const WarpReuse kMode_>
 struct GlobalOffsetHelper {
@@ -347,62 +273,62 @@ struct GlobalOffsetHelper {
  * not correctly reveal the physical layout of data in memory. This requires
  * further special treatment.
  */
-template <typename WarpLayout, typename WarpShape, typename Shared,
+template <typename WarpLayout, typename BaseShape, typename Shared,
           const WarpReuse kMode, const tl::Layout kType = Shared::kType,
           const bool kIsSharedLayout = IsSharedLayout<Shared>>
 struct SharedOffsetHelper;
 
-template <typename WarpLayout_, typename WarpShape_, typename Shared_,
+template <typename WarpLayout_, typename BaseShape_, typename Shared_,
           const WarpReuse kMode_>
-struct SharedOffsetHelper<WarpLayout_, WarpShape_, Shared_, kMode_,
+struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
                           tl::Layout::kRowMajor, false> {
     DEVICE int get_warp_offset() {
         // TODO(KuangjuX): hotfix this.
-        return warp_row_id<WarpLayout>() * kRowStride * WarpShape::kRows *
+        return warp_row_id<WarpLayout>() * kRowStride * BaseShape::kRows *
                    Shared::kCols +
-               warp_col_id<WarpLayout>() * kColStride * WarpShape::kCols;
+               warp_col_id<WarpLayout>() * kColStride * BaseShape::kCols;
     }
 
   private:
     using Shared = Shared_;
     using WarpLayout = WarpLayout_;
-    using WarpShape = WarpShape_;
+    using BaseShape = BaseShape_;
     static constexpr WarpReuse kMode = kMode_;
 
-    constexpr static int kTilePerRow = Shared::kRows / WarpShape::kRows;
-    constexpr static int kTilePerCol = Shared::kCols / WarpShape::kCols;
+    constexpr static int kTilePerRow = Shared::kRows / BaseShape::kRows;
+    constexpr static int kTilePerCol = Shared::kCols / BaseShape::kCols;
 
     // TODO(KuangjuX): hotfix this.
     constexpr static int kRowStride = kTilePerRow / tl::num_rows<WarpLayout>;
     constexpr static int kColStride = kTilePerCol / tl::num_cols<WarpLayout>;
 };
 
-template <typename WarpLayout_, typename WarpShape_, typename Shared_,
+template <typename WarpLayout_, typename BaseShape_, typename Shared_,
           const WarpReuse kMode_>
-struct SharedOffsetHelper<WarpLayout_, WarpShape_, Shared_, kMode_,
+struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
                           tl::Layout::kColMajor, false> {
     DEVICE int get_warp_offset() {
-        return warp_row_id<WarpLayout>() * kRowStride * WarpShape::kRows +
-               warp_col_id<WarpLayout>() * kColStride * WarpShape::kCols *
+        return warp_row_id<WarpLayout>() * kRowStride * BaseShape::kRows +
+               warp_col_id<WarpLayout>() * kColStride * BaseShape::kCols *
                    Shared::kRows;
     }
 
   private:
     using Shared = Shared_;
     using WarpLayout = WarpLayout_;
-    using WarpShape = WarpShape_;
+    using BaseShape = BaseShape_;
     static constexpr WarpReuse kMode = kMode_;
 
-    constexpr static int kTilePerRow = Shared::kRows / WarpShape::kRows;
-    constexpr static int kTilePerCol = Shared::kCols / WarpShape::kCols;
+    constexpr static int kTilePerRow = Shared::kRows / BaseShape::kRows;
+    constexpr static int kTilePerCol = Shared::kCols / BaseShape::kCols;
 
     constexpr static int kRowStride = kTilePerRow / tl::num_rows<WarpLayout>;
     constexpr static int kColStride = kTilePerCol / tl::num_cols<WarpLayout>;
 };
 
-template <typename WarpLayout_, typename WarpShape_, typename Shared_,
+template <typename WarpLayout_, typename BaseShape_, typename Shared_,
           const WarpReuse kMode_, const tl::Layout kType>
-struct SharedOffsetHelper<WarpLayout_, WarpShape_, Shared_, kMode_, kType,
+struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_, kType,
                           true> {
     using WarpLayout = WarpLayout_;
 
@@ -412,11 +338,11 @@ struct SharedOffsetHelper<WarpLayout_, WarpShape_, Shared_, kMode_, kType,
 
   private:
     using Shared = Shared_;
-    using WarpShape = WarpShape_;
+    using BaseShape = BaseShape_;
     static constexpr WarpReuse kMode = kMode_;
 
-    constexpr static int kTilePerRow = Shared::kCols / WarpShape::kCols;
-    constexpr static int kTilePerCol = Shared::kRows / WarpShape::kRows;
+    constexpr static int kTilePerRow = Shared::kCols / BaseShape::kCols;
+    constexpr static int kTilePerCol = Shared::kRows / BaseShape::kRows;
 
     constexpr static int kTilePerWarpRow =
         kTilePerRow / tl::num_cols<WarpLayout>;

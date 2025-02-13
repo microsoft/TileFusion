@@ -26,10 +26,12 @@ template <typename Element>
 struct AccessBase {
     // the maximal width of vectorized access.
     static constexpr int kAccessInBits = 128;
-    static constexpr int kElementBits = cutlass::sizeof_bits<Element>::value;
+    static constexpr int kAccessInBytes = kAccessInBits / 8;
+
+    static constexpr int kElementBits = sizeof(Element) * 8;
     static constexpr int kNumPerAccess = kAccessInBits / kElementBits;
 
-    // the width of memory transaction
+    // the width of memory transaction, Shared memory cacheline width.
     static constexpr int kMemTransWidth = 1024;  // 1024 bits, 128 bytes
 
     // The ideal number of columns for a single warp to load.

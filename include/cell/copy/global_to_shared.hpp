@@ -1,6 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-
 #pragma once
 
 #include "cell/copy/mod.hpp"
@@ -504,7 +503,7 @@ struct GlobalToSharedLoader {
 
     using WarpShape = TileShape<Shared::kRows / WarpLayout::kRows,
                                 Shared::kCols / WarpLayout::kCols>;
-    using BaseShape = warp::WarpBaseTileShape<DType, WarpShape, Shared::kType>;
+    using BaseShape = WarpBaseTileShape<DType, WarpShape, Shared::kType>;
 
     static_assert(Shared::kRows % BaseShape ::kRows == 0,
                   "Shared::kRows must be divisible by BaseShape::kRows.");
@@ -558,7 +557,7 @@ struct SharedToGlobalStorer {
 
     using WarpShape = TileShape<Shared::kRows / WarpLayout::kRows,
                                 Shared::kCols / WarpLayout::kCols>;
-    using BaseShape = warp::WarpBaseTileShape<DType, WarpShape, Shared::kType>;
+    using BaseShape = WarpBaseTileShape<DType, WarpShape, Shared::kType>;
 
     static_assert(Shared::kRows % BaseShape::kRows == 0,
                   "Shared::kRows must be divisible by BaseShape::kRows.");

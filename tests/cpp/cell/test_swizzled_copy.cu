@@ -125,12 +125,16 @@ void run_test_rowmajor() {
     using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<kSc0, kSc1>>;
 
 #ifdef DEBUG
-    LOG(INFO) << "GIterator: " << GIterator{} << std::endl
-              << "SIterator1: " << SIterator1{} << std::endl
-              << "SIterator2: " << SIterator2{} << std::endl
+    LOG(INFO) << std::endl
               << "GlobalTile: " << Global{} << std::endl
-              << "SharedTile: " << Shared1{} << std::endl
-              << "RegTile: " << Reg{} << std::endl;
+              << "GIterator: " << GIterator{} << std::endl
+              << "SharedTile2: " << std::endl
+              << Shared1{} << std::endl
+              << "SIterator1: " << SIterator1{} << std::endl
+              << std::endl
+              << "SharedTile2: " << std::endl
+              << Shared2{} << std::endl
+              << "SIterator2: " << SIterator2{} << std::endl;
 #endif
 
     using G2S1 = GlobalToSharedLoader<Shared1, WarpLayout>;
@@ -210,12 +214,16 @@ void run_test_colmajor() {
     using Reg = RegTile<BaseTileColMajor<Element>, tl::ColMajor<kSc0, kSc1>>;
 
 #ifdef DEBUG
-    LOG(INFO) << "GIterator: " << GIterator{} << std::endl
-              << "SIterator1: " << SIterator1{} << std::endl
-              << "SIterator2: " << SIterator2{} << std::endl
+    LOG(INFO) << std::endl
               << "GlobalTile: " << Global{} << std::endl
-              << "SharedTile: " << Shared1{} << std::endl
-              << "RegTile: " << Reg{} << std::endl;
+              << "GIterator: " << GIterator{} << std::endl
+              << "SharedTile2: " << std::endl
+              << Shared1{} << std::endl
+              << "SIterator1: " << SIterator1{} << std::endl
+              << std::endl
+              << "SharedTile2: " << std::endl
+              << Shared2{} << std::endl
+              << "SIterator2: " << SIterator2{} << std::endl;
 #endif
 
     using G2S1 = GlobalToSharedLoader<Shared1, WarpLayout>;

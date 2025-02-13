@@ -261,7 +261,43 @@ struct SharedLayoutWrapperImpl<true, Layout::kColMajor, 128> {
 
     using Layout = SwizzledColMajor<128, BaseShape>;
 };
+}  // namespace detail
 
+/// @brief Wrapper for creating a shared memory layout, which can be either
+///        swizzled or non-swizzled based on the `Shared::kSwizzled` flag.
+template <typename Shared, const int kBitsPerAccess>
+struct SharedLayoutWrapper {
+    using Layout =
+        detail::SharedLayoutWrapperImpl<Shared::kSwizzled, Shared::kType,
+                                        kBitsPerAccess>::Layout;
+};
+
+template <const int kShape1, const int kShape2, const int kStride1,
+          const int kStride2, const Layout kType>
+HOST_DEVICE auto make_shared_tile_layout() {
+    using Layout =
+        detail::SharedLayout<kShape1, kShape2, kStride1, kStride2, kType>;
+
+    return Layout{};
+}
+
+HOST_DEVICE auto make_row_major_layout(const int row, const int col,
+                                       const int stride) {
+    return cute::make_layout(cute::make_shape(row, col),
+                             cute::make_stride(stride, cute::_1{}));
+}
+
+HOST_DEVICE auto make_col_major_layout(const int row, const int col,
+                                       const int stride) {
+    return cute::make_layout(cute::make_shape(row, col),
+                             cute::make_stride(cute::_1{}, stride));
+}
+
+/// NOTE: The implementations from this line onwards are for legacy codes.
+/// It will gradually be replaced by a unified Layout concept.
+/// =========================================================================
+
+namespace {
 /// @brief Helper for pretty printing a matrix layout's static shape-related
 ///        information. This printer works ONLY on the host.
 struct MatrixLayoutPrettyPrinter {
@@ -272,7 +308,7 @@ struct MatrixLayoutPrettyPrinter {
             << Layout::kColStride << ">, Numel = " << Layout::kNumel;
     }
 };
-}  // namespace detail
+}  // namespace
 
 template <const int kRows_, const int kCols_, const int kRowStride_,
           const int kColStride_>
@@ -300,7 +336,7 @@ template <const int kRows, const int kCols, const int kRowStride,
 static HOST std::ostream& operator<<(
     std::ostream& out,
     const MatrixLayout<kRows, kCols, kRowStride, kColStride>& layout) {
-    detail::MatrixLayoutPrettyPrinter::print(out, layout);
+    MatrixLayoutPrettyPrinter::print(out, layout);
     return out;
 }
 
@@ -313,15 +349,6 @@ using RowMajor = MatrixLayout<kRow, kCol, kStride, 1>;
 // first dimension.
 template <const int kRow, const int kCol, const int kStride = kRow>
 using ColMajor = MatrixLayout<kRow, kCol, 1, kStride>;
-
-/// @brief Wrapper for creating a shared memory layout, which can be either
-///        swizzled or non-swizzled based on the `Shared::kSwizzled` flag.
-template <typename Shared, const int kBitsPerAccess>
-struct SharedLayoutWrapper {
-    using Layout =
-        detail::SharedLayoutWrapperImpl<Shared::kSwizzled, Shared::kType,
-                                        kBitsPerAccess>::Layout;
-};
 
 template <typename Layout>
 static constexpr size_t num_rows = Layout::kRows;
@@ -346,6 +373,7 @@ static constexpr size_t get_numel = Layout::kNumel;
 template <typename Layout_>
 static constexpr Layout layout_type = Layout_::kType;
 
+// FIXME(ying): legacy code, remove it later.
 template <const int kShape1, const int kShape2, const int kStride1,
           const int kStride2>
 HOST_DEVICE auto make_tile_layout() {
@@ -353,24 +381,4 @@ HOST_DEVICE auto make_tile_layout() {
     return Layout{};
 }
 
-template <const int kShape1, const int kShape2, const int kStride1,
-          const int kStride2, const Layout kType>
-HOST_DEVICE auto make_shared_tile_layout() {
-    using Layout =
-        detail::SharedLayout<kShape1, kShape2, kStride1, kStride2, kType>;
-
-    return Layout{};
-}
-
-HOST_DEVICE auto make_row_major_layout(const int row, const int col,
-                                       const int stride) {
-    return cute::make_layout(cute::make_shape(row, col),
-                             cute::make_stride(stride, cute::_1{}));
-}
-
-HOST_DEVICE auto make_col_major_layout(const int row, const int col,
-                                       const int stride) {
-    return cute::make_layout(cute::make_shape(row, col),
-                             cute::make_stride(cute::_1{}, stride));
-}
 }  // namespace tilefusion::tile_layout

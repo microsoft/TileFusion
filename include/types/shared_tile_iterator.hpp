@@ -16,11 +16,8 @@ namespace {
 struct STileIteratorPrettyPrinter {
     template <typename TileIterator>
     static HOST void print(std::ostream& out, const TileIterator& itr) {
-        size_t size1 = dim_size<0, typename TileIterator::ChunkShape>;
-        size_t size2 = dim_size<1, typename TileIterator::ChunkShape>;
-
-        out << "numel = " << TileIterator::Tile::kNumel << ", ChunkShape = ("
-            << size1 << ", " << size2 << "), stripe count = ("
+        out << "ChunkShape = (" << TileIterator::kChunkRows << ", "
+            << TileIterator::kChunkCols << "), stripe count = ("
             << TileIterator::sc0 << ", " << TileIterator::sc1 << ")";
     }
 };
@@ -40,16 +37,16 @@ class STileIterator {
     using BaseShape = traits::BaseTileShape<DType>;
     using SwizzleBaseShape = traits::SwizzleBaseTileShape<DType>;
 
-    static constexpr int kChunkRow = dim_size<0, ChunkShape>;
-    static constexpr int kChunkCol = dim_size<1, ChunkShape>;
+    static constexpr int kChunkRows = dim_size<0, ChunkShape>;
+    static constexpr int kChunkCols = dim_size<1, ChunkShape>;
 
     static_assert(Tile::kRows >= dim_size<0, ChunkShape>,
                   "Tile::kRows must be >= dim_size<0, ChunkShape>");
     static_assert(Tile::kCols >= dim_size<1, ChunkShape>,
                   "Tile::kCols must be >= dim_size<1, ChunkShape>");
 
-    static constexpr int sc0 = Tile::kRows / kChunkRow;
-    static constexpr int sc1 = Tile::kCols / kChunkCol;
+    static constexpr int sc0 = Tile::kRows / kChunkRows;
+    static constexpr int sc1 = Tile::kCols / kChunkCols;
 
     HOST_DEVICE STileIterator() : data_(nullptr) {}
 
@@ -73,17 +70,17 @@ class STileIterator {
         int y = sc0 == 1 ? i : 0;
 
         using TileLayout =
-            decltype(tl::make_shared_tile_layout<kChunkRow, kChunkCol,
+            decltype(tl::make_shared_tile_layout<kChunkRows, kChunkCols,
                                                  kTileRowStride, kTileColStride,
                                                  Tile::kType>());
 
         using NewTile = SharedTile<DType, TileLayout, Tile::kSwizzled>;
 
         // TODO(KuangjuX): hotfix for `offset1` and `offset2`.
-        int offset1 = x * (kChunkRow * Tile::kRowStride) +
+        int offset1 = x * (kChunkRows * Tile::kRowStride) +
                       y * kTilePerChunkCol * BaseShape::kCols;
         int offset2 = x * kTilePerChunkRow * BaseShape::kRows +
-                      y * (Tile::kColStride * kChunkCol);
+                      y * (Tile::kColStride * kChunkCols);
         int offset = Tile::kType == tl::Layout::kRowMajor ? offset1 : offset2;
 
         NewTile tile(data_ + offset);
@@ -114,8 +111,8 @@ class STileIterator {
     static constexpr int kTilePerRow = Tile::kRows / BaseShape::kRows;
     static constexpr int kTilePerCol = Tile::kCols / BaseShape::kCols;
 
-    static constexpr int kTilePerChunkRow = kChunkRow / BaseShape::kRows;
-    static constexpr int kTilePerChunkCol = kChunkCol / BaseShape::kCols;
+    static constexpr int kTilePerChunkRow = kChunkRows / BaseShape::kRows;
+    static constexpr int kTilePerChunkCol = kChunkCols / BaseShape::kCols;
 
     // TODO(KuangjuX): hotfix for `kTileRowStride` and `kTileColStride`.
     static constexpr int kTileRowStride =

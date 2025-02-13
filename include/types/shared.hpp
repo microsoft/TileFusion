@@ -19,11 +19,7 @@ struct SharedTilePrettyPrinter {
         // parameter `tile` here is not used
 
         auto swizzled = Shared::kSwizzled ? "swizzled" : "non-swizzled";
-
-        out << layout_type_to_str(Shared::kType) << "(" << Shared::kRows << ", "
-            << Shared::kCols << ", " << Shared::kRowStride << ", "
-            << Shared::kColStride << "), numel = " << Shared::kNumel
-            << ", swizzled = " << swizzled;
+        out << "\t" << typename Shared::Layout{} << ", Swizzled = " << swizzled;
     }
 };
 
@@ -35,15 +31,15 @@ class SharedTile {
     using DType = Element_;
     using Layout = Layout_;
 
-    static constexpr int kNumel = tl::get_numel<Layout>;
+    static constexpr int kNumel = Layout::kNumel;
 
-    static constexpr int kRows = tl::num_rows<Layout>;
-    static constexpr int kCols = tl::num_cols<Layout>;
+    static constexpr int kRows = Layout::kRows;
+    static constexpr int kCols = Layout::kCols;
+    static constexpr int kRowStride = Layout::kRowStride;
+    static constexpr int kColStride = Layout::kColStride;
 
-    static constexpr int kRowStride = tl::row_stride<Layout>;
-    static constexpr int kColStride = tl::col_stride<Layout>;
+    static constexpr tl::Layout kType = Layout::kType;
 
-    static constexpr tl::Layout kType = tl::layout_type<Layout>;
     static constexpr bool kSwizzled = kSwizzled_;
 
     // This Ctor is to enable the use of the pretty printer of SharedTile in the
