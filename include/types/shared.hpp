@@ -20,10 +20,8 @@ struct SharedTilePrettyPrinter {
 
         auto swizzled = Shared::kSwizzled ? "swizzled" : "non-swizzled";
 
-        out << layout_type_to_str(Shared::kType) << "(" << Shared::kRows << ", "
-            << Shared::kCols << ", " << Shared::kRowStride << ", "
-            << Shared::kColStride << "), numel = " << Shared::kNumel
-            << ", swizzled = " << swizzled;
+        out << "\t" << typename Shared::Layout{} << ", Swizzled = " << swizzled
+            << ", " << std::endl;
     }
 };
 
