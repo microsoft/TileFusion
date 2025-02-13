@@ -16,14 +16,14 @@ namespace tl = tile_layout;
 namespace detail {
 
 template <typename Shared, typename Reg_, const int kRowExec,
-          const int kColExec, const tl::Layout kType, CopyInst kCopyInst>
+          const int kColExec, const tl::Layout kType>
 struct SharedToRegLoaderImpl;
 
 /// @brief partial specialization for row-major shared memory tile.
 template <typename Shared, typename Reg_, const int kRowExec_,
           const int kColExec_>
 struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
-                             tl::Layout::kRowMajor, CopyInst::kLoadMat>
+                             tl::Layout::kRowMajor>
     : public LoadMatBase<typename Shared::DType> {
     using LoadMat = LoadMatBase<typename Shared::DType>;
     using DType = Shared::DType;
@@ -119,7 +119,7 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
 template <typename Shared, typename Reg_, const int kRowExec_,
           const int kColExec_>
 struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
-                             tl::Layout::kColMajor, CopyInst::kLoadMat>
+                             tl::Layout::kColMajor>
     : public LoadMatBase<typename Shared::DType> {
     using Reg = Reg_;
     using DType = Shared::DType;
@@ -241,11 +241,11 @@ template <typename Reg_, typename Shared_, const int kRowExec_,
           const int kColExec_>
 struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
                              tl::Layout::kRowMajor>
-    : public BaseTileStorer<Shared_, tl::Layout::kRowMajor,
-                            sizeof(Shared_::DType) * 8> {
+    : public StoreMatBase<Shared_, tl::Layout::kRowMajor> {
     using Reg = Reg_;
     using Shared = Shared_;
     using DType = Shared::DType;
+    using StoreMat = StoreMatBase<Shared, tl::Layout::kRowMajor>;
 
     static constexpr int SharedRows = Shared::kRows;
     static constexpr int SharedCols = Shared::kCols;
@@ -254,24 +254,23 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const Reg& src, DType* dst, int start_offset) {
-        // TODO(KuangjuX): hotfix this.
-        int lane_row = this->lane_row_id();
-        int lane_col = this->lane_col_id();
-
-        int tile_offset = 0;
 #pragma unroll
         for (int i = 0; i < kRowExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
-                tile_offset = start_offset + i * kRowStride + j * kColStride;
+                int lane_row = this->lane_row_id();
+                int lane_col = this->lane_col_id();
+
+                int tile_offset =
+                    start_offset + i * kRowStride + j * kColStride;
                 int row = 0, col = 0;
 #pragma unroll
-                for (int m = 0; m < this->kSegRows; ++m) {
-                    row = lane_row + m * tl::num_rows<ThreadLayout>;
+                for (int m = 0; m < StoreMat::kSegRows; ++m) {
+                    row = lane_row + m * StoreMat::kThreadRows;
 #pragma unroll
-                    for (int n = 0; n < this->kSegCols; ++n) {
-                        col = this->kElemPerSeg *
-                              (lane_col + n * tl::num_cols<ThreadLayout>);
+                    for (int n = 0; n < StoreMat::kSegCols; ++n) {
+                        col = StoreMat::kElemPerSeg *
+                              (lane_col + n * StoreMat::kThreadCols);
                         int in_tile_offset = row * Shared::kRowStride + col;
                         int offset = tile_offset + in_tile_offset;
                         int swizzled_offset = get_swizzle_offset(offset);
@@ -282,8 +281,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
                         PackedType* dst_ptr =
                             reinterpret_cast<PackedType*>(dst);
 
-                        dst_ptr[swizzled_offset / this->kElemPerSeg] =
-                            src_ptr[n * this->kSegCols + m];
+                        dst_ptr[swizzled_offset / StoreMat::kElemPerSeg] =
+                            src_ptr[n * StoreMat::kSegCols + m];
                     }
                 }
             }
@@ -304,20 +303,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     static constexpr int kSwizzledBlockCols =
         kColExec * BaseShape::kCols / kSwizzledCols;
 
-    // the thread layout for wmma's output tile.
-    using ThreadLayout = tile_layout::RowMajor<8, 4>;
-
-    // in the output of a wmma tile, each thread stores four segments in 2x2
-    // layout, and each fragment contains 2 elements regardless of the data
-    // type
-    static constexpr int kSegRows = 2;
-    static constexpr int kSegCols = 2;
-
-    // the number of elements per segment, vectorized instruction are used to
-    // access `kElemPerSeg` elements.
-    static constexpr int kElemPerSeg = 2;
-
-    using PackedType = typename Packing<DType, kElemPerSeg>::PackedType;
+    using PackedType =
+        typename Packing<DType, StoreMat::kElemPerSeg>::PackedType;
 
     using DstLayout =
         tl::MatrixLayout<kSwizzledBlockRows, kSwizzledBlockCols,
@@ -333,14 +320,6 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     using SharedLayout =
         std::conditional_t<Shared::kSwizzled, Swizzled, NonSwizzled>;
     SharedLayout in_dst_tile_;
-
-    DEVICE int lane_row_id() {
-        return (threadIdx.x % WARP_SIZE) / tl::num_cols<ThreadLayout>;
-    }
-
-    DEVICE int lane_col_id() {
-        return (threadIdx.x % WARP_SIZE) % tl::num_cols<ThreadLayout>;
-    }
 
     DEVICE int2 get_swizzled_tile_id(int offset) {
         // SwizzleTile is a 8 x 64 block.
@@ -379,11 +358,11 @@ template <typename Reg_, typename Shared_, const int kRowExec_,
           const int kColExec_>
 struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
                              tl::Layout::kColMajor>
-    : public BaseTileStorer<Shared_, tl::Layout::kColMajor,
-                            sizeof(Shared_::DType) * 8> {
+    : public StoreMatBase<Shared_, tl::Layout::kColMajor> {
     using Reg = Reg_;
     using Shared = Shared_;
     using DType = Shared::DType;
+    using StoreMat = StoreMatBase<Shared, tl::Layout::kColMajor>;
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
@@ -398,17 +377,17 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
             for (int j = 0; j < kRowExec; ++j) {
                 int tile_offset =
                     start_offset + i * kColStride + j * kRowStride;
-                int lane_row = lane_row_id();
-                int lane_col = lane_col_id();
+                int lane_row = this->lane_row_id();
+                int lane_col = this->lane_col_id();
 
                 int row = 0, col = 0;
 #pragma unroll
-                for (int m = 0; m < this->kSegRows; ++m) {
-                    row = kElemPerSeg *
-                          (lane_row + i * tl::num_rows<ThreadLayout>);
+                for (int m = 0; m < StoreMat::kSegRows; ++m) {
+                    row = StoreMat::kElemPerSeg *
+                          (lane_row + i * StoreMat::kThreadRows);
 #pragma unroll
-                    for (int n = 0; n < this->kSegCols; ++n) {
-                        col = lane_col + j * tl::num_cols<ThreadLayout>;
+                    for (int n = 0; n < StoreMat::kSegCols; ++n) {
+                        col = lane_col + j * StoreMat::kThreadCols;
 
                         int in_tile_offset = col * Shared::kColStride + row;
                         int offset = tile_offset + in_tile_offset;
@@ -419,8 +398,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
                                 src(j, i).data());
                         PackedType* dst_ptr =
                             reinterpret_cast<PackedType*>(dst);
-                        dst_ptr[swizzled_offset / kElemPerSeg] =
-                            src_ptr[n * this->kSegCols + m];
+                        dst_ptr[swizzled_offset / StoreMat::kElemPerSeg] =
+                            src_ptr[n * StoreMat::kSegCols + m];
                     }
                 }
             }
@@ -442,20 +421,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     static constexpr int kRowStride = BaseShape::kRows;
     static constexpr int kColStride = BaseShape::kCols * Shared::kColStride;
 
-    // the thread layout for wmma's output tile.
-    using ThreadLayout = tile_layout::ColMajor<4, 8>;
-
-    // in the output of a wmma tile, each thread stores four segments in 2x2
-    // layout, and each fragment contains 2 elements regardless of the data
-    // type
-    static constexpr int kSegRows = 2;
-    static constexpr int kSegCols = 2;
-
-    // the number of elements per segment, vectorized instruction are used to
-    // access `kElemPerSeg` elements.
-    static constexpr int kElemPerSeg = 2;
-
-    using PackedType = typename Packing<DType, kElemPerSeg>::PackedType;
+    using PackedType =
+        typename Packing<DType, StoreMat::kElemPerSeg>::PackedType;
 
     using DstLayout =
         tl::MatrixLayout<kSwizzleBlockRows, kSwizzleBlockCols, kSwizzleRows,
@@ -504,14 +471,6 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 
         return offset_;
     }
-
-    DEVICE int lane_row_id() {
-        return (threadIdx.x % WARP_SIZE) % tl::num_rows<ThreadLayout>;
-    }
-
-    DEVICE int lane_col_id() {
-        return (threadIdx.x % WARP_SIZE) / tl::num_rows<ThreadLayout>;
-    }
 };
 }  // namespace detail
 
@@ -550,9 +509,8 @@ struct SharedToRegLoader {
         // warp reuse mode.
         int offset = shared_offset_.get_warp_offset();
 
-        using Loader =
-            detail::SharedToRegLoaderImpl<Shared, Reg, kRowExec, kColExec,
-                                          Shared::kType, CopyInst::kLoadMat>;
+        using Loader = detail::SharedToRegLoaderImpl<Shared, Reg, kRowExec,
+                                                     kColExec, Shared::kType>;
         Loader loader;
         loader(src.data(), dst, offset);
     }

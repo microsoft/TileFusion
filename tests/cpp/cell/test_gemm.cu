@@ -326,6 +326,7 @@ TEST(TestGemm, test) {
     run_test<128, 64, 64, tl::RowMajor<1, 1>, 64>();
 
     // 2 x 1 warps
+    // TODO(KuangjuX): fix different warp layout.
     // run_test<128, 64, 128, tl::RowMajor<2, 1>, 64>();
     // run_test<128, 128, 128, tl::RowMajor<2, 1>, 64>();
 }
