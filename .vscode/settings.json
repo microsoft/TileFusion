@@ -72,7 +72,8 @@
     "thread": "cpp",
     "typeindex": "cpp",
     "typeinfo": "cpp",
-    "variant": "cpp"
+    "variant": "cpp",
+    "cassert": "cpp"
   },
   "gotoSymbolStack.currentStackPosition": 0,
   "gotoSymbolStack.maxStackPosition": 0,
