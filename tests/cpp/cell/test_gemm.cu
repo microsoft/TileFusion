@@ -276,6 +276,9 @@ void run_test() {
     dim3 dim_block(config::kThreads, 1, 1);
     int shm_size = (kM + kN) * kK * sizeof(Element);
 
+    printf("config::kWarpPerRow: %d, config::kWarpPerCol: %d\n",
+           config::kWarpPerRow, config::kWarpPerCol);
+
     auto kernel = test_gemm<
         Element, ElementAcc, typename config::GlobalA, typename config::SharedA,
         typename config::LoadSharedA, typename config::GlobalB,
@@ -326,9 +329,19 @@ TEST(TestGemm, test) {
     run_test<128, 64, 64, tl::RowMajor<1, 1>, 64>();
 
     // 2 x 1 warps
-    // TODO(KuangjuX): fix different warp layout.
-    // run_test<128, 64, 128, tl::RowMajor<2, 1>, 64>();
-    // run_test<128, 128, 128, tl::RowMajor<2, 1>, 64>();
+    run_test<32, 64, 128, tl::RowMajor<2, 1>, 128>();
+    run_test<64, 64, 128, tl::RowMajor<2, 1>, 128>();
+    run_test<32, 128, 128, tl::RowMajor<2, 1>, 128>();
+
+    // 1 x 2 warps
+    run_test<32, 128, 128, tl::RowMajor<1, 2>, 128>();
+    // run_test<64, 128, 128, tl::RowMajor<1, 2>, 128>();
+
+    // 2 x 2 warps
+    run_test<64, 64, 128, tl::RowMajor<2, 2>, 128>();
+
+    // 4 x 1 warps
+    run_test<64, 16, 256, tl::RowMajor<4, 1>, 256>();
 }
 
 }  // namespace tilefusion::testing

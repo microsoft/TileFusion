@@ -101,7 +101,6 @@ void run_test_rowmajor() {
     using Element = __half;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
     static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
-    static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
 
     using Global = GlobalTile<Element, tl::RowMajor<kRows, kCols>>;
     using GIterator = GTileIterator<Global, TileShape<kRows, kShmCols>>;
@@ -118,9 +117,7 @@ void run_test_rowmajor() {
     using BaseShape = traits::BaseTileShape<Element>;
 
     const int kSc0 = kShmRows / kWarpPerRow / BaseShape::kRows;
-    // TODO(KuangjuX): Why let `const int kSc1 = kChunkShm / BaseShape::kCols;`?
-    // const int kSc1 = kChunkShm / BaseShape::kCols;
-    const int kSc1 = kChunkShm / kWarpPerCol / BaseShape::kCols;
+    const int kSc1 = kChunkShm / BaseShape::kCols;
 
     using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<kSc0, kSc1>>;
 
@@ -149,7 +146,7 @@ void run_test_rowmajor() {
     using Element = __half;
     thrust::host_vector<Element> hA(numel);
     for (int i = 0; i < hA.size(); ++i) {
-        hA[i] = static_cast<Element>(i);
+        hA[i] = static_cast<Element>(i % 2048);
     }
     thrust::device_vector<Element> dA = hA;
 
@@ -382,7 +379,8 @@ void test_col_major_store() {
 
     int numel = kRows * kCols;
     thrust::host_vector<Element> h_src(numel);
-    for (int i = 0; i < h_src.size(); ++i) h_src[i] = static_cast<Element>(i);
+    for (int i = 0; i < h_src.size(); ++i)
+        h_src[i] = static_cast<Element>(i % 2048);
     thrust::device_vector<Element> d_src = h_src;
 
     thrust::device_vector<Element> d_dst(numel);
@@ -419,7 +417,7 @@ TEST(TestSwizzledLoad, test_load_row_major) {
     // run_test_rowmajor<tl::RowMajor<1, 1>, 128, 128, 128, 64, 64>();
     run_test_rowmajor<tl::RowMajor<2, 1>, 128, 128, 128, 64, 64>();
     run_test_rowmajor<tl::RowMajor<4, 1>, 128, 128, 128, 128, 128>();
-    run_test_rowmajor<tl::RowMajor<2, 2>, 128, 128, 128, 128, 128>();
+    run_test_rowmajor<tl::RowMajor<4, 2>, 128, 128, 128, 128, 128>();
 
     run_test_rowmajor<tl::RowMajor<1, 2>, 16, 256, 16, 128, 128>();
     run_test_rowmajor<tl::RowMajor<1, 2>, 32, 256, 32, 128, 128>();
@@ -431,6 +429,9 @@ TEST(TestSwizzledLoad, test_load_row_major) {
     run_test_rowmajor<tl::RowMajor<2, 2>, 32, 128, 32, 128, 128>();
     run_test_rowmajor<tl::RowMajor<2, 2>, 64, 256, 64, 128, 128>();
     run_test_rowmajor<tl::RowMajor<2, 2>, 64, 256, 64, 128, 64>();
+
+    run_test_rowmajor<tl::RowMajor<2, 1>, 32, 64, 32, 64, 64>();
+    run_test_rowmajor<tl::RowMajor<2, 1>, 64, 64, 64, 64, 64>();
 }
 
 TEST(TestSwizzledLoad, test_load_col_major) {
@@ -438,17 +439,10 @@ TEST(TestSwizzledLoad, test_load_col_major) {
     run_test_colmajor<tl::RowMajor<1, 1>, 128, 64, 64, 64, 32>();
 
     run_test_colmajor<tl::RowMajor<2, 1>, 128, 64, 128, 64, 64>();
+    run_test_colmajor<tl::RowMajor<1, 2>, 64, 128, 64, 128, 64>();
 
-    // run_test_colmajor<tl::RowMajor<1, 2>, 128, 32, 64, 32, 32>();
-    // run_test_colmajor<tl::RowMajor<2, 2>, 256, 128, 64, 128, 32>();
-
-    // run_test_colmajor<tl::RowMajor<2, 1>, 32, 32, 32, 32, 16>();
-    // run_test_colmajor<tl::RowMajor<2, 1>, 128, 32, 64, 32, 32>();
-
-    // run_test_colmajor<tl::RowMajor<4, 1>, 128, 64, 64, 64, 64>();
-    // run_test_colmajor<tl::RowMajor<4, 2>, 256, 128, 128, 128, 64>();
-
-    // run_test_colmajor<tl::RowMajor<2, 4>, 128, 128, 64, 128, 64>();
+    run_test_colmajor<tl::RowMajor<2, 2>, 128, 128, 128, 128, 64>();
+    run_test_colmajor<tl::RowMajor<4, 2>, 256, 128, 256, 128, 64>();
 }
 
 TEST(TestNonSwizzledStore, test_row_major) {
@@ -489,6 +483,8 @@ TEST(TestSwizzledStored, test_row_major) {
 
 TEST(TestNonSwizzledStored, test_col_major) {
     // static constexpr int kSwizzled = false;
+
+    // test_col_major_store<__half, tl::RowMajor<1, 1>, 64, 16, kSwizzled>();
 
     // test_col_major_store<__half, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
     // test_col_major_store<__half, tl::RowMajor<2, 1>, 32, 32, kSwizzled>();

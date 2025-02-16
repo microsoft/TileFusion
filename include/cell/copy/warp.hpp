@@ -283,10 +283,19 @@ template <typename WarpLayout_, typename BaseShape_, typename Shared_,
 struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
                           tl::Layout::kRowMajor, false> {
     DEVICE int get_warp_offset() {
-        // TODO(KuangjuX): hotfix this.
-        return warp_row_id<WarpLayout>() * kRowStride * BaseShape::kRows *
-                   Shared::kCols +
-               warp_col_id<WarpLayout>() * kColStride * BaseShape::kCols;
+        switch (kMode) {
+            case WarpReuse::kCont:
+                return warp_row_id<WarpLayout>() * kRowStride *
+                           BaseShape::kRows * Shared::kCols +
+                       warp_col_id<WarpLayout>() * kColStride *
+                           BaseShape::kCols;
+            case WarpReuse::kRowReuseCont:
+                return warp_row_id<WarpLayout>() * kRowStride *
+                       BaseShape::kRows * Shared::kCols;
+            default:
+                assert(false && "Not implemented yet.");
+                return -1;
+        }
     }
 
   private:
@@ -308,9 +317,19 @@ template <typename WarpLayout_, typename BaseShape_, typename Shared_,
 struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
                           tl::Layout::kColMajor, false> {
     DEVICE int get_warp_offset() {
-        return warp_row_id<WarpLayout>() * kRowStride * BaseShape::kRows +
-               warp_col_id<WarpLayout>() * kColStride * BaseShape::kCols *
-                   Shared::kRows;
+        switch (kMode) {
+            case WarpReuse::kCont:
+                return warp_row_id<WarpLayout>() * kRowStride *
+                           BaseShape::kRows +
+                       warp_col_id<WarpLayout>() * kColStride *
+                           BaseShape::kCols * Shared::kRows;
+            case WarpReuse::kColReuseCont:
+                return warp_col_id<WarpLayout>() * kColStride *
+                       BaseShape::kCols * Shared::kRows;
+            default:
+                assert(false && "Not implemented yet.");
+                return -1;
+        }
     }
 
   private:
