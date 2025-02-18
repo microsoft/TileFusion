@@ -255,9 +255,9 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 
     DEVICE void operator()(const Reg& src, DType* dst, int start_offset) {
 #pragma unroll
-        for (int i = 0; i < kRowExec; ++i) {
+        for (int j = 0; j < kColExec; ++j) {
 #pragma unroll
-            for (int j = 0; j < kColExec; ++j) {
+            for (int i = 0; i < kRowExec; ++i) {
                 int lane_row = this->lane_row_id();
                 int lane_col = this->lane_col_id();
 
@@ -372,11 +372,11 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 
     DEVICE void operator()(const Reg& src, DType* dst, int start_offset) {
 #pragma unroll
-        for (int i = 0; i < kColExec; ++i) {
+        for (int j = 0; j < kColExec; ++j) {
 #pragma unroll
-            for (int j = 0; j < kRowExec; ++j) {
+            for (int i = 0; i < kRowExec; ++i) {
                 int tile_offset =
-                    start_offset + i * kColStride + j * kRowStride;
+                    start_offset + j * kColStride + i * kRowStride;
                 int lane_row = this->lane_row_id();
                 int lane_col = this->lane_col_id();
 
@@ -384,10 +384,10 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 #pragma unroll
                 for (int m = 0; m < StoreMat::kSegRows; ++m) {
                     row = StoreMat::kElemPerSeg *
-                          (lane_row + i * StoreMat::kThreadRows);
+                          (lane_row + m * StoreMat::kThreadRows);
 #pragma unroll
                     for (int n = 0; n < StoreMat::kSegCols; ++n) {
-                        col = lane_col + j * StoreMat::kThreadCols;
+                        col = lane_col + n * StoreMat::kThreadCols;
 
                         int in_tile_offset = col * Shared::kColStride + row;
                         int offset = tile_offset + in_tile_offset;
@@ -395,7 +395,7 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 
                         const PackedType* src_ptr =
                             reinterpret_cast<const PackedType*>(
-                                src(j, i).data());
+                                src(i, j).data());
                         PackedType* dst_ptr =
                             reinterpret_cast<PackedType*>(dst);
                         dst_ptr[swizzled_offset / StoreMat::kElemPerSeg] =
@@ -463,9 +463,9 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
         auto swizzled_tile_id = get_swizzled_tile_id(offset);
         auto in_swizzled_tile_id = get_in_swizzle_tile_id(offset);
         int swizzled_tile_offset =
-            src_tile_(swizzled_tile_id.x, swizzled_tile_id.y);
+            dst_tile_(swizzled_tile_id.x, swizzled_tile_id.y);
         int in_swizzled_tile_offset =
-            in_src_tile_(in_swizzled_tile_id.x, in_swizzled_tile_id.y);
+            in_dst_tile_(in_swizzled_tile_id.x, in_swizzled_tile_id.y);
 
         int offset_ = swizzled_tile_offset + in_swizzled_tile_offset;
 

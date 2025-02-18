@@ -79,7 +79,9 @@ struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kRowMajor> {
      */
     HOST_DEVICE auto operator()(int x, int y) const {
         int idx = (x << (Mbits + Sbits)) | y;
-        assert(idx < (1 << (Bbits + Mbits + Sbits)));
+
+        // KuangjuX: This assert may affect the performance.
+        // assert(idx < (1 << (Bbits + Mbits + Sbits)));
 
         int swizzled_idx = swizzle_(idx);
         int swizzled_x = swizzled_idx >> (Mbits + Sbits);
@@ -114,7 +116,9 @@ struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kColMajor> {
      */
     HOST_DEVICE auto operator()(int x, int y) const {
         int idx = (y << (Bbits + Mbits)) | x;
-        assert(idx < (1 << (Bbits + Mbits + Sbits)));
+
+        // KuanjuX: This assert may affect the performance.
+        // assert(idx < (1 << (Bbits + Mbits + Sbits)));
 
         int swizzled_idx = swizzle_(idx);
         int swizzled_y = swizzled_idx >> (Mbits + Sbits);

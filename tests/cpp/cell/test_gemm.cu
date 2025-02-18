@@ -106,7 +106,8 @@ void cublas_hgemm(int m, int n, int k, const __half* A, const __half* B,
 // @param strided_k: chunk size to partition the k dimension of the shared
 //                   memory tile.
 template <typename Element, typename ElementAcc, const int kM, const int kN,
-          const int kK, typename WarpLayout_, const int kChunkK>
+          const int kK, typename WarpLayout_, const int kChunkK,
+          const bool kSwizzled>
 struct TestTraits {
     using BaseShape = traits::BaseTileShape<Element>;
 
@@ -118,7 +119,6 @@ struct TestTraits {
 
     /// == 2. configure tile transfer between global and shared using CuTe ==
     using GlobalA = GlobalTile<Element, tl::RowMajor<kM, kK>>;
-    static const bool kSwizzled = true;
     using SharedA = SharedTile<Element, tl::RowMajor<kM, kK>, kSwizzled>;
     using LoadSharedA = GlobalToSharedLoader<SharedA, WarpLayout>;
 
@@ -216,7 +216,7 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
 }  // namespace
 
 template <const int kM, const int kN, const int kK, typename WarpLayout,
-          const int kChunkK>
+          const int kChunkK, const bool kSwizzled>
 void run_test() {
     // unittest for register-level gemm by calling into wmma PTX
     using Element = __half;
@@ -249,8 +249,8 @@ void run_test() {
     thrust::device_vector<ElementAcc> d_c = h_c;
 
     // define the configuration of the test
-    using config =
-        TestTraits<Element, ElementAcc, kM, kN, kK, WarpLayout, kChunkK>;
+    using config = TestTraits<Element, ElementAcc, kM, kN, kK, WarpLayout,
+                              kChunkK, kSwizzled>;
 
     LOG(INFO) << "[" << kM << ", " << kN << ", " << kK << "], warps: ["
               << config::kWarpPerRow << ", " << config::kWarpPerCol
@@ -318,17 +318,29 @@ TEST(TestGemm, test) {
     // as this will cause a shared memory overflow.
 
     // 1 warp
-    run_test<16, 16, 64, tl::RowMajor<1, 1>, 64>();  // minimal shape
-    run_test<32, 16, 64, tl::RowMajor<1, 1>, 64>();
-    run_test<16, 32, 64, tl::RowMajor<1, 1>, 64>();
-    run_test<32, 32, 64, tl::RowMajor<1, 1>, 64>();
-    run_test<64, 64, 64, tl::RowMajor<1, 1>, 64>();
-    run_test<128, 64, 64, tl::RowMajor<1, 1>, 64>();
+    run_test<16, 16, 64, tl::RowMajor<1, 1>, 64, true>();  // minimal shape
+    run_test<32, 16, 64, tl::RowMajor<1, 1>, 64, true>();
+    run_test<16, 32, 64, tl::RowMajor<1, 1>, 64, true>();
+    run_test<32, 32, 64, tl::RowMajor<1, 1>, 64, true>();
+    run_test<64, 64, 64, tl::RowMajor<1, 1>, 64, true>();
+    run_test<128, 64, 64, tl::RowMajor<1, 1>, 64, true>();
 
     // 2 x 1 warps
-    // TODO(KuangjuX): fix different warp layout.
-    // run_test<128, 64, 128, tl::RowMajor<2, 1>, 64>();
-    // run_test<128, 128, 128, tl::RowMajor<2, 1>, 64>();
+    run_test<32, 64, 128, tl::RowMajor<2, 1>, 128, true>();
+    run_test<64, 64, 128, tl::RowMajor<2, 1>, 128, true>();
+    run_test<32, 128, 128, tl::RowMajor<2, 1>, 128, true>();
+
+    // 1 x 2 warps
+    run_test<32, 128, 128, tl::RowMajor<1, 2>, 128, true>();
+    // TODO(KuangjuX): CUDA free failed: cudaErrorMisalignedAddress: misaligned
+    // address.
+    // run_test<64, 128, 128, tl::RowMajor<1, 2>, 128, true>();
+
+    // 2 x 2 warps
+    run_test<64, 64, 128, tl::RowMajor<2, 2>, 128, true>();
+
+    // 4 x 1 warps
+    run_test<64, 16, 256, tl::RowMajor<4, 1>, 256, true>();
 }
 
 }  // namespace tilefusion::testing

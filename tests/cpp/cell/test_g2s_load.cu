@@ -173,6 +173,10 @@ TEST(GlobalToSharedLoad, test_row_major_load) {
     run_test_row_major<float, tl::RowMajor<4, 1>, 64, 32, true>();
     run_test_row_major<float, tl::RowMajor<2, 2>, 32, 64, true>();
     run_test_row_major<float, tl::RowMajor<2, 4>, 32, 128, true>();
+
+    // To check correctness for next tests.
+    run_test_row_major<__half, tl::RowMajor<2, 1>, 64, 64, false>();
+    run_test_row_major<__half, tl::RowMajor<2, 1>, 64, 64, true>();
 }
 
 TEST(GlobalToSharedLoad, test_col_major_load) {
