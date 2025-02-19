@@ -313,9 +313,9 @@ void test_row_major_store() {
     // define tiles
     using Global = GlobalTile<Element, tl::RowMajor<kRows, kCols>>;
     static constexpr int kRowRepeats =
-        kRows / tl::num_rows<WarpLayout> / BaseShape::kTileSize;
+        kRows / WarpLayout::kRows / BaseShape::kRows;
     static constexpr int kColRepeats =
-        kCols / tl::num_cols<WarpLayout> / BaseShape::kTileSize;
+        kCols / WarpLayout::kCols / BaseShape::kCols;
 
     using Reg = RegTile<BaseTileRowMajor<Element>,
                         tl::RowMajor<kRowRepeats, kColRepeats>>;
@@ -365,9 +365,9 @@ void test_col_major_store() {
     // define tiles
     using Global = GlobalTile<Element, tl::ColMajor<kRows, kCols>>;
     static constexpr int kRowRepeats =
-        kRows / tl::num_rows<WarpLayout> / BaseShape::kTileSize;
+        kRows / WarpLayout::kRows / BaseShape::kRows;
     static constexpr int kColRepeats =
-        kCols / tl::num_cols<WarpLayout> / BaseShape::kTileSize;
+        kCols / WarpLayout::kCols / BaseShape::kCols;
     using Reg = RegTile<BaseTileColMajor<Element>,
                         tl::ColMajor<kRowRepeats, kColRepeats>>;
     using Shared = SharedTile<Element, tl::ColMajor<kRows, kCols>, kSwizzled>;

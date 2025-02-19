@@ -15,12 +15,12 @@ namespace tl = tile_layout;
  *
  * This function loads a data tile from global to shared memory.
  *
- * @tparam Global The type of the global memory tile.
- * @tparam Shared The type of the shared memory tile.
- * @tparam BaseShape The shape of the base tile.
- * @tparam kRowExec The number of rows to execute.
- * @tparam kColExec The number of columns to execute.
- * @tparam kType The type of Global and Shared memory layout.
+ * @param Global The type of the global memory tile.
+ * @param Shared The type of the shared memory tile.
+ * @param BaseShape The shape of the base tile.
+ * @param kRowExec The number of rows to execute.
+ * @param kColExec The number of columns to execute.
+ * @param kType The type of Global and Shared memory layout.
  */
 template <typename Global, typename Shared, typename BaseShape,
           const int kRowExec, const int kColExec,
@@ -155,9 +155,6 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     using DType = Global::DType;
     using BaseShape = BaseShape_;
 
-    using LoadBase = GlobalToSharedBaseTileLoader<Global, Shared, BaseShape_,
-                                                  tl::Layout::kColMajor>;
-
     static_assert(Global::kRows == Shared::kRows &&
                       Global::kCols == Shared::kCols,
                   "Global and shared memory should have the same shape.");
@@ -200,7 +197,8 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     }
 
   private:
-    static constexpr int kNumPerAccess = LoadBase::kNumPerAccess;
+    static constexpr int kNumPerAccess =
+        traits::AccessBase<DType>::kNumPerAccess;
 
     // Swap the row and column of the `SwizzleBaseShape` in column-major layout.
     using SwizzleBaseShape = traits::SwizzleBaseTileShape<DType>;
