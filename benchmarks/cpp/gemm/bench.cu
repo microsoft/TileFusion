@@ -12,12 +12,19 @@
 #define CHECK_CORRECTNESS true
 
 //// =============== Test Config=============== ////
+// static const int kWarpPerRow = 2;
+// static const int kWarpPerCol = 4;
+// using WholeShape = GemmShape<4096, 4096, 4096>;
+// using CtaTileShape = GemmShape<128, 128, 64>;
+// using WarpLayout = tl::RowMajor<kWarpPerRow, kWarpPerCol>;
+// static constexpr int kRK = 16;
+
 static const int kWarpPerRow = 2;
-static const int kWarpPerCol = 4;
-using WholeShape = GemmShape<4096, 4096, 4096>;
-using CtaTileShape = GemmShape<128, 128, 64>;
+static const int kWarpPerCol = 2;
+using WholeShape = GemmShape<4096, 128, 128>;
+using CtaTileShape = GemmShape<64, 128, 128>;
 using WarpLayout = tl::RowMajor<kWarpPerRow, kWarpPerCol>;
-static constexpr int kRK = 16;
+static constexpr int kRK = 64;
 
 void run_test(std::ofstream& fout) {
     //// =============== Declaration =============== ////
@@ -35,15 +42,16 @@ void run_test(std::ofstream& fout) {
     using Config = KeGemmTraits<InType, AccType, WholeShape, CtaTileShape, kRK,
                                 WarpLayout>;
     auto tilefusion_gemm =
-        &gemm<InType, kM, kN, kK, kTM, kTN, kTK, typename Config::SIteratorA,
+        &gemm<InType, AccType, kM, kN, kK, kTM, kTN, kTK,
+              typename Config::GIteratorA, typename Config::SIteratorA,
               typename Config::SharedA, typename Config::RegA,
-              typename Config::G2SLoaderA, typename Config::S2RLoaderA,
-              typename Config::SIteratorB, typename Config::SharedB,
-              typename Config::RegB, typename Config::G2SLoaderB,
-              typename Config::S2RLoaderB, typename Config::GlobalC,
-              typename Config::SharedC, typename Config::Acc,
-              typename Config::AccHalf, typename Config::CastAcc,
-              typename Config::R2SStorerC, typename Config::S2GStorerC>;
+              typename Config::LoadSharedA, typename Config::LoadRegA,
+              typename Config::GIteratorB, typename Config::SIteratorB,
+              typename Config::SharedB, typename Config::RegB,
+              typename Config::LoadSharedB, typename Config::LoadRegB,
+              typename Config::GlobalC, typename Config::SharedC,
+              typename Config::Acc, typename Config::StoreRegC,
+              typename Config::StoreSharedC>;
 
     using KeTraits = benchmarks::cutlass_wrapper::GemmTraits<
         InType, kWarpPerRow, kWarpPerCol, kM, kN, kK, kTM, kTN, kTK>;
@@ -99,22 +107,21 @@ void run_test(std::ofstream& fout) {
     thrust::device_vector<InType> d_c(kM * kN);
     InType* dC = thrust::raw_pointer_cast(d_c.data());
 
-    // output matrix C for tilefusion gemm kernel
-    thrust::device_vector<InType> d_c2(kM * kN);
-    InType* dC2 = thrust::raw_pointer_cast(d_c2.data());
+    thrust::device_vector<AccType> d_c2(kM * kN);
+    AccType* dC2 = thrust::raw_pointer_cast(d_c2.data());
 
     // output matrix C for cublas gemm
     thrust::device_vector<__half> d_c3(kM * kN);
     __half* dC3 = thrust::raw_pointer_cast(d_c3.data());
 
     thrust::host_vector<InType> h_c;
-    thrust::host_vector<InType> h_c2;
+    thrust::host_vector<AccType> h_c2;
     thrust::host_vector<__half> h_c3;
 
-    //// =============== check correctness =============== ////
+//// =============== check correctness =============== ////
 #ifdef CHECK_CORRECTNESS
     thrust::fill(d_c.begin(), d_c.end(), static_cast<InType>(0.));
-    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<InType>(0.));
+    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<AccType>(0.));
     thrust::fill(d_c3.begin(), d_c3.end(), static_cast<__half>(0.));
 
     cutlass_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC);
@@ -130,12 +137,12 @@ void run_test(std::ofstream& fout) {
     h_c3 = d_c3;
 
     bool passed1 = check_results(
-        thrust::raw_pointer_cast(h_c.data()) /*cutlass*/,
-        thrust::raw_pointer_cast(h_c2.data()) /*tiled cuda*/, kM * kN);
+        thrust::raw_pointer_cast(h_c2.data()), /*tilefusion */
+        thrust::raw_pointer_cast(h_c.data()), /*cutlass */ kM * kN);
 
     bool passed2 = check_results(
-        thrust::raw_pointer_cast(h_c3.data()) /*cutlass*/,
-        thrust::raw_pointer_cast(h_c2.data()) /*tiled cuda*/, kM * kN);
+        thrust::raw_pointer_cast(h_c3.data()), /*cublas */
+        thrust::raw_pointer_cast(h_c.data()), /*cutlass */ kM * kN);
 
     if (!(passed1 && passed2)) {
         std::cerr << "Test failed" << std::endl;
