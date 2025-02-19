@@ -1,6 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-
 #pragma once
 
 #include "cell/copy/mod.hpp"
@@ -8,8 +7,6 @@
 #include "types/mod.hpp"
 
 namespace tilefusion::cell::copy {
-
-using namespace tilefusion::traits;
 using namespace atom;
 namespace tl = tile_layout;
 
@@ -56,7 +53,8 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = BaseTileShape<DType>;
+    using BaseShape = traits::BaseTileShape<DType>;
+
     using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
     static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
@@ -124,7 +122,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     using Reg = Reg_;
     using DType = Shared::DType;
     using LoadMat = LoadMatBase<DType>;
-    using BaseShape = BaseTileShape<DType>;
 
     static constexpr int kSharedRows = Shared::kRows;
     static constexpr int kSharedCols = Shared::kCols;
@@ -159,6 +156,8 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     }
 
   private:
+    using BaseShape = traits::BaseTileShape<DType>;
+
     static constexpr int kSharedRowStride = Shared::kRowStride;
     static constexpr int kSharedColStride = Shared::kColStride;
 
@@ -290,7 +289,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = BaseTileShape<DType>;
+    using BaseShape = traits::BaseTileShape<DType>;
+
     using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
     static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
@@ -407,7 +407,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = BaseTileShape<DType>;
+    using BaseShape = traits::BaseTileShape<DType>;
+
     // Use 64x8 as a basic swizzle block shape in ColMajor layout.
     using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
     static constexpr int kSwizzleRows = SwizzledBaseShape::kCols;
@@ -480,10 +481,10 @@ template <typename Reg_, typename WarpLayout_, const WarpReuse kMode_>
 struct SharedToRegLoader {
     using Reg = Reg_;
     using DType = typename Reg::DType::DType;  // the element data type
-    using WarpShape = BaseTileShape<DType>;
-
     using WarpLayout = WarpLayout_;
     static constexpr WarpReuse kMode = kMode_;
+
+    using BaseShape = traits::BaseTileShape<DType>;
 
     // how many times a `BaseTile` is executed along the row and column
     // direction.
@@ -494,15 +495,15 @@ struct SharedToRegLoader {
     DEVICE void operator()(const Shared& src, Reg& dst) {
         static_assert(std::is_same_v<typename Shared::DType, DType>,
                       "The data type of Shared and Reg must be the same.");
-        static_assert(Shared::kRows % tl::num_rows<WarpLayout> == 0,
+        static_assert(Shared::kRows % WarpLayout::kRows == 0,
                       "The current implementation requires Shared::kRows must "
-                      "be divisible by tl::num_rows<WarpLayout>");
-        static_assert(Shared::kCols % tl::num_cols<WarpLayout> == 0,
+                      "be divisible by WarpLayout::kRows");
+        static_assert(Shared::kCols % WarpLayout::kCols == 0,
                       "The current implementation requires Shared::kCols must "
-                      "be divisible by tl::num_cols<WarpLayout>");
+                      "be divisible by WarpLayout::kCols");
 
         using SharedOffset =
-            warp::SharedOffsetHelper<WarpLayout, WarpShape, Shared, kMode>;
+            warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;
         SharedOffset shared_offset_;
 
         // advance the pointer to input data to the current warp according to
@@ -524,8 +525,9 @@ struct RegToSharedStorer {
     using Reg = Reg_;
     // elementary data type stored in the register tile.
     using DType = typename Reg::DType::DType;
-    using WarpShape = BaseTileShape<DType>;
     using WarpLayout = WarpLayout_;
+
+    using BaseShape = traits::BaseTileShape<DType>;
 
     // how many times a `BaseTile` is executed along the row and column
     // direction.
@@ -541,17 +543,17 @@ struct RegToSharedStorer {
                       "The element data type of Shared and Register tile must "
                       "be the same.");
         static_assert((Reg::kNumel * Reg::DType::kNumel * 32 /*warp size*/ *
-                       tl::get_numel<WarpLayout>) == Shared::kNumel,
+                       WarpLayout::kNumel) == Shared::kNumel,
                       "The number of elements held in the local register file "
                       "by all threads in the CTA must be the same as the "
                       "number held in the shared memory tile.");
         static_assert(
             Shared::kType == Reg::kType,
             "The layout of Shared and Register tile must be the same.");
-        static_assert(Shared::kRows % WarpShape::kRows == 0,
+        static_assert(Shared::kRows % BaseShape::kRows == 0,
                       "The number of shared memory rows must be divisible by "
                       "the base tile row.");
-        static_assert(Shared::kCols % WarpShape::kCols == 0,
+        static_assert(Shared::kCols % BaseShape::kCols == 0,
                       "The number of shared memory columns must be divisible "
                       "by the base tile column.");
 
@@ -559,7 +561,7 @@ struct RegToSharedStorer {
         // warp reuse mode. During the store process, threads do not write to
         // the same shared memory location, thus the warp reuse mode is set to
         // `Cont`.
-        using SharedOffset = warp::SharedOffsetHelper<WarpLayout, WarpShape,
+        using SharedOffset = warp::SharedOffsetHelper<WarpLayout, BaseShape,
                                                       Shared, WarpReuse::kCont>;
         SharedOffset shared_offset_;
         int offset = shared_offset_.get_warp_offset();
