@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "types/base_tile.hpp"
 #include "types/layout.hpp"
 #include "util/print.hpp"
 
@@ -19,13 +20,16 @@ struct SharedTilePrettyPrinter {
         // parameter `tile` here is not used
 
         auto swizzled = Shared::kSwizzled ? "swizzled" : "non-swizzled";
-        out << "\t" << typename Shared::Layout{} << ", Swizzled = " << swizzled;
+        out << "\t" << typename Shared::Layout{} << ", Swizzled = " << swizzled
+            << ", BaseShape = " << typename Shared::BaseShape{};
     }
 };
 
 }  // namespace
 
-template <typename Element_, typename Layout_, const bool kSwizzled_ = false>
+/// TODO(ying): move swizzle a composed layout instead of a boolean value.
+template <typename Element_, typename Layout_, const bool kSwizzled_ = false,
+          typename BaseShape_ = DefaultBaseTile<Element_, Layout_::kType>>
 class SharedTile {
   public:
     using DType = Element_;
@@ -35,6 +39,16 @@ class SharedTile {
 
     static constexpr int kRows = Layout::kRows;
     static constexpr int kCols = Layout::kCols;
+
+    using BaseShape = BaseShape_;
+
+    static_assert(kRows % BaseShape::kRows == 0,
+                  "The number of shared memory rows must be divisible by "
+                  "the base tile row.");
+    static_assert(kCols % BaseShape::kCols == 0,
+                  "The number of shared memory columns must be divisible "
+                  "by the base tile column.");
+
     static constexpr int kRowStride = Layout::kRowStride;
     static constexpr int kColStride = Layout::kColStride;
 
@@ -70,9 +84,11 @@ class SharedTile {
 
 /// @brief Pretty printer for the static shape information of a SharedTile.
 ///        Note: This printer function works ONLY on the host.
-template <typename Element, typename Layout, const bool kSwizzled>
+template <typename Element, typename Layout, const bool kSwizzled,
+          typename BaseShape>
 static HOST std::ostream& operator<<(
-    std::ostream& out, const SharedTile<Element, Layout, kSwizzled>& tile) {
+    std::ostream& out,
+    const SharedTile<Element, Layout, kSwizzled, BaseShape>& tile) {
     SharedTilePrettyPrinter::print(out, tile);
     return out;
 }

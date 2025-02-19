@@ -34,8 +34,12 @@ class STileIterator {
     using Tile = Tile_;
     using DType = Tile::DType;
     using ChunkShape = ChunkShape_;
-    using BaseShape = traits::BaseTileShape<DType>;
+
+    // TODO(ying): Resolve overlapping concepts that cause internal structures
+    // to be inaccessible from external environments. Ensure this ambiguity is
+    // acceptable.
     using SwizzleBaseShape = traits::SwizzleBaseTileShape<DType>;
+    using BaseShape = typename Tile::BaseShape;
 
     static constexpr int kChunkRows = dim_size<0, ChunkShape>;
     static constexpr int kChunkCols = dim_size<1, ChunkShape>;
