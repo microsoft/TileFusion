@@ -140,67 +140,88 @@ void run_test_col_major() {
 }  // namespace
 
 TEST(GlobalToSharedLoad, test_row_major_load) {
-    // test non-swizzled __half.
-    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 64, false>();
-    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 256, false>();
-    run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, false>();
-    run_test_row_major<__half, tl::RowMajor<4, 1>, 64, 64, false>();
-    run_test_row_major<__half, tl::RowMajor<2, 2>, 32, 128, false>();
-    run_test_row_major<__half, tl::RowMajor<2, 4>, 32, 256, false>();
-    run_test_row_major<__half, tl::RowMajor<2, 4>, 64, 512, false>();
+    {  // test non-swizzled __half.
+        static constexpr bool kSwizzled = false;
 
-    // test swizzled __half.
-    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 64, true>();
-    run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 256, true>();
-    run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, true>();
-    run_test_row_major<__half, tl::RowMajor<4, 1>, 64, 64, true>();
-    run_test_row_major<__half, tl::RowMajor<2, 2>, 32, 128, true>();
-    run_test_row_major<__half, tl::RowMajor<2, 4>, 32, 256, true>();
-    run_test_row_major<__half, tl::RowMajor<2, 4>, 64, 512, true>();
+        run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 256, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<2, 1>, 64, 64, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<4, 1>, 64, 64, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<2, 2>, 32, 128, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<2, 4>, 32, 256, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<2, 4>, 64, 512, kSwizzled>();
+    }
 
-    // test non-swizzled float.
-    run_test_row_major<float, tl::RowMajor<1, 1>, 8, 32, false>();
-    run_test_row_major<float, tl::RowMajor<1, 1>, 16, 64, false>();
-    run_test_row_major<float, tl::RowMajor<1, 4>, 16, 128, false>();
-    run_test_row_major<float, tl::RowMajor<4, 1>, 64, 32, false>();
-    run_test_row_major<float, tl::RowMajor<2, 2>, 32, 64, false>();
-    run_test_row_major<float, tl::RowMajor<2, 4>, 32, 128, false>();
+    {  // test swizzled __half.
+        static constexpr bool kSwizzled = true;
 
-    // test swizzled float.
-    run_test_row_major<float, tl::RowMajor<1, 1>, 8, 32, true>();
-    run_test_row_major<float, tl::RowMajor<1, 1>, 16, 64, true>();
-    run_test_row_major<float, tl::RowMajor<1, 4>, 16, 128, true>();
-    run_test_row_major<float, tl::RowMajor<4, 1>, 64, 32, true>();
-    run_test_row_major<float, tl::RowMajor<2, 2>, 32, 64, true>();
-    run_test_row_major<float, tl::RowMajor<2, 4>, 32, 128, true>();
+        run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<1, 1>, 16, 256, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<2, 1>, 64, 64, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<1, 4>, 16, 256, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<4, 1>, 64, 64, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<2, 2>, 32, 128, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<2, 4>, 32, 256, kSwizzled>();
+        run_test_row_major<__half, tl::RowMajor<2, 4>, 64, 512, kSwizzled>();
+    }
 
-    // To check correctness for next tests.
-    run_test_row_major<__half, tl::RowMajor<2, 1>, 64, 64, false>();
-    run_test_row_major<__half, tl::RowMajor<2, 1>, 64, 64, true>();
+    {  // test non-swizzled float.
+        static constexpr bool kSwizzled = false;
+
+        run_test_row_major<float, tl::RowMajor<1, 1>, 8, 32, kSwizzled>();
+        run_test_row_major<float, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
+        run_test_row_major<float, tl::RowMajor<1, 4>, 16, 128, kSwizzled>();
+        run_test_row_major<float, tl::RowMajor<4, 1>, 64, 32, kSwizzled>();
+        run_test_row_major<float, tl::RowMajor<2, 2>, 32, 64, kSwizzled>();
+        run_test_row_major<float, tl::RowMajor<2, 4>, 32, 128, kSwizzled>();
+    }
+
+    {  // test swizzled float.
+        static constexpr bool kSwizzled = true;
+
+        run_test_row_major<float, tl::RowMajor<1, 1>, 8, 32, kSwizzled>();
+        run_test_row_major<float, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
+        run_test_row_major<float, tl::RowMajor<1, 4>, 16, 128, kSwizzled>();
+        run_test_row_major<float, tl::RowMajor<4, 1>, 64, 32, kSwizzled>();
+        run_test_row_major<float, tl::RowMajor<2, 2>, 32, 64, kSwizzled>();
+        run_test_row_major<float, tl::RowMajor<2, 4>, 32, 128, kSwizzled>();
+    }
 }
 
 TEST(GlobalToSharedLoad, test_col_major_load) {
-    // FIXME(ying): temporarily disable the test to refactor the copy.
-    // Make sure all the unit tests pass after the refactor.
+    {
+        static constexpr bool kSwizzled = false;
 
-    run_test_col_major<__half, tl::RowMajor<1, 1>, 64, 16, false>();
-    run_test_col_major<__half, tl::RowMajor<1, 1>, 128, 16, false>();
-    run_test_col_major<__half, tl::RowMajor<1, 4>, 64, 128, false>();
-    run_test_col_major<__half, tl::RowMajor<4, 1>, 256, 16, false>();
-    run_test_col_major<__half, tl::RowMajor<2, 2>, 128, 32, false>();
+        run_test_col_major<__half, tl::RowMajor<1, 1>, 64, 16, kSwizzled>();
+        run_test_col_major<__half, tl::RowMajor<1, 1>, 128, 16, kSwizzled>();
+        run_test_col_major<__half, tl::RowMajor<1, 4>, 64, 128, kSwizzled>();
+        run_test_col_major<__half, tl::RowMajor<4, 1>, 256, 16, kSwizzled>();
+        run_test_col_major<__half, tl::RowMajor<2, 2>, 128, 32, kSwizzled>();
+    }
 
-    run_test_col_major<__half, tl::RowMajor<1, 1>, 64, 16, true>();
-    run_test_col_major<__half, tl::RowMajor<1, 1>, 128, 16, true>();
-    run_test_col_major<__half, tl::RowMajor<1, 4>, 64, 128, true>();
-    run_test_col_major<__half, tl::RowMajor<4, 1>, 256, 32, true>();
-    run_test_col_major<__half, tl::RowMajor<2, 2>, 128, 32, true>();
+    {
+        static constexpr bool kSwizzled = true;
+        run_test_col_major<__half, tl::RowMajor<1, 1>, 64, 16, kSwizzled>();
+        run_test_col_major<__half, tl::RowMajor<1, 1>, 128, 16, kSwizzled>();
+        run_test_col_major<__half, tl::RowMajor<1, 4>, 64, 128, kSwizzled>();
+        run_test_col_major<__half, tl::RowMajor<4, 1>, 256, 32, kSwizzled>();
+        run_test_col_major<__half, tl::RowMajor<2, 2>, 128, 32, kSwizzled>();
+    }
 
-    run_test_col_major<float, tl::RowMajor<1, 1>, 32, 16, false>();
-    run_test_col_major<float, tl::RowMajor<1, 1>, 64, 16, false>();
-    run_test_col_major<float, tl::RowMajor<1, 4>, 64, 64, false>();
-    run_test_col_major<float, tl::RowMajor<4, 1>, 128, 32, false>();
-    run_test_col_major<float, tl::RowMajor<2, 2>, 64, 64, false>();
+    {
+        static constexpr bool kSwizzled = false;
 
-    run_test_col_major<float, tl::RowMajor<1, 1>, 128, 128, true>();
+        run_test_col_major<float, tl::RowMajor<1, 1>, 32, 16, kSwizzled>();
+        run_test_col_major<float, tl::RowMajor<1, 1>, 64, 16, kSwizzled>();
+        run_test_col_major<float, tl::RowMajor<1, 4>, 64, 64, kSwizzled>();
+        run_test_col_major<float, tl::RowMajor<4, 1>, 128, 32, kSwizzled>();
+        run_test_col_major<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+    }
+
+    {
+        static constexpr bool kSwizzled = true;
+        run_test_col_major<float, tl::RowMajor<1, 1>, 128, 128, kSwizzled>();
+    }
 }
 }  // namespace tilefusion::testing

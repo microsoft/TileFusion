@@ -137,16 +137,16 @@ struct TestTraits {
 
     // register tile for operand A, calculate register usage for operand A
     // warp tile shape for the operand A
-    static constexpr int kAMs = kM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kAKs = kChunkK / BaseShape::kTileSize;
+    static constexpr int kAMs = kM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kAKs = kChunkK / BaseShape::kCols;
     using RegA = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<kAMs, kAKs>>;
     // load RegTileA from shared
     using LoadRegA =
         SharedToRegLoader<RegA, WarpLayout, WarpReuse::kRowReuseCont>;
 
     // register tile for operand B, calculate register usage for operand B
-    static constexpr int kBKs = kChunkK / BaseShape::kTileSize;
-    static constexpr int kBNs = kN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kBKs = kChunkK / BaseShape::kRows;
+    static constexpr int kBNs = kN / kWarpPerCol / BaseShape::kCols;
     using RegB = RegTile<BaseTileColMajor<Element>, tl::ColMajor<kBKs, kBNs>>;
     // load RegTileB from shared
     using LoadRegB =
@@ -154,8 +154,8 @@ struct TestTraits {
 
     // register tile for output C
     // calculate register usage for output C
-    static constexpr int kCMs = kM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kCNs = kN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kCMs = kM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kCNs = kN / kWarpPerCol / BaseShape::kCols;
 
     using RegC =
         RegTile<BaseTileRowMajor<ElementAcc>, tl::RowMajor<kCMs, kCNs>>;
@@ -327,10 +327,13 @@ TEST(TestGemm, test) {
     // For example, on A100, do not test GEMM larger than [128, 128, 128],
     // as this will cause a shared memory overflow.
 
-    // 1 x 1 warp
-    run_test<16, 32, 64, tl::RowMajor<1, 1>, 64, true>();  // minimal shape
+    // 1 warp
+    run_test<16, 16, 64, tl::RowMajor<1, 1>, 64, true>();  // minimal shape
+    run_test<32, 16, 64, tl::RowMajor<1, 1>, 64, true>();
+    run_test<16, 32, 64, tl::RowMajor<1, 1>, 64, true>();
     run_test<32, 32, 64, tl::RowMajor<1, 1>, 64, true>();
     run_test<64, 64, 64, tl::RowMajor<1, 1>, 64, true>();
+    run_test<128, 64, 64, tl::RowMajor<1, 1>, 64, true>();
 
     // 2 x 1 warps
     run_test<32, 64, 128, tl::RowMajor<2, 1>, 128, true>();
@@ -344,10 +347,10 @@ TEST(TestGemm, test) {
     // run_test<64, 128, 128, tl::RowMajor<1, 2>, 128, true>();
 
     // 2 x 2 warps
-    run_test<64, 128, 128, tl::RowMajor<2, 2>, 128, true>();
+    run_test<64, 64, 128, tl::RowMajor<2, 2>, 128, true>();
 
     // 4 x 1 warps
-    run_test<64, 32, 256, tl::RowMajor<4, 1>, 256, true>();
+    run_test<64, 16, 256, tl::RowMajor<4, 1>, 256, true>();
 }
 
 }  // namespace tilefusion::testing
