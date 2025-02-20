@@ -12,13 +12,6 @@
 #define CHECK_CORRECTNESS true
 
 //// =============== Test Config=============== ////
-// static const int kWarpPerRow = 2;
-// static const int kWarpPerCol = 4;
-// using WholeShape = GemmShape<4096, 4096, 4096>;
-// using CtaTileShape = GemmShape<128, 128, 64>;
-// using WarpLayout = tl::RowMajor<kWarpPerRow, kWarpPerCol>;
-// static constexpr int kRK = 16;
-
 static const int kWarpPerRow = 2;
 static const int kWarpPerCol = 2;
 using WholeShape = GemmShape<4096, 4096, 128>;
