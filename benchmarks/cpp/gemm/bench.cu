@@ -9,7 +9,7 @@
 #include <fstream>
 #include <iomanip>
 
-// #define CHECK_CORRECTNESS true
+#define CHECK_CORRECTNESS true
 
 //// =============== Test Config=============== ////
 // static const int kWarpPerRow = 2;

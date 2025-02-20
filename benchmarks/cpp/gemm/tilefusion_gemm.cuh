@@ -52,8 +52,8 @@ struct KeGemmTraits {
     using SIteratorA = STileIterator<SharedA, TileShape<kTM, kRK>>;
 
     // Register tile for a single thread of operand A
-    static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kAKs = kRK / BaseShape::kTileSize;
+    static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kAKs = kRK / BaseShape::kCols;
     using RegA = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kAMs, kAKs>>;
 
     using LoadRegA =
@@ -76,8 +76,8 @@ struct KeGemmTraits {
                   "mismatched K dimension!");
 
     // Register tile for a single thread of operand A
-    static constexpr int kBKs = kRK / BaseShape::kTileSize;
-    static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kBKs = kRK / BaseShape::kRows;
+    static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kCols;
     using RegB = RegTile<BaseTileColMajor<InType>, tl::ColMajor<kBKs, kBNs>>;
 
     using LoadRegB =
@@ -89,8 +89,8 @@ struct KeGemmTraits {
     using SharedC = SharedTile<InType, tl::RowMajor<kTM, kTN>, kSwizzled>;
 
     // Register Tile for output C
-    static constexpr int kCMs = kTM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kCNs = kTN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kCMs = kTM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kCNs = kTN / kWarpPerCol / BaseShape::kCols;
     using Acc = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kCMs, kCNs>>;
     using AccHalf = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kCMs, kCNs>>;
 
