@@ -143,14 +143,14 @@ struct TestTraits {
     // TODO: whether BaseTileShape should depend on Element type?
     using BaseShape = traits::BaseTileShape<Element>;
 
-    static constexpr int kAMs = kM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kAKs = kK / BaseShape::kTileSize;
+    static constexpr int kAMs = kM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kAKs = kK / BaseShape::kCols;
 
-    static constexpr int kBKs = kK / BaseShape::kTileSize;
-    static constexpr int kBNs = kN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kBKs = kK / BaseShape::kRows;
+    static constexpr int kBNs = kN / kWarpPerCol / BaseShape::kCols;
 
-    static constexpr int kCMs = kM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kCNs = kN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kCMs = kM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kCNs = kN / kWarpPerCol / BaseShape::kCols;
 
     using SharedA = SharedTile<Element, tl::RowMajor<kM, kK>>;
     using TileIteratorA = STileIterator<SharedA, TileShape<kM, kK>>;

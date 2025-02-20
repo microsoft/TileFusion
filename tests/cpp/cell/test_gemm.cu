@@ -137,16 +137,16 @@ struct TestTraits {
 
     // register tile for operand A, calculate register usage for operand A
     // warp tile shape for the operand A
-    static constexpr int kAMs = kM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kAKs = kChunkK / BaseShape::kTileSize;
+    static constexpr int kAMs = kM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kAKs = kChunkK / BaseShape::kCols;
     using RegA = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<kAMs, kAKs>>;
     // load RegTileA from shared
     using LoadRegA =
         SharedToRegLoader<RegA, WarpLayout, WarpReuse::kRowReuseCont>;
 
     // register tile for operand B, calculate register usage for operand B
-    static constexpr int kBKs = kChunkK / BaseShape::kTileSize;
-    static constexpr int kBNs = kN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kBKs = kChunkK / BaseShape::kRows;
+    static constexpr int kBNs = kN / kWarpPerCol / BaseShape::kCols;
     using RegB = RegTile<BaseTileColMajor<Element>, tl::ColMajor<kBKs, kBNs>>;
     // load RegTileB from shared
     using LoadRegB =
@@ -154,8 +154,8 @@ struct TestTraits {
 
     // register tile for output C
     // calculate register usage for output C
-    static constexpr int kCMs = kM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kCNs = kN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kCMs = kM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kCNs = kN / kWarpPerCol / BaseShape::kCols;
 
     using RegC =
         RegTile<BaseTileRowMajor<ElementAcc>, tl::RowMajor<kCMs, kCNs>>;

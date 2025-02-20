@@ -41,15 +41,13 @@ struct AccessBase {
     static constexpr int kExpectedSize = kMemTransWidth / kElementBits;
 };
 
+// FIXME(ying): Legacy code, remove it gradually.
 template <typename Element>
     requires BaseType<Element>
 struct BaseTileShape {
-    using DType = Element;
-
-    static constexpr int kTileSize = 16;
-    static constexpr int kRows = kTileSize;
-    static constexpr int kCols = kTileSize;
-    static constexpr int kNumel = kRows * kCols;
+    static constexpr int kRows = 16;
+    static constexpr int kCols = 16;
+    static constexpr int kNumel = 256 /* kRows * kCols */;
 };
 
 /**

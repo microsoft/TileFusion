@@ -21,16 +21,15 @@ struct Swizzle {
     static constexpr int Mbits = kM;
     static constexpr int Sbits = kS;
     /**
-     * @brief Apply the swizzle to an index.
+     * @brief Applies the swizzle function to permute a 1-D index.
      *
-     * @param idx The index in a swizzle chunk of 2^B * 2^S * 2^M elements.
-     * @return The swizzled index.
+     * @param idx The 1-D index within the swizzle space of 2^B * 2^S * 2^M
+     *            elements.
+     * @return The permuted (swizzled) index.
      */
     HOST_DEVICE int operator()(int idx) const {
         // | Bbits | Sbits | Mbits |
         // Mbits as mask for the lower bits.
-
-        assert(idx < (1 << (Bbits + Mbits + Sbits)));
 
         int bs = idx >> Mbits;
         // (b, s) as a 2d coordinate.
@@ -46,15 +45,23 @@ struct Swizzle {
 };
 
 /**
- * @brief Swizzled Layout.
- *
- * @tparam Layout_ The layout to swizzle.
+ * @brief `SwizzledLayout` combines a `Layout` with a swizzle function.
+ *        The `Layout` maps a 2-D coordinate to a 1-D index, while the swizzle
+ *        function permutes these 1-D indices. Essentially, `SwizzledLayout`
+ *        implements a composed function where a given 2-D coordinate is
+ *        first translated into an intermediate 1-D index by the layout
+ *        function. The swizzle function then permutes this intermediate 1-D
+ *        index into a new 1-D index, which is finally interpreted again as a
+ *        2-D coordinate in the space defined by `Layout`.
+ * @tparam Layout The `Layout` that defines a function mapping a 2-D coordinate
+ *                to a 1-D index.
  * @tparam kB The number of bits for B.
  * @tparam kM The number of bits for M.
  * @tparam kS The number of bits for S.
+ * @tparam kType The type of the Layout.
  */
-template <typename Layout_, const int kB, const int kM, const int kS,
-          const tl::Layout kType>
+template <typename Layout, const int kB, const int kM, const int kS,
+          const tl::Layout kType = Layout::kType>
 struct SwizzledLayout;
 
 template <typename Layout_, const int kB, const int kM, const int kS>
@@ -72,16 +79,14 @@ struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kRowMajor> {
                   "The number of columns in the layout should be 2^S * 2^M.");
 
     /**
-     * @brief Apply the swizzle in a layout.
+     * @brief Compose the swizzle function with the layout function.
      *
-     * @param x Row dimension index, with a total of 2^B rows.
-     * @param y Column dimension index, with a total of 2^S * 2^M columns.
+     * @param x The row index, with a total of 2^B rows.
+     * @param y The column index, with a total of 2^S * 2^M columns.
+     * @return The swizzled index after applying the layout function.
      */
     HOST_DEVICE auto operator()(int x, int y) const {
         int idx = (x << (Mbits + Sbits)) | y;
-
-        // KuangjuX: This assert may affect the performance.
-        // assert(idx < (1 << (Bbits + Mbits + Sbits)));
 
         int swizzled_idx = swizzle_(idx);
         int swizzled_x = swizzled_idx >> (Mbits + Sbits);
@@ -109,16 +114,14 @@ struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kColMajor> {
                   "The number of columns in the layout should be 2^B.");
 
     /**
-     * @brief Apply the swizzle in a layout.
+     * @brief Compose the swizzle function with the layout function.
      *
-     * @param x Row dimension index, with a total of 2^B rows.
-     * @param y Column dimension index, with a total of 2^S * 2^M columns.
+     * @param x The row index, with a total of 2^B rows.
+     * @param y The column index, with a total of 2^S * 2^M columns.
+     * @return The swizzled index after applying the layout function.
      */
     HOST_DEVICE auto operator()(int x, int y) const {
         int idx = (y << (Bbits + Mbits)) | x;
-
-        // KuanjuX: This assert may affect the performance.
-        // assert(idx < (1 << (Bbits + Mbits + Sbits)));
 
         int swizzled_idx = swizzle_(idx);
         int swizzled_y = swizzled_idx >> (Mbits + Sbits);

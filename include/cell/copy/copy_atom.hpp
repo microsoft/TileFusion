@@ -11,22 +11,16 @@
 #include "traits/base.hpp"
 #include "types/layout.hpp"
 
-#include <cute/tensor.hpp>
-
 namespace tilefusion::cell::copy::atom {
 namespace tl = tile_layout;
-using namespace cute;
 
 namespace {
 template <const int kBytes>
 DEVICE void ld_global_st_shared(uint32_t dst, void const* src) {
     static_assert(kBytes == 4 || kBytes == 8 || kBytes == 16);
 
-#if (__CUDA_ARCH__ >= 900)
-    // SM90, hopper
-    assert(false && "Not implemented yet.");
-#elif (__CUDA_ARCH__ >= 800)
-    // SM80, SM86, ampere
+#if (__CUDA_ARCH__ >= 800)
+    // SM90, hopper, SM80, SM86, ampere
     // TODO(ying): add a wrapper to allow choosing between different caching
     // policies (e.g. "cache all levels").
     asm volatile("cp.async.cg.shared.global [%0], [%1], %2;\n" ::"r"(dst),
@@ -271,53 +265,6 @@ struct StoreMatBase<Shared, tl::Layout::kColMajor> {
 
     DEVICE int lane_col_id() {
         return (threadIdx.x % WARP_SIZE) / tl::num_rows<ThreadLayout>;
-    }
-};
-
-template <typename Global, typename Shared, typename BaseShape,
-          const tl::Layout kType = Shared::kType>
-struct GlobalToSharedBaseTileLoader;
-
-/// @brief Load a BaseTile from global memory to shared memory.
-template <typename Global, typename Shared, typename BaseShape_>
-struct GlobalToSharedBaseTileLoader<Global, Shared, BaseShape_,
-                                    tl::Layout::kColMajor> {
-    using DType = Shared::DType;
-
-    // The macro kernel breaks down the entire copy operation into iterations
-    // over 16x16 BaseTiles. To transfer a single BaseTile, threads in a warp
-    // are arranged in a 16x2 row-major layout. Each thread uses 128-bit data in
-    // a single access.
-    using ThreadLayout = tile_layout::RowMajor<2, 16>;
-    static constexpr int kThreadsPerRow = tl::num_rows<ThreadLayout>;
-    static constexpr int kThreadsPerCol = tl::num_cols<ThreadLayout>;
-
-    static constexpr int kNumPerAccess =
-        traits::AccessBase<DType>::kNumPerAccess;
-
-    using BaseShape = traits::BaseTileShape<DType>;
-
-    static constexpr int kRowStride = kThreadsPerRow * kNumPerAccess;
-    static constexpr int kExecCount = BaseShape::kRows / kRowStride;
-
-    // create CuTe's compatible column-major layout for the global memory.
-    using BaseTileGlobalLayout =
-        cute::Layout<Shape<Int<BaseShape::kRows>, Int<BaseShape::kCols>>,
-                     Stride<_1, Int<Global::kColStride>>>;
-
-    using BaseTileSharedLayout = tl::SharedLayoutWrapper<
-        Shared, traits::AccessBase<DType>::kAccessInBits>::Layout;
-
-    /// @brief returns the lane row of the current thread within a warp.
-    DEVICE int lane_row_id() {
-        int lane_id = threadIdx.x % WARP_SIZE;
-        return lane_id / tl::num_cols<ThreadLayout>;
-    }
-
-    /// @brief returns the lane col of the current thread within a warp.
-    DEVICE int lane_col_id() {
-        int lane_id = threadIdx.x % WARP_SIZE;
-        return lane_id % tl::num_cols<ThreadLayout>;
     }
 };
 

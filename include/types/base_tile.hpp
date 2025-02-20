@@ -114,9 +114,6 @@ struct WarpBaseTileShape<DType, TileShape, tl::Layout::kColMajor> {
     using WarpThreadLayout = tl::ColMajor<kRowThreads, kColThreads>;
 };
 
-template <typename Element, const tl::Layout kType>
-using DefaultBaseTile = WarpBaseTileShape<Element, TileShape<16, 16>, kType>;
-
 /// @brief Pretty printer for the static shape information of a
 ///        `WarpBaseTileShape`. Note: This printer function works ONLY on the
 ///        host.
