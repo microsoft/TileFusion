@@ -30,8 +30,6 @@ struct Swizzle {
         // | Bbits | Sbits | Mbits |
         // Mbits as mask for the lower bits.
 
-        assert(idx < (1 << (Bbits + Mbits + Sbits)));
-
         int bs = idx >> Mbits;
         // (b, s) as a 2d coordinate.
         int y = bs & ((1 << Sbits) - 1);
@@ -80,9 +78,6 @@ struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kRowMajor> {
     HOST_DEVICE auto operator()(int x, int y) const {
         int idx = (x << (Mbits + Sbits)) | y;
 
-        // KuangjuX: This assert may affect the performance.
-        // assert(idx < (1 << (Bbits + Mbits + Sbits)));
-
         int swizzled_idx = swizzle_(idx);
         int swizzled_x = swizzled_idx >> (Mbits + Sbits);
         int swizzled_y = swizzled_idx & ((1 << (Mbits + Sbits)) - 1);
@@ -116,9 +111,6 @@ struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kColMajor> {
      */
     HOST_DEVICE auto operator()(int x, int y) const {
         int idx = (y << (Bbits + Mbits)) | x;
-
-        // KuanjuX: This assert may affect the performance.
-        // assert(idx < (1 << (Bbits + Mbits + Sbits)));
 
         int swizzled_idx = swizzle_(idx);
         int swizzled_y = swizzled_idx >> (Mbits + Sbits);

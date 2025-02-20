@@ -40,7 +40,6 @@ struct KeGemmTraits {
     static const bool kSwizzled = true;
 
     // Total data access for operand A in global memory
-    // using GlobalA = GlobalTile<InType, tl::RowMajor<kTM, kK, kK>>;
     using GlobalA = GlobalTile<InType, tl::RowMajor<kTM, kK, kK>>;
     using GIteratorA = GTileIterator<GlobalA, TileShape<kTM, kTK>>;
 
@@ -85,43 +84,45 @@ struct KeGemmTraits {
         SharedToRegLoader<RegB, WarpLayout, WarpReuse::kColReuseCont>;
 
     // Global Tile for output C
-    // using GlobalC = GlobalTile<AccType, tl::RowMajor<kTM, kTN, kN>>;
-    using GlobalC = GlobalTile<AccType, tl::RowMajor<kTM, kTN, kN>>;
+    using GlobalC = GlobalTile<InType, tl::RowMajor<kTM, kTN, kN>>;
     // Shared Tile for output C
-    using SharedC = SharedTile<AccType, tl::RowMajor<kTM, kTN>, kSwizzled>;
+    using SharedC = SharedTile<InType, tl::RowMajor<kTM, kTN>, kSwizzled>;
 
     // Register Tile for output C
     static constexpr int kCMs = kTM / kWarpPerRow / BaseShape::kTileSize;
     static constexpr int kCNs = kTN / kWarpPerCol / BaseShape::kTileSize;
     using Acc = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kCMs, kCNs>>;
+    using AccHalf = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kCMs, kCNs>>;
 
-    using StoreRegC = RegToSharedStorer<Acc, WarpLayout>;
+    using ConvertAcc = compute::RegTileConvert<Acc, AccHalf>;
+
+    using StoreRegC = RegToSharedStorer<AccHalf, WarpLayout>;
     using StoreSharedC = SharedToGlobalStorer<SharedC, WarpLayout>;
 };
 
-template <typename InType, typename AccType,            //
-          const int kM, const int kN, const int kK,     //
-          const int kTM, const int kTN, const int kTK,  //
-          typename GIteratorA,                          //
-          typename SIteratorA,                          //
-          typename SharedA, typename RegA,              //
-          typename LoadSharedA, typename LoadRegA,      //
-          typename GIteratorB,                          //
-          typename SIteratorB,                          //
-          typename SharedB, typename RegB,              //
-          typename LoadSharedB, typename LoadRegB,      //
-          typename GlobalC, typename SharedC,           //
-          typename Acc,                                 //
+template <typename InType, typename AccType,                    //
+          const int kM, const int kN, const int kK,             //
+          const int kTM, const int kTN, const int kTK,          //
+          typename GIteratorA,                                  //
+          typename SIteratorA,                                  //
+          typename SharedA, typename RegA,                      //
+          typename LoadSharedA, typename LoadRegA,              //
+          typename GIteratorB,                                  //
+          typename SIteratorB,                                  //
+          typename SharedB, typename RegB,                      //
+          typename LoadSharedB, typename LoadRegB,              //
+          typename GlobalC, typename SharedC,                   //
+          typename Acc, typename AccHalf, typename ConvertAcc,  //
           typename StoreRegC, typename StoreSharedC>
-__global__ void gemm(const InType* dA_, const InType* dB_, AccType* dC_) {
+__global__ void gemm(const InType* dA_, const InType* dB_, InType* dC_) {
     InType* dA = const_cast<InType*>(dA_) + blockIdx.x * kTM * kK;
     InType* dB = const_cast<InType*>(dB_) + blockIdx.y * kTN * kK;
-    AccType* dC = dC_ + blockIdx.x * kTM * kN + blockIdx.y * kTN;
+    InType* dC = dC_ + blockIdx.x * kTM * kN + blockIdx.y * kTN;
 
     extern __shared__ __align__(sizeof(double)) unsigned char buf[];
     InType* sA_ptr = reinterpret_cast<InType*>(buf);
     InType* sB_ptr = sA_ptr + SIteratorA::Tile::kNumel;
-    AccType* sC_ptr = reinterpret_cast<AccType*>(buf);
+    InType* sC_ptr = reinterpret_cast<InType*>(buf);
 
     GIteratorA gAs(dA);
     GIteratorB gBs(dB);
@@ -135,6 +136,8 @@ __global__ void gemm(const InType* dA_, const InType* dB_, AccType* dC_) {
     RegB rB;
 
     Acc acc;
+    AccHalf acc_half;
+    ConvertAcc convert_acc;
 
     SharedC sC(sC_ptr);
     GlobalC gC(dC);
@@ -162,7 +165,9 @@ __global__ void gemm(const InType* dA_, const InType* dB_, AccType* dC_) {
         }
     }
 
-    store_rC(acc, sC);
+    convert_acc(acc, acc_half);
+
+    store_rC(acc_half, sC);
     __syncthreads();
     store_sC(sC, gC);
 }

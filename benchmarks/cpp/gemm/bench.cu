@@ -9,7 +9,7 @@
 #include <fstream>
 #include <iomanip>
 
-#define CHECK_CORRECTNESS true
+// #define CHECK_CORRECTNESS true
 
 //// =============== Test Config=============== ////
 // static const int kWarpPerRow = 2;
@@ -21,7 +21,7 @@
 
 static const int kWarpPerRow = 2;
 static const int kWarpPerCol = 2;
-using WholeShape = GemmShape<4096, 128, 128>;
+using WholeShape = GemmShape<4096, 4096, 128>;
 using CtaTileShape = GemmShape<64, 128, 128>;
 using WarpLayout = tl::RowMajor<kWarpPerRow, kWarpPerCol>;
 static constexpr int kRK = 64;
@@ -50,7 +50,8 @@ void run_test(std::ofstream& fout) {
               typename Config::SharedB, typename Config::RegB,
               typename Config::LoadSharedB, typename Config::LoadRegB,
               typename Config::GlobalC, typename Config::SharedC,
-              typename Config::Acc, typename Config::StoreRegC,
+              typename Config::Acc, typename Config::AccHalf,
+              typename Config::ConvertAcc, typename Config::StoreRegC,
               typename Config::StoreSharedC>;
 
     using KeTraits = benchmarks::cutlass_wrapper::GemmTraits<
@@ -106,22 +107,21 @@ void run_test(std::ofstream& fout) {
     // output matrix C for cutlass GEMM kernel
     thrust::device_vector<InType> d_c(kM * kN);
     InType* dC = thrust::raw_pointer_cast(d_c.data());
-
-    thrust::device_vector<AccType> d_c2(kM * kN);
-    AccType* dC2 = thrust::raw_pointer_cast(d_c2.data());
+    thrust::device_vector<InType> d_c2(kM * kN);
+    InType* dC2 = thrust::raw_pointer_cast(d_c2.data());
 
     // output matrix C for cublas gemm
     thrust::device_vector<__half> d_c3(kM * kN);
     __half* dC3 = thrust::raw_pointer_cast(d_c3.data());
 
     thrust::host_vector<InType> h_c;
-    thrust::host_vector<AccType> h_c2;
+    thrust::host_vector<InType> h_c2;
     thrust::host_vector<__half> h_c3;
 
 //// =============== check correctness =============== ////
 #ifdef CHECK_CORRECTNESS
     thrust::fill(d_c.begin(), d_c.end(), static_cast<InType>(0.));
-    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<AccType>(0.));
+    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<InType>(0.));
     thrust::fill(d_c3.begin(), d_c3.end(), static_cast<__half>(0.));
 
     cutlass_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC);
@@ -186,7 +186,7 @@ void run_test(std::ofstream& fout) {
 
     fout << "[" << kM << ", " << kN << ", " << kK << "]\t[" << kTM << ", "
          << kTN << ", " << kTK << "]\t" << kRK << "\t[" << kWarpPerRow << ", "
-         << kWarpPerCol << "]\t" << cublas_time << "\t" << base << "("
+         << kWarpPerCol << "]\t" << cublas_time << "\t" << cutlass_time << "("
          << std::setprecision(2) << cutlass_time / base << ")"
          << "\t" << std::setprecision(6) << tilefusion_time << " ("
          << std::setprecision(2) << tilefusion_time / base << ")" << std::endl;
