@@ -88,6 +88,17 @@ bool check_results(const __half* values1, const cutlass::half_t* values2_,
     return check_results_impl(values1, values2, numel);
 }
 
+template <>
+bool check_results(const float* values1, const cutlass::half_t* values2_,
+                   int numel) {
+    const __half* values2 = reinterpret_cast<const __half*>(values2_);
+    __half* hvalues1 = (__half*)malloc(numel * sizeof(__half));
+    for (int i = 0; i < numel; ++i) {
+        hvalues1[i] = __float2half(values1[i]);
+    }
+    return check_results_impl(hvalues1, values2, numel);
+}
+
 float cublas_hgemm(int64_t kM, int64_t kN, int64_t kK, const __half* A,
                    const __half* B, __half* C, bool timeit = false,
                    int warm_up = 5, int iters = 20) {

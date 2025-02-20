@@ -118,8 +118,10 @@ __global__ void gemm_kernel(const Element* dA, const Element* dB, Element* dC) {
         gB_ptr += kTK;
     }
 
-    typename KeTraits::StoreC_R2S sC;  // declare register to shared store plan
-    sC.copy(acc, buf);                 // store register tile to shared memory
+    // declare register to shared store plan
+    typename KeTraits::StoreC_R2S sC;
+    // store register tile to shared memory
+    sC.copy(acc, buf);
     __syncthreads();
 
     // store shared memory tile to global memory

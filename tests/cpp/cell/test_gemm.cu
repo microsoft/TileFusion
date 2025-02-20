@@ -159,8 +159,10 @@ struct TestTraits {
 
     using RegC =
         RegTile<BaseTileRowMajor<ElementAcc>, tl::RowMajor<kCMs, kCNs>>;
+    using SharedC = SharedTile<ElementAcc, tl::RowMajor<kM, kN>, kSwizzled>;
     using GlobalC = GlobalTile<ElementAcc, tl::RowMajor<kM, kN>>;
-    using CStorer = copy::RegToGlobalStorer<GlobalC, RegC, WarpLayout>;
+    using StoreRegC = RegToSharedStorer<RegC, WarpLayout>;
+    using StoreSharedC = SharedToGlobalStorer<SharedC, WarpLayout>;
 };
 
 template <typename Element, typename ElementAcc,                     //
@@ -168,7 +170,8 @@ template <typename Element, typename ElementAcc,                     //
           typename GlobalB, typename SharedB, typename LoadSharedB,  //
           typename TileIteratorA, typename RegA, typename LoadRegA,
           typename TileIteratorB, typename RegB, typename LoadRegB,
-          typename GlobalC, typename RegC, typename StoreC>
+          typename GlobalC, typename SharedC, typename RegC, typename StoreRegC,
+          typename StoreSharedC>
 __global__ void test_gemm(const Element* ga, const Element* gb,
                           ElementAcc* gc) {
     GlobalA gA(ga);
@@ -177,6 +180,7 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
     extern __shared__ __align__(sizeof(double)) unsigned char buf_[];
     auto* shared_a = reinterpret_cast<Element*>(buf_);
     auto* shared_b = shared_a + TileIteratorA::Tile::kNumel;
+    auto* shared_c = reinterpret_cast<ElementAcc*>(buf_);
 
     SharedA sA(shared_a);
     SharedB sB(shared_b);
@@ -208,10 +212,15 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
     }
     __syncthreads();
 
-    // store from register to global
+    SharedC sC(shared_c);
+    StoreRegC store_rC;
+    store_rC(acc, sC);
+
+    __syncthreads();
+    // store from shared to global
     GlobalC gC(gc);
-    StoreC store_rC;
-    store_rC(acc, gC);
+    StoreSharedC store_sC;
+    store_sC(sC, gC);
 }
 }  // namespace
 
@@ -281,7 +290,8 @@ void run_test() {
         typename config::LoadSharedA, typename config::GlobalB,
         typename config::SharedB, typename config::LoadSharedB, IteratorA, RegA,
         typename config::LoadRegA, IteratorB, RegB, typename config::LoadRegB,
-        typename config::GlobalC, RegC, typename config::CStorer>;
+        typename config::GlobalC, typename config::SharedC, RegC,
+        typename config::StoreRegC, typename config::StoreSharedC>;
 
     if (shm_size > 48 * 1024) {
         cudaFuncSetAttribute(
