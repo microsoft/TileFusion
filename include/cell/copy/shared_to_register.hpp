@@ -53,7 +53,7 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = traits::BaseTileShape<DType>;
+    using BaseShape = Shared::BaseShape;
 
     using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
@@ -409,7 +409,6 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
   private:
     using BaseShape = traits::BaseTileShape<DType>;
 
-    // Use 64x8 as a basic swizzle block shape in ColMajor layout.
     using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
     static constexpr int kSwizzleRows = SwizzledBaseShape::kCols;
     static constexpr int kSwizzleCols = SwizzledBaseShape::kRows;
@@ -484,8 +483,6 @@ struct SharedToRegLoader {
     using WarpLayout = WarpLayout_;
     static constexpr WarpReuse kMode = kMode_;
 
-    using BaseShape = traits::BaseTileShape<DType>;
-
     // how many times a `BaseTile` is executed along the row and column
     // direction.
     static constexpr int kRowExec = Reg::kRows;
@@ -503,7 +500,7 @@ struct SharedToRegLoader {
                       "be divisible by WarpLayout::kCols");
 
         using SharedOffset =
-            warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;
+            warp::SharedOffsetHelper<WarpLayout, Shared, kMode>;
         SharedOffset shared_offset_;
 
         // advance the pointer to input data to the current warp according to
@@ -527,8 +524,6 @@ struct RegToSharedStorer {
     using DType = typename Reg::DType::DType;
     using WarpLayout = WarpLayout_;
 
-    using BaseShape = traits::BaseTileShape<DType>;
-
     // how many times a `BaseTile` is executed along the row and column
     // direction.
     static constexpr int kRowExec = Reg::kRows;
@@ -550,19 +545,13 @@ struct RegToSharedStorer {
         static_assert(
             Shared::kType == Reg::kType,
             "The layout of Shared and Register tile must be the same.");
-        static_assert(Shared::kRows % BaseShape::kRows == 0,
-                      "The number of shared memory rows must be divisible by "
-                      "the base tile row.");
-        static_assert(Shared::kCols % BaseShape::kCols == 0,
-                      "The number of shared memory columns must be divisible "
-                      "by the base tile column.");
 
         // advance the pointer to input data to the current warp according to
         // warp reuse mode. During the store process, threads do not write to
         // the same shared memory location, thus the warp reuse mode is set to
         // `Cont`.
-        using SharedOffset = warp::SharedOffsetHelper<WarpLayout, BaseShape,
-                                                      Shared, WarpReuse::kCont>;
+        using SharedOffset =
+            warp::SharedOffsetHelper<WarpLayout, Shared, WarpReuse::kCont>;
         SharedOffset shared_offset_;
         int offset = shared_offset_.get_warp_offset();
 
