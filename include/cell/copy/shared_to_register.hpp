@@ -26,9 +26,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     using DType = Shared::DType;
     using Reg = Reg_;
 
-    static constexpr int kSharedRows = Shared::kRows;
-    static constexpr int kSharedCols = Shared::kCols;
-
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
@@ -40,9 +37,10 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
         for (int i = 0; i < kRowExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
-                int tile_offset =
-                    start_offset + i * kSharedCols * BaseShape::kRows +
-                    j * BaseShape::kCols + lane_row * kSharedCols + lane_col;
+                int tile_offset = start_offset +
+                                  i * kSharedRowStride * BaseShape::kRows +
+                                  j * BaseShape::kCols +
+                                  lane_row * kSharedRowStride + lane_col;
                 int offset = get_swizzle_offset(tile_offset);
 
                 // advance pointer to the 16x16 `BaseTile` indexed by(i, j).
@@ -58,6 +56,8 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
     static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
+
+    static constexpr int kSharedRowStride = Shared::kRowStride;
 
     static constexpr int kSwizzledBlockRows =
         kRowExec * BaseShape::kRows / kSwizzledRows;
@@ -81,8 +81,8 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
 
     DEVICE int2 get_swizzled_tile_id(int offset) {
         // SwizzleTile is a 8 x 64 block.
-        int swizzle_tile_col = (offset % kSharedCols) / kSwizzledCols;
-        int swizzle_tile_row = (offset / kSharedCols) / kSwizzledRows;
+        int swizzle_tile_col = (offset % kSharedRowStride) / kSwizzledCols;
+        int swizzle_tile_row = (offset / kSharedRowStride) / kSwizzledRows;
         return make_int2(swizzle_tile_row, swizzle_tile_col);
     }
 
@@ -90,8 +90,8 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
         // Get id in the swizzle tile.
         auto swizzled_tile_id = get_swizzled_tile_id(offset);
 
-        int row = offset / kSharedCols;
-        int col = offset % kSharedCols;
+        int row = offset / kSharedRowStride;
+        int col = offset % kSharedRowStride;
 
         int in_swizzle_tile_col = col % kSwizzledCols;
         int in_swizzle_tile_row = row % kSwizzledRows;
@@ -123,9 +123,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     using DType = Shared::DType;
     using LoadMat = LoadMatBase<DType>;
 
-    static constexpr int kSharedRows = Shared::kRows;
-    static constexpr int kSharedCols = Shared::kCols;
-
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
@@ -144,9 +141,10 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
         for (int i = 0; i < kColExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kRowExec; ++j) {
-                int tile_offset =
-                    start_offset + i * kSharedRows * BaseShape::kCols +
-                    j * BaseShape::kRows + lane_col * kSharedRows + lane_row;
+                int tile_offset = start_offset +
+                                  i * kSharedColStride * BaseShape::kCols +
+                                  j * BaseShape::kRows +
+                                  lane_col * kSharedColStride + lane_row;
                 int offset = get_swizzle_offset(tile_offset);
 
                 // issue the hardware-backed memory access instruction
@@ -158,7 +156,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
   private:
     using BaseShape = traits::BaseTileShape<DType>;
 
-    static constexpr int kSharedRowStride = Shared::kRowStride;
     static constexpr int kSharedColStride = Shared::kColStride;
 
     using BaseTilesLayout =
@@ -200,8 +197,8 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
 
     DEVICE int2 get_swizzled_tile_id(int offset) {
         // SwizzleTile is a 8 x 64 block.
-        int swizzle_tile_row = (offset % kSharedRows) / kSwizzleRows;
-        int swizzle_tile_col = (offset / kSharedRows) / kSwizzleCols;
+        int swizzle_tile_row = (offset % kSharedColStride) / kSwizzleRows;
+        int swizzle_tile_col = (offset / kSharedColStride) / kSwizzleCols;
         return make_int2(swizzle_tile_row, swizzle_tile_col);
     }
 
@@ -209,8 +206,8 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
         // Get id in the swizzle tile.
         auto swizzled_tile_id = get_swizzled_tile_id(offset);
 
-        int row = offset % kSharedRows;
-        int col = offset / kSharedRows;
+        int row = offset % kSharedColStride;
+        int col = offset / kSharedColStride;
 
         int in_swizzle_tile_row = row % kSwizzleRows;
         int in_swizzle_tile_col = col % kSwizzleCols;
@@ -245,9 +242,6 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     using Shared = Shared_;
     using DType = Shared::DType;
     using StoreMat = StoreMatBase<Shared, tl::Layout::kRowMajor>;
-
-    static constexpr int kSharedRows = Shared::kRows;
-    static constexpr int kSharedCols = Shared::kCols;
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
@@ -298,6 +292,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     static constexpr int kRowStride = BaseShape::kRows * Shared::kRowStride;
     static constexpr int kColStride = BaseShape::kCols;
 
+    static constexpr int kSharedRowStride = Shared::kRowStride;
+
     static constexpr int kSwizzledBlockRows =
         kRowExec * BaseShape::kRows / kSwizzledRows;
     static constexpr int kSwizzledBlockCols =
@@ -323,8 +319,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 
     DEVICE int2 get_swizzled_tile_id(int offset) {
         // SwizzleTile is a 8 x 64 block.
-        int swizzle_tile_col = (offset % kSharedCols) / kSwizzledCols;
-        int swizzle_tile_row = (offset / kSharedCols) / kSwizzledRows;
+        int swizzle_tile_col = (offset % kSharedRowStride) / kSwizzledCols;
+        int swizzle_tile_row = (offset / kSharedRowStride) / kSwizzledRows;
         return make_int2(swizzle_tile_row, swizzle_tile_col);
     }
 
@@ -332,8 +328,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
         // Get id in the swizzle tile.
         auto swizzled_tile_id = get_swizzled_tile_id(offset);
 
-        int row = offset / kSharedCols;
-        int col = offset % kSharedCols;
+        int row = offset / kSharedRowStride;
+        int col = offset % kSharedRowStride;
 
         int in_swizzle_tile_col = col % kSwizzledCols;
         int in_swizzle_tile_row = row % kSwizzledRows;
@@ -366,9 +362,6 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
-
-    static constexpr int kSharedRows = Shared::kRows;
-    static constexpr int kSharedCols = Shared::kCols;
 
     DEVICE void operator()(const Reg& src, DType* dst, int start_offset) {
 #pragma unroll
@@ -422,6 +415,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     static constexpr int kRowStride = BaseShape::kRows;
     static constexpr int kColStride = BaseShape::kCols * Shared::kColStride;
 
+    static constexpr int kSharedColStride = Shared::kColStride;
+
     using PackedType =
         typename Packing<DType, StoreMat::kElemPerSeg>::PackedType;
 
@@ -442,8 +437,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 
     DEVICE int2 get_swizzled_tile_id(int offset) {
         // SwizzleTile is a 8 x 64 block.
-        int swizzle_tile_row = (offset % kSharedRows) / kSwizzleRows;
-        int swizzle_tile_col = (offset / kSharedRows) / kSwizzleCols;
+        int swizzle_tile_row = (offset % kSharedColStride) / kSwizzleRows;
+        int swizzle_tile_col = (offset / kSharedColStride) / kSwizzleCols;
         return make_int2(swizzle_tile_row, swizzle_tile_col);
     }
 
@@ -451,8 +446,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
         // Get id in the swizzle tile.
         auto swizzled_tile_id = get_swizzled_tile_id(offset);
 
-        int row = offset % kSharedRows;
-        int col = offset / kSharedRows;
+        int row = offset % kSharedColStride;
+        int col = offset / kSharedColStride;
 
         int in_swizzle_tile_row = row % kSwizzleRows;
         int in_swizzle_tile_col = col % kSwizzleCols;
