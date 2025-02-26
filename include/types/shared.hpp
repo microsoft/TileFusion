@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "types/base_tile.hpp"
 #include "types/layout.hpp"
 #include "util/print.hpp"
 
@@ -17,29 +18,41 @@ struct SharedTilePrettyPrinter {
     template <typename Shared>
     static HOST void print(std::ostream& out, const Shared& tile) {
         // parameter `tile` here is not used
-
         auto swizzled = Shared::kSwizzled ? "swizzled" : "non-swizzled";
-        out << "\t" << typename Shared::Layout{} << ", Swizzled = " << swizzled;
+        out << "\t" << typename Shared::Layout{} << ", Swizzled = " << swizzled
+            << std::endl
+            << "\t" << typename Shared::BaseShape{};
     }
 };
 
 }  // namespace
 
-template <typename Element_, typename Layout_, const bool kSwizzled_ = false>
+/// FIXME(ying): 1. move swizzle a composed layout instead of a boolean value.
+// 2. The default value for `BaseShape_` is a workaround to maintain
+// compatibility with the previous versions of BaseTile. Remove it after all the
+// concepts are unified.
+template <typename Element_, typename Layout_, const bool kSwizzled_ = false,
+          typename BaseShape_ = traits::BaseTileShape<Element_>>
 class SharedTile {
   public:
     using DType = Element_;
     using Layout = Layout_;
-
-    static constexpr int kNumel = Layout::kNumel;
+    using BaseShape = BaseShape_;
 
     static constexpr int kRows = Layout::kRows;
     static constexpr int kCols = Layout::kCols;
-    static constexpr int kRowStride = Layout::kRowStride;
-    static constexpr int kColStride = Layout::kColStride;
-
     static constexpr tl::Layout kType = Layout::kType;
 
+    static_assert(kRows % BaseShape::kRows == 0,
+                  "The number of shared memory rows must be divisible by "
+                  "the base tile row.");
+    static_assert(kCols % BaseShape::kCols == 0,
+                  "The number of shared memory columns must be divisible "
+                  "by the base tile column.");
+
+    static constexpr int kNumel = Layout::kNumel;
+    static constexpr int kRowStride = Layout::kRowStride;
+    static constexpr int kColStride = Layout::kColStride;
     static constexpr bool kSwizzled = kSwizzled_;
 
     // This Ctor is to enable the use of the pretty printer of SharedTile in the
@@ -70,9 +83,11 @@ class SharedTile {
 
 /// @brief Pretty printer for the static shape information of a SharedTile.
 ///        Note: This printer function works ONLY on the host.
-template <typename Element, typename Layout, const bool kSwizzled>
+template <typename Element, typename Layout, const bool kSwizzled,
+          typename BaseShape>
 static HOST std::ostream& operator<<(
-    std::ostream& out, const SharedTile<Element, Layout, kSwizzled>& tile) {
+    std::ostream& out,
+    const SharedTile<Element, Layout, kSwizzled, BaseShape>& tile) {
     SharedTilePrettyPrinter::print(out, tile);
     return out;
 }

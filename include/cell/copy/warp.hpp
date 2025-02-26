@@ -166,11 +166,10 @@ HOST_DEVICE constexpr int warp_tile_cols() {
     return -1;
 }
 
-template <typename BaseShape_, typename Tile_, typename WarpLayout_,
-          const WarpReuse kMode_>
+template <typename Tile_, typename WarpLayout_, const WarpReuse kMode_>
 struct ExecCounter {
-    using BaseShape = BaseShape_;
     using Tile = Tile_;
+    using BaseShape = typename Tile::BaseShape;
 
     static_assert(
         Tile::kCols % BaseShape::kCols == 0,
@@ -273,15 +272,14 @@ struct GlobalOffsetHelper {
  * not correctly reveal the physical layout of data in memory. This requires
  * further special treatment.
  */
-template <typename WarpLayout, typename BaseShape, typename Shared,
-          const WarpReuse kMode, const tl::Layout kType = Shared::kType,
+template <typename WarpLayout, typename Shared, const WarpReuse kMode,
+          const tl::Layout kType = Shared::kType,
           const bool kIsSharedLayout = IsSharedLayout<Shared>>
 struct SharedOffsetHelper;
 
-template <typename WarpLayout_, typename BaseShape_, typename Shared_,
-          const WarpReuse kMode_>
-struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
-                          tl::Layout::kRowMajor, false> {
+template <typename WarpLayout_, typename Shared_, const WarpReuse kMode_>
+struct SharedOffsetHelper<WarpLayout_, Shared_, kMode_, tl::Layout::kRowMajor,
+                          false> {
     DEVICE int get_warp_offset() {
         switch (kMode) {
             case WarpReuse::kCont:
@@ -301,8 +299,9 @@ struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
   private:
     using Shared = Shared_;
     using WarpLayout = WarpLayout_;
-    using BaseShape = BaseShape_;
     static constexpr WarpReuse kMode = kMode_;
+
+    using BaseShape = Shared::BaseShape;
 
     constexpr static int kTilePerRow = Shared::kRows / BaseShape::kRows;
     constexpr static int kTilePerCol = Shared::kCols / BaseShape::kCols;
@@ -312,10 +311,9 @@ struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
     constexpr static int kColStride = kTilePerCol / tl::num_cols<WarpLayout>;
 };
 
-template <typename WarpLayout_, typename BaseShape_, typename Shared_,
-          const WarpReuse kMode_>
-struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
-                          tl::Layout::kColMajor, false> {
+template <typename WarpLayout_, typename Shared_, const WarpReuse kMode_>
+struct SharedOffsetHelper<WarpLayout_, Shared_, kMode_, tl::Layout::kColMajor,
+                          false> {
     DEVICE int get_warp_offset() {
         switch (kMode) {
             case WarpReuse::kCont:
@@ -335,8 +333,9 @@ struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
   private:
     using Shared = Shared_;
     using WarpLayout = WarpLayout_;
-    using BaseShape = BaseShape_;
     static constexpr WarpReuse kMode = kMode_;
+
+    using BaseShape = Shared::BaseShape;
 
     constexpr static int kTilePerRow = Shared::kRows / BaseShape::kRows;
     constexpr static int kTilePerCol = Shared::kCols / BaseShape::kCols;
@@ -345,10 +344,9 @@ struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
     constexpr static int kColStride = kTilePerCol / tl::num_cols<WarpLayout>;
 };
 
-template <typename WarpLayout_, typename BaseShape_, typename Shared_,
-          const WarpReuse kMode_, const tl::Layout kType>
-struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_, kType,
-                          true> {
+template <typename WarpLayout_, typename Shared_, const WarpReuse kMode_,
+          const tl::Layout kType>
+struct SharedOffsetHelper<WarpLayout_, Shared_, kMode_, kType, true> {
     using WarpLayout = WarpLayout_;
 
     DEVICE int get_warp_offset() {
@@ -357,8 +355,9 @@ struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_, kType,
 
   private:
     using Shared = Shared_;
-    using BaseShape = BaseShape_;
     static constexpr WarpReuse kMode = kMode_;
+
+    using BaseShape = Shared::BaseShape;
 
     constexpr static int kTilePerRow = Shared::kCols / BaseShape::kCols;
     constexpr static int kTilePerCol = Shared::kRows / BaseShape::kRows;

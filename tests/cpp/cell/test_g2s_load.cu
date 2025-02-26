@@ -58,7 +58,13 @@ void run_test_row_major() {
     thrust::device_vector<Element> d_A = h_A;
 
     using SrcTile = GlobalTile<Element, tl::RowMajor<kRows, kCols>>;
-    using DstTile = SharedTile<Element, tl::RowMajor<kRows, kCols>, kSwizzled>;
+
+    using WarpShape = TileShape<warp_tile_rows<kRows, WarpLayout::kRows>(),
+                                warp_tile_cols<kCols, WarpLayout::kCols>()>;
+    using BaseShape =
+        WarpBaseTileShape<Element, WarpShape, tl::Layout::kRowMajor>;
+    using DstTile =
+        SharedTile<Element, tl::RowMajor<kRows, kCols>, kSwizzled, BaseShape>;
 
     using Loader = copy::GlobalToSharedLoader<DstTile, WarpLayout>;
     Loader loader;
@@ -93,7 +99,7 @@ void run_test_row_major() {
 template <typename Element, typename WarpLayout, const int kRows,
           const int kCols, const bool kSwizzled = false>
 void run_test_col_major() {
-    static const int kThreads = tl::get_numel<WarpLayout> * 32;
+    static const int kThreads = WarpLayout::kNumel * 32;
 
     int numel = kRows * kCols;
     thrust::host_vector<Element> h_A(numel);
@@ -105,7 +111,13 @@ void run_test_col_major() {
     thrust::device_vector<Element> d_A = h_A;
 
     using SrcTile = GlobalTile<Element, tl::ColMajor<kRows, kCols>>;
-    using DstTile = SharedTile<Element, tl::ColMajor<kRows, kCols>, kSwizzled>;
+
+    using WarpShape = TileShape<warp_tile_rows<kRows, WarpLayout::kRows>(),
+                                warp_tile_cols<kCols, WarpLayout::kCols>()>;
+    using BaseShape =
+        WarpBaseTileShape<Element, WarpShape, tl::Layout::kColMajor>;
+    using DstTile =
+        SharedTile<Element, tl::ColMajor<kRows, kCols>, kSwizzled, BaseShape>;
 
     using Loader = copy::GlobalToSharedLoader<DstTile, WarpLayout>;
     Loader loader;

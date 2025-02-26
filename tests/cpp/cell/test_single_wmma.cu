@@ -140,7 +140,6 @@ struct TestTraits {
     static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
 
     // ============= shared to register loader =================
-    // TODO: whether BaseTileShape should depend on Element type?
     using BaseShape = traits::BaseTileShape<Element>;
 
     static constexpr int kAMs = kM / kWarpPerRow / BaseShape::kRows;
