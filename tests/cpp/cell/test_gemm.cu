@@ -334,6 +334,7 @@ TEST(TestGemm, test) {
     run_test<32, 32, 64, tl::RowMajor<1, 1>, 64, true>();
     run_test<64, 64, 64, tl::RowMajor<1, 1>, 64, true>();
     run_test<128, 64, 64, tl::RowMajor<1, 1>, 64, true>();
+    run_test<128, 64, 128, tl::RowMajor<1, 1>, 64, true>();
 
     // 2 x 1 warps
     run_test<32, 64, 128, tl::RowMajor<2, 1>, 128, true>();
