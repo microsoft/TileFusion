@@ -29,7 +29,9 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
-    DEVICE void operator()(const DType* src, Reg& dst, int start_offset) {
+    DEVICE void operator()(const DType* src, Reg& dst, int warp_offset,
+                           int iterator_offset) {
+        int global_offset = warp_offset + iterator_offset;
         int lane_row = this->lane_row_id();
         int lane_col = this->lane_col_id() * LoadMat::kNumPerAccess;
 
@@ -37,11 +39,11 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
         for (int i = 0; i < kRowExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
-                int tile_offset = start_offset +
+                int tile_offset = global_offset +
                                   i * kSharedRowStride * BaseShape::kRows +
                                   j * BaseShape::kCols +
                                   lane_row * kSharedRowStride + lane_col;
-                int offset = get_swizzle_offset(tile_offset);
+                int offset = get_swizzle_offset(tile_offset) - iterator_offset;
 
                 // advance pointer to the 16x16 `BaseTile` indexed by(i, j).
                 // issue the hardware-backed memory access instruction.
@@ -130,7 +132,9 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
         : base_tiles_(BaseTilesLayout{})
         , in_base_tile_(BaseTileSharedLayout{}) {}
 
-    DEVICE void operator()(const DType* src, Reg& dst, int start_offset) {
+    DEVICE void operator()(const DType* src, Reg& dst, int warp_offset,
+                           int iterator_offset) {
+        int global_offset = warp_offset + iterator_offset;
         // transpose the lane position if the shared memory is in
         // column-major. 16 threads are mapped to the strided dimension
         // of the data while the 2 threads are mapped to the contiguous
@@ -141,11 +145,11 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
         for (int i = 0; i < kColExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kRowExec; ++j) {
-                int tile_offset = start_offset +
+                int tile_offset = global_offset +
                                   i * kSharedColStride * BaseShape::kCols +
                                   j * BaseShape::kRows +
                                   lane_col * kSharedColStride + lane_row;
-                int offset = get_swizzle_offset(tile_offset);
+                int offset = get_swizzle_offset(tile_offset) - iterator_offset;
 
                 // issue the hardware-backed memory access instruction
                 this->ldmatrix(src + offset, dst(j, i).mutable_data());
@@ -246,7 +250,7 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
-    DEVICE void operator()(const Reg& src, DType* dst, int start_offset) {
+    DEVICE void operator()(const Reg& src, DType* dst, int warp_offset) {
 #pragma unroll
         for (int j = 0; j < kColExec; ++j) {
 #pragma unroll
@@ -254,8 +258,7 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
                 int lane_row = this->lane_row_id();
                 int lane_col = this->lane_col_id();
 
-                int tile_offset =
-                    start_offset + i * kRowStride + j * kColStride;
+                int tile_offset = warp_offset + i * kRowStride + j * kColStride;
                 int row = 0, col = 0;
 #pragma unroll
                 for (int m = 0; m < StoreMat::kSegRows; ++m) {
@@ -363,13 +366,12 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
-    DEVICE void operator()(const Reg& src, DType* dst, int start_offset) {
+    DEVICE void operator()(const Reg& src, DType* dst, int warp_offset) {
 #pragma unroll
         for (int j = 0; j < kColExec; ++j) {
 #pragma unroll
             for (int i = 0; i < kRowExec; ++i) {
-                int tile_offset =
-                    start_offset + j * kColStride + i * kRowStride;
+                int tile_offset = warp_offset + j * kColStride + i * kRowStride;
                 int lane_row = this->lane_row_id();
                 int lane_col = this->lane_col_id();
 
@@ -503,12 +505,13 @@ struct SharedToRegLoader {
 
         // advance the pointer to input data to the current warp according to
         // warp reuse mode.
-        int offset = shared_offset_.get_warp_offset();
+        int warp_offset = shared_offset_.get_warp_offset();
+        int iterator_offset = src.get_offset();
 
         using Loader = detail::SharedToRegLoaderImpl<Shared, Reg, kRowExec,
                                                      kColExec, Shared::kType>;
         Loader loader;
-        loader(src.data(), dst, offset);
+        loader(src.data(), dst, warp_offset, iterator_offset);
     }
 };
 
@@ -559,13 +562,13 @@ struct RegToSharedStorer {
         using SharedOffset = warp::SharedOffsetHelper<WarpLayout, BaseShape,
                                                       Shared, WarpReuse::kCont>;
         SharedOffset shared_offset_;
-        int offset = shared_offset_.get_warp_offset();
+        int warp_offset = shared_offset_.get_warp_offset();
 
         using Storer = detail::RegToSharedStorerImpl<Reg, Shared, kRowExec,
                                                      kColExec, Reg::kType>;
         Storer storer;
 
-        storer(src, dst_.mutable_data(), offset);
+        storer(src, dst_.mutable_data(), warp_offset);
     }
 };
 }  // namespace tilefusion::cell::copy

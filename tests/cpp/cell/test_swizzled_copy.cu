@@ -413,8 +413,10 @@ TEST(TestSwizzledLoad, test_load_row_major) {
     run_test_rowmajor<tl::RowMajor<1, 1>, 32, 128, 32, 128, 64>();
     run_test_rowmajor<tl::RowMajor<1, 1>, 32, 256, 32, 256, 64>();
     run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 64>();
-    // TODO(KuangjuX): misaligned address.
-    // run_test_rowmajor<tl::RowMajor<1, 1>, 128, 128, 128, 64, 64>();
+    // smaller chunk
+    run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 32>();
+    run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 16>();
+
     run_test_rowmajor<tl::RowMajor<2, 1>, 128, 128, 128, 64, 64>();
     run_test_rowmajor<tl::RowMajor<4, 1>, 128, 128, 128, 128, 128>();
     run_test_rowmajor<tl::RowMajor<4, 2>, 128, 128, 128, 128, 128>();
@@ -429,6 +431,7 @@ TEST(TestSwizzledLoad, test_load_row_major) {
     run_test_rowmajor<tl::RowMajor<2, 2>, 32, 128, 32, 128, 128>();
     run_test_rowmajor<tl::RowMajor<2, 2>, 64, 256, 64, 128, 128>();
     run_test_rowmajor<tl::RowMajor<2, 2>, 64, 256, 64, 128, 64>();
+    run_test_rowmajor<tl::RowMajor<2, 2>, 64, 256, 64, 128, 32>();
 
     run_test_rowmajor<tl::RowMajor<2, 1>, 32, 64, 32, 64, 64>();
     run_test_rowmajor<tl::RowMajor<2, 1>, 64, 64, 64, 64, 64>();

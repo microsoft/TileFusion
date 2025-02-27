@@ -44,13 +44,21 @@ class SharedTile {
 
     // This Ctor is to enable the use of the pretty printer of SharedTile in the
     // host code.
-    HOST SharedTile() : data_(nullptr), layout_(Layout{}) {}
+    HOST SharedTile() : data_(nullptr), layout_(Layout{}), offset_(0) {}
 
-    DEVICE SharedTile(DType* data) : data_(data), layout_(Layout{}) {}
+    DEVICE SharedTile(DType* data)
+        : data_(data), layout_(Layout{}), offset_(0) {}
+
+    DEVICE SharedTile(DType* data, int offset)
+        : data_(data), layout_(Layout{}), offset_(offset) {}
 
     DEVICE DType* mutable_data() { return data_; }
 
     DEVICE const DType* data() const { return data_; }
+
+    DEVICE int get_offset() const { return offset_; }
+
+    DEVICE void move_tile(int offset) { offset_ += offset; }
 
     HOST_DEVICE const Layout& layout() const { return layout_; }
 
@@ -66,6 +74,7 @@ class SharedTile {
   private:
     DType* data_;
     Layout layout_;
+    int offset_;
 };
 
 /// @brief Pretty printer for the static shape information of a SharedTile.
