@@ -159,10 +159,8 @@ struct TestTraits {
 
     using RegC =
         RegTile<BaseTileRowMajor<ElementAcc>, tl::RowMajor<kCMs, kCNs>>;
-    using SharedC = SharedTile<ElementAcc, tl::RowMajor<kM, kN>, kSwizzled>;
     using GlobalC = GlobalTile<ElementAcc, tl::RowMajor<kM, kN>>;
-    using StoreRegC = RegToSharedStorer<RegC, WarpLayout>;
-    using StoreSharedC = SharedToGlobalStorer<SharedC, WarpLayout>;
+    using CStorer = copy::RegToGlobalStorer<GlobalC, RegC, WarpLayout>;
 };
 
 template <typename Element, typename ElementAcc,                     //
@@ -170,8 +168,7 @@ template <typename Element, typename ElementAcc,                     //
           typename GlobalB, typename SharedB, typename LoadSharedB,  //
           typename TileIteratorA, typename RegA, typename LoadRegA,
           typename TileIteratorB, typename RegB, typename LoadRegB,
-          typename GlobalC, typename SharedC, typename RegC, typename StoreRegC,
-          typename StoreSharedC>
+          typename GlobalC, typename RegC, typename StoreC>
 __global__ void test_gemm(const Element* ga, const Element* gb,
                           ElementAcc* gc) {
     GlobalA gA(ga);
@@ -180,7 +177,6 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
     extern __shared__ __align__(sizeof(double)) unsigned char buf_[];
     auto* shared_a = reinterpret_cast<Element*>(buf_);
     auto* shared_b = shared_a + TileIteratorA::Tile::kNumel;
-    auto* shared_c = reinterpret_cast<ElementAcc*>(buf_);
 
     SharedA sA(shared_a);
     SharedB sB(shared_b);
@@ -212,15 +208,10 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
     }
     __syncthreads();
 
-    SharedC sC(shared_c);
-    StoreRegC store_rC;
-    store_rC(acc, sC);
-
-    __syncthreads();
-    // store from shared to global
+    // store from register to global
     GlobalC gC(gc);
-    StoreSharedC store_sC;
-    store_sC(sC, gC);
+    StoreC store_rC;
+    store_rC(acc, gC);
 }
 }  // namespace
 
@@ -290,8 +281,7 @@ void run_test() {
         typename config::LoadSharedA, typename config::GlobalB,
         typename config::SharedB, typename config::LoadSharedB, IteratorA, RegA,
         typename config::LoadRegA, IteratorB, RegB, typename config::LoadRegB,
-        typename config::GlobalC, typename config::SharedC, RegC,
-        typename config::StoreRegC, typename config::StoreSharedC>;
+        typename config::GlobalC, RegC, typename config::CStorer>;
 
     if (shm_size > 48 * 1024) {
         cudaFuncSetAttribute(
@@ -340,15 +330,14 @@ TEST(TestGemm, test) {
     run_test<32, 64, 128, tl::RowMajor<2, 1>, 128, true>();
     run_test<64, 64, 128, tl::RowMajor<2, 1>, 128, true>();
     run_test<32, 128, 128, tl::RowMajor<2, 1>, 128, true>();
+    run_test<32, 128, 128, tl::RowMajor<2, 1>, 64, true>();
 
     // 1 x 2 warps
     run_test<32, 128, 128, tl::RowMajor<1, 2>, 128, true>();
-    // TODO(KuangjuX): CUDA free failed: cudaErrorMisalignedAddress: misaligned
-    // address.
-    // run_test<64, 128, 128, tl::RowMajor<1, 2>, 128, true>();
 
     // 2 x 2 warps
     run_test<64, 64, 128, tl::RowMajor<2, 2>, 128, true>();
+    run_test<64, 64, 128, tl::RowMajor<2, 2>, 64, true>();
 
     // 4 x 1 warps
     run_test<64, 16, 256, tl::RowMajor<4, 1>, 256, true>();
