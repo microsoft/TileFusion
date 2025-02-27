@@ -83,7 +83,7 @@ class STileIterator {
                       y * (Tile::kColStride * kChunkCols);
         int offset = Tile::kType == tl::Layout::kRowMajor ? offset1 : offset2;
 
-        NewTile tile(data_ + offset);
+        NewTile tile(data_ + offset, offset);
         return tile;
     }
 

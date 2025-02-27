@@ -326,6 +326,10 @@ TEST(TestGemm, test) {
     run_test<128, 64, 64, tl::RowMajor<1, 1>, 64, true>();
     run_test<128, 64, 128, tl::RowMajor<1, 1>, 64, true>();
 
+    // smaller chunk size
+    run_test<128, 64, 128, tl::RowMajor<1, 1>, 32, true>();
+    run_test<128, 64, 128, tl::RowMajor<1, 1>, 16, true>();
+
     // 2 x 1 warps
     run_test<32, 64, 128, tl::RowMajor<2, 1>, 128, true>();
     run_test<64, 64, 128, tl::RowMajor<2, 1>, 128, true>();
@@ -338,6 +342,10 @@ TEST(TestGemm, test) {
     // 2 x 2 warps
     run_test<64, 64, 128, tl::RowMajor<2, 2>, 128, true>();
     run_test<64, 64, 128, tl::RowMajor<2, 2>, 64, true>();
+
+    // smaller chunk size
+    run_test<64, 64, 128, tl::RowMajor<2, 2>, 32, true>();
+    run_test<64, 64, 128, tl::RowMajor<2, 2>, 16, true>();
 
     // 4 x 1 warps
     run_test<64, 16, 256, tl::RowMajor<4, 1>, 256, true>();
