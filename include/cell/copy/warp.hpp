@@ -17,17 +17,6 @@ namespace tl = tile_layout;
 
 namespace {  // functions/class/structs that are not exposed to a larger scope
 
-// FIXME(ying): This hotfix addresses the current implementation's inability
-// to explicitly distinguish between shared memory's row-major or
-// column-major layout and global memory's layouts. However, this should be
-// fixed in the future.
-template <typename Layout>
-static constexpr bool IsSharedLayout =
-    (Layout::kRowStride == Layout::kCols && Layout::kColStride == 1) ||
-            (Layout::kRowStride == 1 && Layout::kColStride == Layout::kRows)
-        ? false
-        : true;
-
 template <const WarpReuse kMode, int kRowStride, int kColStride>
 struct WarpOffsetHelper;
 
@@ -274,14 +263,13 @@ struct GlobalOffsetHelper {
  * further special treatment.
  */
 template <typename WarpLayout, typename BaseShape, typename Shared,
-          const WarpReuse kMode, const tl::Layout kType = Shared::kType,
-          const bool kIsSharedLayout = IsSharedLayout<Shared>>
+          const WarpReuse kMode, const tl::Layout kType = Shared::kType>
 struct SharedOffsetHelper;
 
 template <typename WarpLayout_, typename BaseShape_, typename Shared_,
           const WarpReuse kMode_>
 struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
-                          tl::Layout::kRowMajor, false> {
+                          tl::Layout::kRowMajor> {
     DEVICE int get_warp_offset() {
         switch (kMode) {
             case WarpReuse::kCont:
@@ -315,7 +303,7 @@ struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
 template <typename WarpLayout_, typename BaseShape_, typename Shared_,
           const WarpReuse kMode_>
 struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
-                          tl::Layout::kColMajor, false> {
+                          tl::Layout::kColMajor> {
     DEVICE int get_warp_offset() {
         switch (kMode) {
             case WarpReuse::kCont:
@@ -345,31 +333,4 @@ struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_,
     constexpr static int kColStride = kTilePerCol / tl::num_cols<WarpLayout>;
 };
 
-template <typename WarpLayout_, typename BaseShape_, typename Shared_,
-          const WarpReuse kMode_, const tl::Layout kType>
-struct SharedOffsetHelper<WarpLayout_, BaseShape_, Shared_, kMode_, kType,
-                          true> {
-    using WarpLayout = WarpLayout_;
-
-    DEVICE int get_warp_offset() {
-        return offset_(warp_row_id<WarpLayout>(), warp_col_id<WarpLayout>());
-    }
-
-  private:
-    using Shared = Shared_;
-    using BaseShape = BaseShape_;
-    static constexpr WarpReuse kMode = kMode_;
-
-    constexpr static int kTilePerRow = Shared::kCols / BaseShape::kCols;
-    constexpr static int kTilePerCol = Shared::kRows / BaseShape::kRows;
-
-    constexpr static int kTilePerWarpRow =
-        kTilePerRow / tl::num_cols<WarpLayout>;
-    constexpr static int kTilePerWarpCol =
-        kTilePerCol / tl::num_rows<WarpLayout>;
-
-    using Offset = WarpOffsetHelper<kMode, Shared::kRowStride * kTilePerWarpCol,
-                                    Shared::kColStride * kTilePerWarpRow>;
-    Offset offset_;
-};
 }  // namespace tilefusion::cell::copy::warp
