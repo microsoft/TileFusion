@@ -58,8 +58,6 @@ class SharedTile {
 
     DEVICE int get_offset() const { return offset_; }
 
-    DEVICE void move_tile(int offset) { offset_ += offset; }
-
     HOST_DEVICE const Layout& layout() const { return layout_; }
 
     // for write access
