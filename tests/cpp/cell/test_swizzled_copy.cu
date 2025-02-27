@@ -440,6 +440,7 @@ TEST(TestSwizzledLoad, test_load_row_major) {
 TEST(TestSwizzledLoad, test_load_col_major) {
     run_test_colmajor<tl::RowMajor<1, 1>, 64, 32, 64, 32, 32>();
     run_test_colmajor<tl::RowMajor<1, 1>, 128, 64, 64, 64, 32>();
+    run_test_colmajor<tl::RowMajor<1, 1>, 128, 64, 64, 64, 32>();
 
     run_test_colmajor<tl::RowMajor<2, 1>, 128, 64, 128, 64, 64>();
     run_test_colmajor<tl::RowMajor<1, 2>, 64, 128, 64, 128, 64>();
