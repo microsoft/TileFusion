@@ -55,7 +55,7 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
   private:
     using BaseShape = traits::BaseTileShape<DType>;
 
-    using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
+    using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType, 128>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
     static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
 
@@ -172,7 +172,7 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     BaseTileSharedLayout in_base_tile_;
 
     // Use 64x8 as a basic swizzle block shape.
-    using SwizzleBaseShape = traits::SwizzleBaseTileShape<DType>;
+    using SwizzleBaseShape = traits::SwizzleBaseTileShape<DType, 128>;
     // Swap the row and column of the `SwizzleBaseShape`.
     static constexpr int kSwizzleRows = SwizzleBaseShape::kCols;
     static constexpr int kSwizzleCols = SwizzleBaseShape::kRows;
@@ -288,7 +288,7 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
   private:
     using BaseShape = traits::BaseTileShape<DType>;
 
-    using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
+    using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType, 128>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
     static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
 
@@ -405,7 +405,7 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     using BaseShape = traits::BaseTileShape<DType>;
 
     // Use 64x8 as a basic swizzle block shape in ColMajor layout.
-    using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
+    using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType, 128>;
     static constexpr int kSwizzleRows = SwizzledBaseShape::kCols;
     static constexpr int kSwizzleCols = SwizzledBaseShape::kRows;
 

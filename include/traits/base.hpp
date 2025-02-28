@@ -53,12 +53,12 @@ struct BaseTileShape {
 /**
  * @brief The base tile shape for Swizzle<3, 3, 3>.
  */
-template <typename Element>
+template <typename Element, int kBytes>
     requires BaseType<Element>
 struct SwizzleBaseTileShape;
 
 template <>
-struct SwizzleBaseTileShape<__half> {
+struct SwizzleBaseTileShape<__half, 128> {
     using DType = __half;
 
     static constexpr int kRows = 8;
@@ -71,7 +71,7 @@ struct SwizzleBaseTileShape<__half> {
 };
 
 template <>
-struct SwizzleBaseTileShape<cutlass::half_t> {
+struct SwizzleBaseTileShape<cutlass::half_t, 128> {
     using DType = cutlass::half_t;
 
     static constexpr int kRows = 8;
@@ -84,7 +84,7 @@ struct SwizzleBaseTileShape<cutlass::half_t> {
 };
 
 template <>
-struct SwizzleBaseTileShape<float> {
+struct SwizzleBaseTileShape<float, 128> {
     using DType = float;
 
     static constexpr int kRows = 8;
@@ -94,6 +94,45 @@ struct SwizzleBaseTileShape<float> {
     static constexpr int B = 3;
     static constexpr int M = 2;
     static constexpr int S = 3;
+};
+
+template <>
+struct SwizzleBaseTileShape<__half, 64> {
+    using DType = __half;
+
+    static constexpr int kRows = 4;
+    static constexpr int kCols = 32;
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 2;
+    static constexpr int M = 3;
+    static constexpr int S = 2;
+};
+
+template <>
+struct SwizzleBaseTileShape<cutlass::half_t, 64> {
+    using DType = cutlass::half_t;
+
+    static constexpr int kRows = 2;
+    static constexpr int kCols = 32;
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 2;
+    static constexpr int M = 3;
+    static constexpr int S = 2;
+};
+
+template <>
+struct SwizzleBaseTileShape<float, 64> {
+    using DType = float;
+
+    static constexpr int kRows = 4;
+    static constexpr int kCols = 16;
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 2;
+    static constexpr int M = 2;
+    static constexpr int S = 2;
 };
 
 }  // namespace tilefusion::traits
