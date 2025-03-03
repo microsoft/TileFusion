@@ -356,8 +356,8 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape, kRowExec_,
         for (int i = 0; i < kRowExec; ++i) {
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
-                offset = i * BaseShape::kRows * Global::kRowStride +
-                         j * BaseShape::kCols + row * Global::kRowStride + col;
+                offset = i * BaseShape::kRows * Shared::kRowStride +
+                         j * BaseShape::kCols + row * Shared::kRowStride + col;
                 src_offset = get_swizzle_offset(offset);
                 dst_offset = dst_tile_(i, j) + in_dst_tile_(row, col);
 
