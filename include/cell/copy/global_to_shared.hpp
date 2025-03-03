@@ -630,6 +630,10 @@ struct GlobalToSharedLoader {
     static constexpr int kRowExec = ExecCounter::kRowExec;
     static constexpr int kColExec = ExecCounter::kColExec;
 
+    static_assert(kRowExec && kColExec,
+                  "Ensure that the execution count for all rows and columns is "
+                  "greater than 0.");
+
     static constexpr int kSharedContInBytes =
         Shared::kType == tl::Layout::kRowMajor
             ? Shared::kCols * sizeof(DType) / WarpLayout::kCols
@@ -641,10 +645,6 @@ struct GlobalToSharedLoader {
 
     static constexpr int kSharedAccessInBytes =
         kSharedContInBytes >= 128 ? 128 : kSharedContInBytes;
-
-    static_assert(kRowExec && kColExec,
-                  "Ensure that the execution count for all rows and columns is "
-                  "greater than 0.");
 
     template <typename Global>
     DEVICE void operator()(const Global& src, Shared& dst) {
