@@ -35,7 +35,6 @@ class STileIterator {
     using DType = Tile::DType;
     using ChunkShape = ChunkShape_;
     using BaseShape = traits::BaseTileShape<DType>;
-    using SwizzleBaseShape = traits::SwizzleBaseTileShape<DType>;
 
     static constexpr int kChunkRows = dim_size<0, ChunkShape>;
     static constexpr int kChunkCols = dim_size<1, ChunkShape>;

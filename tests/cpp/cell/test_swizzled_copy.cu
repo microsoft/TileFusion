@@ -413,6 +413,7 @@ TEST(TestSwizzledLoad, test_load_row_major) {
     run_test_rowmajor<tl::RowMajor<1, 1>, 32, 128, 32, 128, 64>();
     run_test_rowmajor<tl::RowMajor<1, 1>, 32, 256, 32, 256, 64>();
     run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 64>();
+
     // smaller chunk
     run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 32>();
     run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 16>();
@@ -435,6 +436,11 @@ TEST(TestSwizzledLoad, test_load_row_major) {
 
     run_test_rowmajor<tl::RowMajor<2, 1>, 32, 64, 32, 64, 64>();
     run_test_rowmajor<tl::RowMajor<2, 1>, 64, 64, 64, 64, 64>();
+
+    // Swizzle <2, 3, 3>
+    run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 32>();
+    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 32, 32, 32, 32>();
+    run_test_rowmajor<tl::RowMajor<2, 2>, 32, 64, 32, 64, 64>();
 }
 
 TEST(TestSwizzledLoad, test_load_col_major) {
@@ -447,6 +453,11 @@ TEST(TestSwizzledLoad, test_load_col_major) {
 
     run_test_colmajor<tl::RowMajor<2, 2>, 128, 128, 128, 128, 64>();
     run_test_colmajor<tl::RowMajor<4, 2>, 256, 128, 256, 128, 64>();
+
+    // Swizzle <2, 3, 3>
+    run_test_colmajor<tl::RowMajor<1, 1>, 32, 16, 32, 16, 16>();
+    run_test_colmajor<tl::RowMajor<1, 1>, 32, 32, 32, 32, 32>();
+    run_test_colmajor<tl::RowMajor<2, 2>, 64, 32, 64, 32, 32>();
 }
 
 TEST(TestNonSwizzledStore, test_row_major) {
@@ -465,6 +476,11 @@ TEST(TestNonSwizzledStore, test_row_major) {
     test_row_major_store<float, tl::RowMajor<2, 1>, 64, 64, kSwizzled>();
     test_row_major_store<float, tl::RowMajor<1, 2>, 64, 128, kSwizzled>();
     test_row_major_store<float, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+
+    // Swizzle <2, 3, 3>
+    test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
+    test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 32, kSwizzled>();
+    test_row_major_store<__half, tl::RowMajor<2, 2>, 32, 64, kSwizzled>();
 }
 
 TEST(TestSwizzledStored, test_row_major) {
@@ -483,6 +499,11 @@ TEST(TestSwizzledStored, test_row_major) {
     test_row_major_store<float, tl::RowMajor<2, 1>, 64, 64, kSwizzled>();
     test_row_major_store<float, tl::RowMajor<1, 2>, 64, 128, kSwizzled>();
     test_row_major_store<float, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+
+    // Swizzle <2, 3, 3>
+    test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
+    test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 32, kSwizzled>();
+    test_row_major_store<__half, tl::RowMajor<2, 2>, 32, 64, kSwizzled>();
 }
 
 TEST(TestNonSwizzledStored, test_col_major) {

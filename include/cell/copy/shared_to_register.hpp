@@ -13,14 +13,15 @@ namespace tl = tile_layout;
 namespace detail {
 
 template <typename Shared, typename Reg_, const int kRowExec,
-          const int kColExec, const tl::Layout kType>
+          const int kColExec, const int kSharedAccessInBytes,
+          const tl::Layout kType>
 struct SharedToRegLoaderImpl;
 
 /// @brief partial specialization for row-major shared memory tile.
 template <typename Shared, typename Reg_, const int kRowExec_,
-          const int kColExec_>
+          const int kColExec_, const int kSharedAccessInBytes>
 struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
-                             tl::Layout::kRowMajor>
+                             kSharedAccessInBytes, tl::Layout::kRowMajor>
     : public LoadMatBase<typename Shared::DType> {
     using LoadMat = LoadMatBase<typename Shared::DType>;
     using DType = Shared::DType;
@@ -55,7 +56,8 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
   private:
     using BaseShape = traits::BaseTileShape<DType>;
 
-    using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
+    using SwizzledBaseShape =
+        traits::SwizzleBaseTileShape<DType, kSharedAccessInBytes>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
     static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
 
@@ -117,9 +119,9 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
 
 /// @brief partial specialization for column-major shared memory tile.
 template <typename Shared, typename Reg_, const int kRowExec_,
-          const int kColExec_>
+          const int kColExec_, const int kSharedAccessInBytes>
 struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
-                             tl::Layout::kColMajor>
+                             kSharedAccessInBytes, tl::Layout::kColMajor>
     : public LoadMatBase<typename Shared::DType> {
     using Reg = Reg_;
     using DType = Shared::DType;
@@ -172,7 +174,8 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     BaseTileSharedLayout in_base_tile_;
 
     // Use 64x8 as a basic swizzle block shape.
-    using SwizzleBaseShape = traits::SwizzleBaseTileShape<DType>;
+    using SwizzleBaseShape =
+        traits::SwizzleBaseTileShape<DType, kSharedAccessInBytes>;
     // Swap the row and column of the `SwizzleBaseShape`.
     static constexpr int kSwizzleRows = SwizzleBaseShape::kCols;
     static constexpr int kSwizzleCols = SwizzleBaseShape::kRows;
@@ -234,13 +237,13 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
 };
 
 template <typename Reg, typename Shared, const int kRowExec, const int kColExec,
-          const tl::Layout kType>
+          const int kSharedAccessInBytes, const tl::Layout kType>
 struct RegToSharedStorerImpl;
 
 template <typename Reg_, typename Shared_, const int kRowExec_,
-          const int kColExec_>
+          const int kColExec_, const int kSharedAccessInBytes>
 struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
-                             tl::Layout::kRowMajor>
+                             kSharedAccessInBytes, tl::Layout::kRowMajor>
     : public StoreMatBase<Shared_, tl::Layout::kRowMajor> {
     using Reg = Reg_;
     using Shared = Shared_;
@@ -288,7 +291,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
   private:
     using BaseShape = traits::BaseTileShape<DType>;
 
-    using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
+    using SwizzledBaseShape =
+        traits::SwizzleBaseTileShape<DType, kSharedAccessInBytes>;
     static constexpr int kSwizzledRows = SwizzledBaseShape::kRows;
     static constexpr int kSwizzledCols = SwizzledBaseShape::kCols;
 
@@ -354,9 +358,9 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
 };
 
 template <typename Reg_, typename Shared_, const int kRowExec_,
-          const int kColExec_>
+          const int kColExec_, const int kSharedAccessInBytes>
 struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
-                             tl::Layout::kColMajor>
+                             kSharedAccessInBytes, tl::Layout::kColMajor>
     : public StoreMatBase<Shared_, tl::Layout::kColMajor> {
     using Reg = Reg_;
     using Shared = Shared_;
@@ -405,7 +409,8 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     using BaseShape = traits::BaseTileShape<DType>;
 
     // Use 64x8 as a basic swizzle block shape in ColMajor layout.
-    using SwizzledBaseShape = traits::SwizzleBaseTileShape<DType>;
+    using SwizzledBaseShape =
+        traits::SwizzleBaseTileShape<DType, kSharedAccessInBytes>;
     static constexpr int kSwizzleRows = SwizzledBaseShape::kCols;
     static constexpr int kSwizzleCols = SwizzledBaseShape::kRows;
 
@@ -488,6 +493,9 @@ struct SharedToRegLoader {
     static constexpr int kRowExec = Reg::kRows;
     static constexpr int kColExec = Reg::kCols;
 
+    static_assert(kRowExec && kColExec,
+                  "Execution count should be greater than 0.");
+
     template <typename Shared>
     DEVICE void operator()(const Shared& src, Reg& dst) {
         static_assert(std::is_same_v<typename Shared::DType, DType>,
@@ -499,6 +507,18 @@ struct SharedToRegLoader {
                       "The current implementation requires Shared::kCols must "
                       "be divisible by WarpLayout::kCols");
 
+        static constexpr int kSharedContInBytes =
+            Shared::kType == tl::Layout::kRowMajor
+                ? Shared::kRowStride * sizeof(DType) / WarpLayout::kCols
+                : Shared::kColStride * sizeof(DType) / WarpLayout::kRows;
+
+        static_assert(kSharedContInBytes % 32 == 0,
+                      "The number of bytes in a warp tile must be divisible by "
+                      "32.");
+
+        static constexpr int kSharedAccessInBytes =
+            kSharedContInBytes >= 128 ? 128 : kSharedContInBytes;
+
         using SharedOffset =
             warp::SharedOffsetHelper<WarpLayout, BaseShape, Shared, kMode>;
         SharedOffset shared_offset_;
@@ -508,8 +528,9 @@ struct SharedToRegLoader {
         int warp_offset = shared_offset_.get_warp_offset();
         int iterator_offset = src.get_offset();
 
-        using Loader = detail::SharedToRegLoaderImpl<Shared, Reg, kRowExec,
-                                                     kColExec, Shared::kType>;
+        using Loader =
+            detail::SharedToRegLoaderImpl<Shared, Reg, kRowExec, kColExec,
+                                          kSharedAccessInBytes, Shared::kType>;
         Loader loader;
         loader(src.data(), dst, warp_offset, iterator_offset);
     }
@@ -531,6 +552,9 @@ struct RegToSharedStorer {
     // direction.
     static constexpr int kRowExec = Reg::kRows;
     static constexpr int kColExec = Reg::kCols;
+
+    static_assert(kRowExec && kColExec,
+                  "Execution count should be greater than 0.");
 
     /// @brief Store the WMMA output register tile to shared memory. The source
     ///        is the current thread's local register tile, and the destination
@@ -555,6 +579,18 @@ struct RegToSharedStorer {
                       "The number of shared memory columns must be divisible "
                       "by the base tile column.");
 
+        static constexpr int kSharedContInBytes =
+            Shared::kType == tl::Layout::kRowMajor
+                ? Shared::kRowStride * sizeof(DType) / WarpLayout::kCols
+                : Shared::kColStride * sizeof(DType) / WarpLayout::kRows;
+
+        static_assert(kSharedContInBytes % 32 == 0,
+                      "The number of bytes in a warp tile must be divisible by "
+                      "32.");
+
+        static constexpr int kSharedAccessInBytes =
+            kSharedContInBytes >= 128 ? 128 : kSharedContInBytes;
+
         // advance the pointer to input data to the current warp according to
         // warp reuse mode. During the store process, threads do not write to
         // the same shared memory location, thus the warp reuse mode is set to
@@ -564,8 +600,9 @@ struct RegToSharedStorer {
         SharedOffset shared_offset_;
         int warp_offset = shared_offset_.get_warp_offset();
 
-        using Storer = detail::RegToSharedStorerImpl<Reg, Shared, kRowExec,
-                                                     kColExec, Reg::kType>;
+        using Storer =
+            detail::RegToSharedStorerImpl<Reg, Shared, kRowExec, kColExec,
+                                          kSharedAccessInBytes, Reg::kType>;
         Storer storer;
 
         storer(src, dst_.mutable_data(), warp_offset);
