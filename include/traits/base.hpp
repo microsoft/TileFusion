@@ -113,7 +113,7 @@ template <>
 struct SwizzleBaseTileShape<cutlass::half_t, 64> {
     using DType = cutlass::half_t;
 
-    static constexpr int kRows = 2;
+    static constexpr int kRows = 4;
     static constexpr int kCols = 32;
     static constexpr int kNumel = kRows * kCols;
 
