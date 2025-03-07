@@ -31,8 +31,8 @@ struct GemmTraits {
     using GlobalA = GlobalTile<InType, tl::RowMajor<kTM, kK, kK>>;
     using IteratorA = GTileIterator<GlobalA, TileShape<kTM, kChunkK>>;
 
-    static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kAKs = kChunkK / BaseShape::kTileSize;
+    static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kAKs = kChunkK / BaseShape::kCols;
     using RegA = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kAMs, kAKs>>;
 
     using ALoader = copy::GlobalToRegLoader<RegA, WarpLayout,
@@ -42,8 +42,8 @@ struct GemmTraits {
     using GlobalB = GlobalTile<InType, tl::ColMajor<kK, kTN, kK>>;
     using IteratorB = GTileIterator<GlobalB, TileShape<kChunkK, kTN>>;
 
-    static constexpr int kBKs = kChunkK / BaseShape::kTileSize;
-    static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kBKs = kChunkK / BaseShape::kRows;
+    static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kCols;
     using RegB = RegTile<BaseTileColMajor<InType>, tl::ColMajor<kBKs, kBNs>>;
 
     using BLoader = copy::GlobalToRegLoader<RegB, WarpLayout,
@@ -52,8 +52,8 @@ struct GemmTraits {
     // output C
     using GlobalC = GlobalTile<AccType, tl::RowMajor<kTM, kTN, kN>>;
 
-    static constexpr int kCMs = kTM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kCNs = kTN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kCMs = kTM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kCNs = kTN / kWarpPerCol / BaseShape::kCols;
     using RegC = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kCMs, kCNs>>;
 
     using CStorer = copy::RegToGlobalStorer<GlobalC, RegC, WarpLayout>;

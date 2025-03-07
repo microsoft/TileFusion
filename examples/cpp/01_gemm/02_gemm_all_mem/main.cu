@@ -6,7 +6,7 @@
 
 void run_test() {
     using WholeShape = GemmShape<4096, 4096, 4096>;
-    using CtaTileShape = GemmShape<64, 256, 32>;
+    using CtaTileShape = GemmShape<64, 128, 128>;
     using WarpLayout = tl::RowMajor<2, 2>;
     static constexpr int kRK = 32;
 
