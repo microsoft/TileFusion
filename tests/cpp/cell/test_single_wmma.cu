@@ -178,7 +178,7 @@ struct TestTraits {
 
 template <const int kM, const int kN, const int kK, typename WarpLayout>
 void run_test() {
-    using Element = cutlass::half_t;
+    using Element = __half;
     using ElementAcc = float;
 
     using config = TestTraits<Element, ElementAcc, kM, kN, kK, WarpLayout>;
