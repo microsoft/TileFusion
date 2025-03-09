@@ -1,13 +1,11 @@
 ---
 layout: page
 title: Benchmarks
-nav_order: 3
+nav_order: 5
 has_children: true
 ---
 
-# TileFusion Benchmarks
-
-This section contains performance benchmarks for TileFusion across various hardware configurations and workloads.
+This section contains performance benchmarks for TileFusion across various workloads.
 
 ## Contents
 
