@@ -1,9 +1,3 @@
----
-layout: home
-title: Home
-nav_order: 1
----
-
 <div align="center">
   <img src="assets/TileFusion-logo.png" width="120"/>
 </div>
