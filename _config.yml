@@ -1,4 +1,9 @@
 # Site settings
+title: TileFusion
+description: Simplifying Kernel Fusion with Tile Processing
+baseurl: "/TileFusion" 
+url: "https://microsoft.github.io"
+github_username: microsoft
 mathjax:
   enable: true # MathJax equations, e.g. true, false (default)
   combo: "tex-mml-chtml"
@@ -11,9 +16,26 @@ google_fonts:
 
 # Build settings
 markdown: kramdown
+kramdown:
+  math_engine: mathjax
 theme: minima 
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
 
 # Exclude from processing
 exclude:
   - 3rd-party
   - .gitignore
+
+# Navigation
+header_pages:
+  - index.md
+  - examples.md
+  - docs/index.md
+  - benchmarks/index.md
+
+# Just the Docs configuration
+aux_links:
+  "TileFusion on GitHub":
+    - "//github.com/microsoft/TileFusion"
