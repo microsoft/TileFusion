@@ -31,8 +31,9 @@ exclude:
 # Navigation
 header_pages:
   - index.md
-  - examples.md
   - docs/index.md
+  - examples.md
+  - docs/installation.md
   - benchmarks/index.md
 
 # Just the Docs configuration
