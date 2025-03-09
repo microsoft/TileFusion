@@ -5,8 +5,6 @@ nav_order: 3
 has_children: true
 ---
 
-# TileFusion Documentation
-
 Welcome to the TileFusion documentation. Here you'll find detailed information about the library's design documents, APIs, and usage patterns.
 
 ## Contents

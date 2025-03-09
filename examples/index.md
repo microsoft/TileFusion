@@ -5,9 +5,7 @@ nav_order: 4
 has_children: true
 ---
 
-# TileFusion Examples
-
-This page showcases various examples of using TileFusion in real-world applications.
+This page showcases various examples of using TileFusion.
 
 ## Basic GEMM Example
 
