@@ -4,7 +4,7 @@
 
 # TileFusion: Simplifying Kernel Fusion with Tile Processing
 
-**TileFusion** is a highly efficient kernel template library designed to elevate CUDA C’s level of abstraction for processing tiles. It is designed to be:
+**TileFusion** is a highly efficient C++ macro kernel template library designed to elevate the level of abstraction in CUDA C for processing tiles. It is designed to be:
 
 - **Higher-Level Programming**: TileFusion offers a set of device kernels for transferring tiles between the CUDA device's three memory hierarchies and for computing tiles.
 - **Modularity**: TileFusion enables users to construct their applications by processing larger tiles in time and space using the provided BaseTiles.

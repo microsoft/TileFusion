@@ -1,9 +1,16 @@
 # Site settings
 title: TileFusion
-description: Simplifying Kernel Fusion with Tile Processing
+description: TileFusion is a highly efficient C++ macro kernel template library designed to elevate the level of abstraction in CUDA C for processing tiles.
 baseurl: "/TileFusion" 
 url: "https://microsoft.github.io"
-github_username: microsoft
+authors:
+  - name: "Ying Cao"
+    email: "lcy.seso@gmail.com"
+    github: "lcy-seso"
+  - name: "Chengxiang Qi"
+    email: "KuangjuX@outlook.com"
+    github: "KuangjuX"
+
 mathjax:
   enable: true # MathJax equations, e.g. true, false (default)
   combo: "tex-mml-chtml"
@@ -18,7 +25,13 @@ google_fonts:
 markdown: kramdown
 kramdown:
   math_engine: mathjax
-theme: minima 
+theme: minima
+
+minima:
+  date_format: "%b %-d, %Y"
+  social_links:
+    - { platform: github,  user_url: "https://github.com/microsoft/TileFusion" }
+
 plugins:
   - jekyll-feed
   - jekyll-seo-tag
@@ -31,10 +44,11 @@ exclude:
 # Navigation
 header_pages:
   - index.md
-  - docs/index.md
-  - examples.md
   - docs/installation.md
+  - docs/index.md
+  - examples/index.md
   - benchmarks/index.md
+  - docs/about.md
 
 # Just the Docs configuration
 aux_links:
