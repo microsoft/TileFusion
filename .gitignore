@@ -16,6 +16,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+_build/
 develop-eggs/
 dist/
 downloads/
@@ -32,3 +33,4 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+*.so
