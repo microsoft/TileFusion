@@ -1,19 +1,16 @@
-## Data Tile Transfer between Global and Shared Memory
-
-### Overview
 This preliminary test evaluates the performance of transferring a row-major data tile containing half-precision floating-point values between global memory and shared memory. The transfer process involves loading the data tile into shared memory and subsequently storing it back to global memory. This cycle is repeated 100 times to measure performance.
 
-### Performance Evaluation
 Performance is assessed based on the total time required to complete the 100 data tile transfers.
 
-### Implementations
+## Implementations
+
 The test includes implementations using TileFusion and cutlass, with no bank conflicts observed in the NVIDIA Compute Utility. The cutlass implementation utilizes a copy plan that allows for maximal global memory coalescing to optimally utilize the global memory.
 
-### Test Environment
+## Test Environment
 - **GPU**: NVIDIA Tesla A100
 - **CUDA Version**: 12.6
 
-### Results
+## Results
 
 |Shape|Warp Layout|tilefusion(ms)|cutlass(ms)|Ratio|
 |:---|:---:|:---:|:---:|:---:|
