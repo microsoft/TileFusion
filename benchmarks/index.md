@@ -9,4 +9,5 @@ This section contains performance benchmarks for TileFusion across various workl
 
 ## Contents
 
+- [Data Transfer Between Global and Shared Memory](cpp/g2s_copy/README.md)
 - [GEMM Performance](cpp/gemm/README.md)
