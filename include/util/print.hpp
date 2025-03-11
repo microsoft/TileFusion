@@ -29,21 +29,6 @@ DEVICE void print_tile(const float* data, const Layout& layout) {
 
 /// @brief Print a tile of half-precision floating point numbers.
 template <typename Layout>
-DEVICE void print_tile(const cutlass::half_t* data, const Layout& layout) {
-    const half* data_ = reinterpret_cast<const half*>(data);
-
-    for (int i = 0; i < tl::num_rows<Layout>; ++i) {
-        for (int j = 0; j < tl::num_cols<Layout>; ++j) {
-            printf("%.2f, ", __half2float(data_[layout(i, j)]));
-        }
-        printf("\n");
-
-        if (i && (i + 1) % 16 == 0) printf("\n");
-    }
-}
-
-/// @brief Print a tile of half-precision floating point numbers.
-template <typename Layout>
 DEVICE void print_tile(const __half* data, const Layout& layout) {
     for (int i = 0; i < tl::num_rows<Layout>; ++i) {
         for (int j = 0; j < tl::num_cols<Layout>; ++j) {
