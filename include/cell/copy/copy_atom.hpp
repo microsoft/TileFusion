@@ -224,7 +224,6 @@ struct StoreMatBase<Shared, tl::Layout::kRowMajor> {
     static constexpr int kElemPerSeg = 2;
 
     static constexpr int kAccessInBits = kElemPerSeg * int(sizeof(DType) * 8);
-    typename tl::SharedLayoutWrapper<Shared, kAccessInBits>::Layout in_tile_;
 
     DEVICE int lane_row_id() {
         return (threadIdx.x % WARP_SIZE) / tl::num_cols<ThreadLayout>;
@@ -255,9 +254,7 @@ struct StoreMatBase<Shared, tl::Layout::kColMajor> {
     // the number of elements per segment, vectorized instruction are used to
     // access `kElemPerSeg` elements.
     static constexpr int kElemPerSeg = 2;
-
     static constexpr int kAccessInBits = kElemPerSeg * int(sizeof(DType) * 8);
-    typename tl::SharedLayoutWrapper<Shared, kAccessInBits>::Layout in_tile_;
 
     DEVICE int lane_row_id() {
         return (threadIdx.x % WARP_SIZE) % tl::num_rows<ThreadLayout>;

@@ -29,27 +29,27 @@ static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
 using GlobalA = GlobalTile<InType, tl::RowMajor<kTM, kK, kK>>;
 using IteratorA = GTileIterator<GlobalA, TileShape<kTM, kChunkK>>;
 
-static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kTileSize;
-static constexpr int kAKs = kChunkK / BaseShape::kTileSize;
+static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
+static constexpr int kAKs = kChunkK / BaseShape::kCols;
 using RegA = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kAMs, kAKs>>;
 
-using ALoader = copy::GlobalToRegLoader<RegA, WarpLayout,
-                                        copy::WarpReuse::kRowReuseCont>;
+using ALoader =
+copy::GlobalToRegLoader<RegA, WarpLayout, copy::WarpReuse::kRowReuseCont>;
 
 using GlobalB = GlobalTile<InType, tl::ColMajor<kK, kTN, kK>>;
 using IteratorB = GTileIterator<GlobalB, TileShape<kChunkK, kTN>>;
 
-static constexpr int kBKs = kChunkK / BaseShape::kTileSize;
-static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kTileSize;
+static constexpr int kBKs = kChunkK / BaseShape::kRows;
+static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kCols;
 using RegB = RegTile<BaseTileColMajor<InType>, tl::ColMajor<kBKs, kBNs>>;
 
-using BLoader = copy::GlobalToRegLoader<RegB, WarpLayout,
-                                        copy::WarpReuse::kColReuseCont>;
+using BLoader =
+    copy::GlobalToRegLoader<RegB, WarpLayout, copy::WarpReuse::kColReuseCont>;
 
 using GlobalC = GlobalTile<AccType, tl::RowMajor<kTM, kTN, kN>>;
 
-static constexpr int kCMs = kTM / kWarpPerRow / BaseShape::kTileSize;
-static constexpr int kCNs = kTN / kWarpPerCol / BaseShape::kTileSize;
+static constexpr int kCMs = kTM / kWarpPerRow / BaseShape::kRows;
+static constexpr int kCNs = kTN / kWarpPerCol / BaseShape::kCols;
 using RegC = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kCMs, kCNs>>;
 
 using CStorer = copy::RegToGlobalStorer<GlobalC, RegC, WarpLayout>;
@@ -64,7 +64,7 @@ extern "C" int kernel_entry(__half* parameter1, __half* parameter2,
     auto kernel =
         &gemm<InType, AccType, kM, kN, kK, kTM, kTN, IteratorA, RegA, ALoader,
               IteratorB, RegB, BLoader, GlobalC, RegC, CStorer>;
-
+ 
     kernel<<<dim3(block_x, block_y, 1), dim3(kThreads, 1, 1)>>>(
         parameter1, parameter2, paramter3);
 

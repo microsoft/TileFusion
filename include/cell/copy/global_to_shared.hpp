@@ -58,8 +58,7 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
         int row = lane_row_id();
         int col = lane_col_id() * kNumPerAccess;
 
-        int src_offset = 0, dst_offset = 0;
-        int offset = 0;
+        int src_offset = 0, dst_offset = 0, offset = 0;
         uint32_t dst_ptr;
 #pragma unroll
         for (int i = 0; i < kRowExec; ++i) {

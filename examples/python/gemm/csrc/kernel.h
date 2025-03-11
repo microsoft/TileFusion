@@ -1,6 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-
 #pragma once
 
 using namespace tilefusion;
@@ -35,7 +34,7 @@ __global__ void gemm(const InType* dA, const InType* dB, AccType* dC) {
         loader_b(gBs(k), rB);
         __syncthreads();
 
-        compute::gemm(rA, rB, acc);
+        gemm(rA, rB, acc);
     }
     __syncthreads();
 

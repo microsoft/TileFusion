@@ -2,7 +2,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
-
 from typing import Tuple
 
 import torch
@@ -24,8 +23,8 @@ def run_unittest(
     epsilon: float = 5e-2,
     debug_print=False
 ):
-    gemm_func(a, b, c, M, N, K, TM, TN, kChunkK, *warp_layout)
     ref_c = a @ b.t()
+    gemm_func(a, b, c, M, N, K, TM, TN, kChunkK, *warp_layout)
 
     if debug_print:
         print("Result:")
@@ -50,8 +49,13 @@ def run_test(
     device = torch.device("cuda")
     dtype = torch.float16
 
-    a = torch.randn(M, K, device=device, dtype=dtype)
-    b = torch.randn(N, K, device=device, dtype=dtype)
+    a = torch.normal(
+        mean=0.1, std=1e-3, size=(M, K), device=device, dtype=dtype
+    )
+    b = torch.normal(
+        mean=0.1, std=1e-3, size=(N, K), device=device, dtype=dtype
+    )
+
     c = torch.zeros(M, N, device=device, dtype=torch.float32)
 
     if not run_unittest(a, b, c, M, N, K, TM, TN, kChunkK, warp_layout):

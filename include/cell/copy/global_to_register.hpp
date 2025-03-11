@@ -13,11 +13,11 @@ namespace tilefusion::cell::copy {
 
 /**
  * @brief Load a BastTile Matrix from Global memory to Register.
- * @tparam Global_ Global memory tile type.
- * @tparam BaseTile_ BaseTile type.
- * @tparam type Global Layout type.
+ * @param Global Global memory tile type.
+ * @param BaseTile BaseTile type.
+ * @param kType Global Layout type.
  */
-template <typename Global_, typename BaseTile_, const tl::Layout kType>
+template <typename Global, typename BaseTile, const tl::Layout kType>
 struct GlobalToRegMatLoader;
 
 template <typename Global_, typename BaseTile_>
@@ -56,18 +56,12 @@ struct GlobalToRegMatLoader<Global_, BaseTile_, tl::Layout::kColMajor> {
 
 /**
  * @brief Store a [`BaseTile`] to Global memory.
- * @tparam Global_ Global memory tile type.
- * @tparam BaseTile_ BaseTile type.
- * @tparam type Global Layout type.
+ * @param Global Global memory tile type.
+ * @param BaseTile BaseTile type.
+ * @param kType Global Layout type.
  */
 template <typename Global_, typename BaseTile_, const tl::Layout kType>
-struct RegToGlobalMatStorer {
-    using Global = Global_;
-    using BaseTile = BaseTile_;
-    using DType = Global::DType;
-
-    DEVICE void operator()(const BaseTile& src, DType* dst);
-};
+struct RegToGlobalMatStorer;
 
 template <typename Global_, typename BaseTile_>
 struct RegToGlobalMatStorer<Global_, BaseTile_, tl::Layout::kRowMajor> {
@@ -109,7 +103,7 @@ struct RegToGlobalMatStorer<Global_, BaseTile_, tl::Layout::kColMajor> {
  * @param Reg Register tile type.
  * @param kRowExec Number of times a `RegTile` is executed along the row
  * @param kColExec Number of times a `RegTile` is executed along the column
- * @param type Global Layout type.
+ * @param kType Global Layout type.
  */
 template <typename Global, typename Reg, const int kRowExec, const int kColExec,
           const tl::Layout kType>
@@ -128,7 +122,7 @@ struct GlobalToRegLoaderImpl<Global_, Reg_, kRowExec_, kColExec_,
     static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const DType* src, Reg& dst) {
-        int lane_id = threadIdx.x % warpSize;
+        int lane_id = threadIdx.x % WARP_SIZE;
         const DType* data;
 
         using Loader = GlobalToRegMatLoader<Global, typename Reg::DType,
@@ -162,7 +156,7 @@ struct GlobalToRegLoaderImpl<Global_, Reg_, kRowExec_, kColExec_,
     static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const DType* src, Reg& dst) {
-        int lane_id = threadIdx.x % warpSize;
+        int lane_id = threadIdx.x % WARP_SIZE;
 
         const DType* data;
         using Loader = GlobalToRegMatLoader<Global, typename Reg::DType,
@@ -188,7 +182,7 @@ struct GlobalToRegLoaderImpl<Global_, Reg_, kRowExec_, kColExec_,
  * @param Reg Register tile type.
  * @param kRowExec Number of times a `RegTile` is executed along the row
  * @param kColExec Number of times a `RegTile` is executed along the column
- * @param type Global Layout type.
+ * @param kType Global Layout type.
  */
 template <typename Global, typename Reg, const int kRowExec, const int kColExec,
           const tl::Layout kType>
@@ -208,7 +202,7 @@ struct RegToGlobalStorerImpl<Global_, Reg_, kRowExec_, kColExec_,
     static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const Reg& src, DType* dst) {
-        int lane_id = threadIdx.x % warpSize;
+        int lane_id = threadIdx.x % WARP_SIZE;
         DType* data;
 
         using Storer = RegToGlobalMatStorer<Global, typename Reg::DType,
@@ -243,7 +237,7 @@ struct RegToGlobalStorerImpl<Global_, Reg_, kRowExec_, kColExec_,
     static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const Reg& src, DType* dst) {
-        int lane_id = threadIdx.x % warpSize;
+        int lane_id = threadIdx.x % WARP_SIZE;
         DType* data;
 
         using Storer = RegToGlobalMatStorer<Global, typename Reg::DType,
@@ -270,7 +264,6 @@ struct RegToGlobalStorerImpl<Global_, Reg_, kRowExec_, kColExec_,
  * @param Reg_ Register tile type.
  * @param WarpLayout_ Warp layout type.
  * @param kMode_ Warp reuse mode.
- * @param Base Copy base.
  */
 template <typename Reg_, typename WarpLayout_, const WarpReuse kMode_>
 struct GlobalToRegLoader {
@@ -286,7 +279,7 @@ struct GlobalToRegLoader {
 
     template <typename Global>
     DEVICE void operator()(const Global& src, Reg& dst) {
-        // 1. advance the pointer to input data to the current warp
+        // advance the pointer to input data to the current warp
         // according to warp reuse mode.
         int offset = global_offset_.template get_warp_offset<Global>();
 
@@ -305,10 +298,9 @@ struct GlobalToRegLoader {
 /**
  * @brief Store a data tile from Register to Global memory based on the warp
  *        reuse mode.
- * @tparam Global_ Global memory tile type.
- * @tparam Reg_ Register tile type.
- * @tparam WarpLayout_ Warp layout type.
- * @tparam kMode_ Warp reuse mode.
+ * @param Global_ Global memory tile type.
+ * @param Reg_ Register tile type.
+ * @param WarpLayout_ Warp layout type.
  */
 template <typename Global_, typename Reg_, typename WarpLayout_>
 struct RegToGlobalStorer {
@@ -325,7 +317,7 @@ struct RegToGlobalStorer {
     DEVICE void operator()(const Reg& src, Global& dst) {
         DType* dst_ptr = dst.mutable_data();
 
-        // 1. advance the pointer to output data to the current warp
+        // advance the pointer to output data to the current warp
         // according to warp reuse mode.
         int offset = global_offset_.template get_warp_offset<Global>();
 

@@ -68,10 +68,8 @@ class STileIterator {
         int x = sc0 == 1 ? 0 : i;
         int y = sc0 == 1 ? i : 0;
 
-        using TileLayout =
-            decltype(tl::make_shared_tile_layout<kChunkRows, kChunkCols,
-                                                 kTileRowStride, kTileColStride,
-                                                 Tile::kType>());
+        using TileLayout = tl::MatrixLayout<kChunkRows, kChunkCols,
+                                            kTileRowStride, kTileColStride>;
 
         using NewTile = SharedTile<DType, TileLayout, Tile::kSwizzled>;
 

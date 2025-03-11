@@ -19,7 +19,7 @@ template <typename Layout>
 DEVICE void print_tile(const float* data, const Layout& layout) {
     for (int i = 0; i < tl::num_rows<Layout>; ++i) {
         for (int j = 0; j < tl::num_cols<Layout>; ++j) {
-            printf("%.0f, ", data[layout(i, j)]);
+            printf("%.2f, ", data[layout(i, j)]);
         }
         printf("\n");
 
@@ -34,7 +34,7 @@ DEVICE void print_tile(const cutlass::half_t* data, const Layout& layout) {
 
     for (int i = 0; i < tl::num_rows<Layout>; ++i) {
         for (int j = 0; j < tl::num_cols<Layout>; ++j) {
-            printf("%.0f, ", __half2float(data_[layout(i, j)]));
+            printf("%.2f, ", __half2float(data_[layout(i, j)]));
         }
         printf("\n");
 
@@ -47,7 +47,7 @@ template <typename Layout>
 DEVICE void print_tile(const __half* data, const Layout& layout) {
     for (int i = 0; i < tl::num_rows<Layout>; ++i) {
         for (int j = 0; j < tl::num_cols<Layout>; ++j) {
-            printf("%.0f, ", __half2float(data[layout(i, j)]));
+            printf("%.2f, ", __half2float(data[layout(i, j)]));
         }
         printf("\n");
 
@@ -75,7 +75,7 @@ struct RegVecPrinter {
         int lane_id = tid % 32;
         for (int i = 0; i < kRows; ++i) {
             if (lane_id % 4 == 0) {
-                printf("%.3f, ", __half2float(tile(i, 0)));
+                printf("%.2f, ", __half2float(tile(i, 0)));
             }
 
 #if defined(__CUDA_ARCH__)
@@ -83,7 +83,7 @@ struct RegVecPrinter {
             __syncthreads();
 #endif
             if (lane_id % 4 == 0) {
-                printf("%.3f, ", __half2float(tile(i, 1)));
+                printf("%.2f, ", __half2float(tile(i, 1)));
             }
         }
 
@@ -110,17 +110,17 @@ struct RegTilePrinter<RegTile, tl::Layout::kRowMajor> {
                                bool is_top) {
         for (int col_num = 0; col_num < kCols; ++col_num) {
             if (is_top) {
-                printf("%.3f, %.3f, ",
+                printf("%.2f, %.2f, ",
                        __half2float(tile(row_num, col_num)(0, 0)),
                        __half2float(tile(row_num, col_num)(0, 1)));
-                printf("%.3f, %.3f, ",
+                printf("%.2f, %.2f, ",
                        __half2float(tile(row_num, col_num)(1, 0)),
                        __half2float(tile(row_num, col_num)(1, 1)));
             } else {
-                printf("%.3f, %.3f, ",
+                printf("%.2f, %.2f, ",
                        __half2float(tile(row_num, col_num)(0, 2)),
                        __half2float(tile(row_num, col_num)(0, 3)));
-                printf("%.3f, %.3f, ",
+                printf("%.2f, %.2f, ",
                        __half2float(tile(row_num, col_num)(1, 2)),
                        __half2float(tile(row_num, col_num)(1, 3)));
             }
