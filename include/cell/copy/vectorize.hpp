@@ -6,8 +6,6 @@
 #include "config.hpp"
 #include "cuda_utils.hpp"
 
-#include <cutlass/half.h>
-
 namespace tilefusion::cell::copy {
 
 /**
@@ -43,20 +41,6 @@ struct Vectorize<__half, 2> {
     static constexpr int vectorize_bits = 32;
 
     DEVICE void copy(const __half* src, __half* dst) {
-        const __half2* src_vec = reinterpret_cast<const __half2*>(src);
-        __half2* dst_vec = reinterpret_cast<__half2*>(dst);
-        *dst_vec = *src_vec;
-    }
-};
-
-template <>
-struct Vectorize<cutlass::half_t, 2> {
-    using UnVecType = cutlass::half_t;
-    using VecType = __half2;
-    static constexpr int vectorize_nums = 2;
-    static constexpr int vectorize_bits = 32;
-
-    DEVICE void copy(const cutlass::half_t* src, cutlass::half_t* dst) {
         const __half2* src_vec = reinterpret_cast<const __half2*>(src);
         __half2* dst_vec = reinterpret_cast<__half2*>(dst);
         *dst_vec = *src_vec;

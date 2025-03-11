@@ -20,9 +20,6 @@ constexpr int get_rows<float> = 1;
 template <>
 constexpr int get_rows<__half> = 1;
 
-template <>
-constexpr int get_rows<cutlass::half_t> = 1;
-
 template <typename DType>
 constexpr int get_cols = DType::kCols;
 
@@ -31,9 +28,6 @@ constexpr int get_cols<float> = 1;
 
 template <>
 constexpr int get_cols<__half> = 1;
-
-template <>
-constexpr int get_cols<cutlass::half_t> = 1;
 
 /// @brief Helper for pretty printing a register tile's static shape
 ///        information. This printer works ONLY on the host.

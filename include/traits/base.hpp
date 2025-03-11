@@ -6,9 +6,6 @@
 #include <cuda_bf16.h>
 typedef __nv_bfloat16 __bfloat16;
 
-#include <cutlass/numeric_size.h>
-#include <cutlass/numeric_types.h>
-
 #include <type_traits>
 
 namespace tilefusion::traits {
@@ -16,9 +13,7 @@ namespace tilefusion::traits {
 template <typename Element>
 concept BaseType =
     std::is_same_v<Element, float> || std::is_same_v<Element, __half> ||
-    std::is_same_v<Element, cutlass::half_t> ||
-    std::is_same_v<Element, __bfloat16> ||
-    std::is_same_v<Element, cutlass::bfloat16_t>;
+    std::is_same_v<Element, __bfloat16>;
 
 /// @brief Architecture-specific magic numbers.
 /// @tparam Element: the data type of the elements.
