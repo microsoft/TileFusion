@@ -12,7 +12,7 @@ using namespace cell;
 namespace tl = tile_layout;
 
 TEST(TestLayout, test_layout) {
-    using Element = cutlass::half_t;
+    using Element = __half;
 
     using Layout1 = tl::RowMajor<4, 7>;
     EXPECT_EQ(tl::num_rows<Layout1>, 4);
