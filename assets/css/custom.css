@@ -1,0 +1,72 @@
+.site-footer {
+  background-color: #f8f9fa;
+  padding: 40px 0;
+  color: #333;
+  border-top: 1px solid #e9ecef;
+}
+
+.footer-header {
+  margin-bottom: 30px;
+}
+
+.footer-heading {
+  font-size: 24px;
+  margin-bottom: 15px;
+  color: #0078d4; /* Microsoft blue */
+}
+
+.footer-content {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: 30px;
+  width: 100%; /* Ensure full width */
+}
+
+.footer-col {
+  flex: 1;
+  min-width: 200px;
+  padding: 0 15px;
+  margin-bottom: 20px;
+}
+
+.footer-col h3 {
+  font-size: 18px;
+  margin-bottom: 15px;
+  color: #0078d4;
+}
+
+.footer-col ul {
+  list-style: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.footer-col ul li {
+  margin-bottom: 8px;
+}
+
+.footer-bottom {
+  clear: both; /* Ensure footer-bottom appears after all floating elements */
+  width: 100%; /* Ensure full width */
+  text-align: center;
+  border-top: 1px solid #e9ecef;
+  padding-top: 20px;
+  font-size: 14px;
+  color: #666;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+}
+
+@media screen and (max-width: 600px) {
+  .footer-content {
+    flex-direction: column;
+  }
+  
+  .footer-col {
+    width: 100%;
+    padding: 0;
+  }
+} 

@@ -201,28 +201,28 @@ void run(bool check = true) {
 }
 
 int main() {
-    run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
-        FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-                            /*kTP*/>,
-        1>();
-
-    run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
-        FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-                            /*kTP*/>,
-        2>();
-
     run<FlashAttentionShape<64 /*M*/, 128 /*N*/, 128 /*K*/, 128 /*P*/>,
-        FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
+        FlashAttentionShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128
                             /*kTP*/>,
         1>();
 
-    run<FlashAttentionShape<64 /*M*/, 256 /*N*/, 128 /*K*/, 128 /*P*/>,
-        FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        1>();
+    // run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
+    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
+    //                         /*kTP*/>,
+    //     2>();
 
-    run<FlashAttentionShape<64 /*M*/, 512 /*N*/, 128 /*K*/, 128 /*P*/>,
-        FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        1>();
+    // run<FlashAttentionShape<64 /*M*/, 128 /*N*/, 128 /*K*/, 128 /*P*/>,
+    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
+    //                         /*kTP*/>,
+    //     1>();
+
+    // run<FlashAttentionShape<64 /*M*/, 256 /*N*/, 128 /*K*/, 128 /*P*/>,
+    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
+    //     /*kTP*/>, 1>();
+
+    // run<FlashAttentionShape<64 /*M*/, 512 /*N*/, 128 /*K*/, 128 /*P*/>,
+    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
+    //     /*kTP*/>, 1>();
 
     return 0;
 }

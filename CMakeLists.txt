@@ -31,9 +31,7 @@ include_directories(include)
 add_subdirectory(src)
 add_subdirectory(tests/cpp)
 
-# FIXME(ying): temporarily disable the test to refactor the copy. Make sure all
-# the unit tests pass after the refactor.
-option(BUILD_EXAMPLES "Build TileFusion with examples" OFF)
+option(BUILD_EXAMPLES "Build TileFusion with examples" ON)
 if(BUILD_EXAMPLES)
   set(EXAMPLES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/examples/cpp")
   file(GLOB SUBDIRS "${EXAMPLES_DIR}/*")

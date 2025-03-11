@@ -29,7 +29,7 @@ void run_test(std::ofstream& fout) {
     static constexpr int kTN = dim_size<1, CtaTileShape>;
     static constexpr int kTK = dim_size<2, CtaTileShape>;
 
-    using InType = cutlass::half_t;
+    using InType = __half;
     using AccType = float;
 
     using Config = KeGemmTraits<InType, AccType, WholeShape, CtaTileShape, kRK,
@@ -48,10 +48,10 @@ void run_test(std::ofstream& fout) {
               typename Config::StoreSharedC>;
 
     using KeTraits = benchmarks::cutlass_wrapper::GemmTraits<
-        InType, kWarpPerRow, kWarpPerCol, kM, kN, kK, kTM, kTN, kTK>;
+        cutlass::half_t, kWarpPerRow, kWarpPerCol, kM, kN, kK, kTM, kTN, kTK>;
     auto cutlass_gemm =
-        &benchmarks::cutlass_wrapper::gemm_kernel<InType, kM, kN, kK, kTM, kTN,
-                                                  kTK, KeTraits>;
+        &benchmarks::cutlass_wrapper::gemm_kernel<cutlass::half_t, kM, kN, kK,
+                                                  kTM, kTN, kTK, KeTraits>;
 
     static constexpr int inputs = kTK * (kTN + kTM) * sizeof(InType);
     static constexpr int acc = kTM * kTN * sizeof(InType);
@@ -82,24 +82,24 @@ void run_test(std::ofstream& fout) {
 
     //// =============== Prepare data =============== ////
     // input matrix A
-    thrust::host_vector<InType> h_a(kM * kK);
+    thrust::host_vector<cutlass::half_t> h_a(kM * kK);
     for (int i = 0; i < h_a.size(); ++i)
-        h_a[i] = static_cast<InType>(rand_float());
-    thrust::device_vector<InType> d_a = h_a;
-    const InType* dA = thrust::raw_pointer_cast(d_a.data());
+        h_a[i] = static_cast<cutlass::half_t>(rand_float());
+    thrust::device_vector<cutlass::half_t> d_a = h_a;
+    const cutlass::half_t* dA = thrust::raw_pointer_cast(d_a.data());
     const __half* dA2 = reinterpret_cast<const __half*>(dA);
 
     // input matrix B
-    thrust::host_vector<InType> h_b(kK * kN);
+    thrust::host_vector<cutlass::half_t> h_b(kK * kN);
     for (int i = 0; i < h_b.size(); ++i)
-        h_b[i] = static_cast<InType>(rand_float());
-    thrust::device_vector<InType> d_b = h_b;
-    const InType* dB = thrust::raw_pointer_cast(d_b.data());
+        h_b[i] = static_cast<cutlass::half_t>(rand_float());
+    thrust::device_vector<cutlass::half_t> d_b = h_b;
+    const cutlass::half_t* dB = thrust::raw_pointer_cast(d_b.data());
     const __half* dB2 = reinterpret_cast<const __half*>(dB);
 
     // output matrix C for cutlass GEMM kernel
-    thrust::device_vector<InType> d_c(kM * kN);
-    InType* dC = thrust::raw_pointer_cast(d_c.data());
+    thrust::device_vector<cutlass::half_t> d_c(kM * kN);
+    cutlass::half_t* dC = thrust::raw_pointer_cast(d_c.data());
     thrust::device_vector<InType> d_c2(kM * kN);
     InType* dC2 = thrust::raw_pointer_cast(d_c2.data());
 
@@ -107,13 +107,13 @@ void run_test(std::ofstream& fout) {
     thrust::device_vector<__half> d_c3(kM * kN);
     __half* dC3 = thrust::raw_pointer_cast(d_c3.data());
 
-    thrust::host_vector<InType> h_c;
+    thrust::host_vector<cutlass::half_t> h_c;
     thrust::host_vector<InType> h_c2;
     thrust::host_vector<__half> h_c3;
 
 //// =============== check correctness =============== ////
 #ifdef CHECK_CORRECTNESS
-    thrust::fill(d_c.begin(), d_c.end(), static_cast<InType>(0.));
+    thrust::fill(d_c.begin(), d_c.end(), static_cast<cutlass::half_t>(0.));
     thrust::fill(d_c2.begin(), d_c2.end(), static_cast<InType>(0.));
     thrust::fill(d_c3.begin(), d_c3.end(), static_cast<__half>(0.));
 
@@ -121,7 +121,7 @@ void run_test(std::ofstream& fout) {
     cudaDeviceSynchronize();
     h_c = d_c;
 
-    tilefusion_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC2);
+    tilefusion_gemm<<<dim_grid, dim_block, smem_size>>>(dA2, dB2, dC2);
     cudaDeviceSynchronize();
     h_c2 = d_c2;
 
@@ -145,7 +145,7 @@ void run_test(std::ofstream& fout) {
 #endif
 
     //// =============== Timing =============== ////
-    thrust::fill(d_c.begin(), d_c.end(), static_cast<InType>(0.));
+    thrust::fill(d_c.begin(), d_c.end(), static_cast<cutlass::half_t>(0.));
     thrust::fill(d_c2.begin(), d_c2.end(), static_cast<InType>(0.));
     thrust::fill(d_c3.begin(), d_c3.end(), static_cast<__half>(0.));
 
@@ -156,7 +156,7 @@ void run_test(std::ofstream& fout) {
     const int iters = 50;
     for (int i = 0; i < warm_up; ++i) {
         cutlass_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC);
-        tilefusion_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC2);
+        tilefusion_gemm<<<dim_grid, dim_block, smem_size>>>(dA2, dB2, dC2);
     }
     cudaDeviceSynchronize();
 
@@ -170,7 +170,7 @@ void run_test(std::ofstream& fout) {
 
     timer.start();
     for (int i = 0; i < iters; ++i) {
-        tilefusion_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC2);
+        tilefusion_gemm<<<dim_grid, dim_block, smem_size>>>(dA2, dB2, dC2);
     }
     cudaDeviceSynchronize();
     float tilefusion_time = timer.stop() / iters;

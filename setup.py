@@ -47,6 +47,23 @@ class CMakeExtension(Extension):
         Extension.__init__(self, name, sources=[], **kwargs)
         self.cmake_lists_dir = os.path.abspath(cmake_lists_dir)
 
+        if os.path.isdir(".git") and os.path.exists(".gitmodules"):
+            subprocess.run([
+                "git", "submodule", "update", "--init", "--recursive"
+            ],
+                           check=True)
+        else:
+            dependencies = [
+                "3rd-party/cutlass/include/cutlass/cutlass.h",
+                "3rd-party/googletest/googletest/include/gtest/gtest.h"
+            ]
+            for file in dependencies:
+                if not os.path.exists(file):
+                    raise RuntimeError((
+                        f"{file} is missing, "
+                        "please use source distribution or git clone"
+                    ))
+
 
 class CMakeBuildExt(build_ext):
     """launches the CMake build."""

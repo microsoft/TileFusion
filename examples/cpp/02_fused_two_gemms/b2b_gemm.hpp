@@ -42,8 +42,8 @@ struct B2BGemmTraits {
 
     using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kUseSwizzling>;
 
-    static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kAKs = kTK / BaseShape::kTileSize;
+    static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kAKs = kTK / BaseShape::kCols;
     using RegA = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kAMs, kAKs>>;
 
     using SharedALoader = GlobalToSharedLoader<SharedA, WarpLayout>;
@@ -55,8 +55,8 @@ struct B2BGemmTraits {
     using GIteratorB = GTileIterator<GlobalB, TileShape<kTK, kTN>>;
     using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, kUseSwizzling>;
 
-    static constexpr int kBKs = kTK / BaseShape::kTileSize;
-    static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kBKs = kTK / BaseShape::kRows;
+    static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kCols;
     using RegB = RegTile<BaseTileColMajor<InType>, tl::ColMajor<kBKs, kBNs>>;
 
     using SharedBLoader = GlobalToSharedLoader<SharedB, WarpLayout>;
@@ -69,8 +69,8 @@ struct B2BGemmTraits {
     using GIteratorC = GTileIterator<GlobalC, TileShape<kTN, kTP>>;
     using SharedC = SharedTile<InType, tl::ColMajor<kTN, kTP>, kUseSwizzling>;
 
-    static constexpr int kCNs = kTN / BaseShape::kTileSize;
-    static constexpr int kCPs = kTP / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kCNs = kTN / BaseShape::kRows;
+    static constexpr int kCPs = kTP / kWarpPerCol / BaseShape::kCols;
     using RegC = RegTile<BaseTileColMajor<InType>, tl::ColMajor<kCNs, kCPs>>;
 
     using SharedCLoader = GlobalToSharedLoader<SharedC, WarpLayout>;
@@ -80,13 +80,13 @@ struct B2BGemmTraits {
     // output D
     using GlobalD = GlobalTile<AccType, tl::RowMajor<kTM, kTP>>;
 
-    static constexpr int kDMs = kTM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kDPs = kTP / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kDMs = kTM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kDPs = kTP / kWarpPerCol / BaseShape::kCols;
     using RegD = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kDMs, kDPs>>;
     using DStorer = copy::RegToGlobalStorer<GlobalD, RegD, WarpLayout>;
 
-    static constexpr int kAccMs = kTM / kWarpPerRow / BaseShape::kTileSize;
-    static constexpr int kAccNs = kTN / kWarpPerCol / BaseShape::kTileSize;
+    static constexpr int kAccMs = kTM / kWarpPerRow / BaseShape::kRows;
+    static constexpr int kAccNs = kTN / kWarpPerCol / BaseShape::kCols;
 
     // Reg Acc
     using RegAcc =
