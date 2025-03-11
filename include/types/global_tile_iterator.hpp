@@ -69,9 +69,8 @@ class GTileIterator {
         int x = sc0 == 1 ? 0 : i;
         int y = sc0 == 1 ? i : 0;
 
-        using TileLayout =
-            decltype(tl::make_tile_layout<kStride0, kStride1, Tile::kRowStride,
-                                          Tile::kColStride>());
+        using TileLayout = tl::MatrixLayout<kStride0, kStride1,
+                                            Tile::kRowStride, Tile::kColStride>;
         using NewTile = GlobalTile<DType, TileLayout>;
 
         int offset = Tile::kType == tl::Layout::kRowMajor
@@ -87,9 +86,8 @@ class GTileIterator {
         assert(data_);               // The iterator is not initialized.
         assert(x < sc0 && y < sc1);  // indices must be within the strip count.
 
-        using TileLayout =
-            decltype(tl::make_tile_layout<kStride0, kStride1, Tile::kRowStride,
-                                          Tile::kColStride>());
+        using TileLayout = tl::MatrixLayout<kStride0, kStride1,
+                                            Tile::kRowStride, Tile::kColStride>;
         using NewTile = GlobalTile<DType, TileLayout>;
 
         int offset = Tile::kType == tl::Layout::kRowMajor
@@ -106,10 +104,8 @@ class GTileIterator {
 
         // Updated the layout for sub-tiles accessed by the sliced iterator.
         // Note: Only the shape changes; the stride remains the same.
-        using TileLayout = decltype(tl::make_tile_layout<kStride0, Tile::kCols,
-                                                         Tile::kRowStride,
-                                                         Tile::kColStride>());
-
+        using TileLayout = tl::MatrixLayout<kStride0, Tile::kCols,
+                                            Tile::kRowStride, Tile::kColStride>;
         using NewTile = GlobalTile<DType, TileLayout>;
         using Iter = GTileIterator<NewTile, ChunkShape>;
         static_assert(Iter::sc0 == 1);
@@ -129,10 +125,9 @@ class GTileIterator {
 
         // Updated the layout for sub-tiles accessed by the sliced iterator.
         // Note: Only the shape changes; the stride remains the same.
-        using TileLayout = decltype(tl::make_tile_layout<Tile::kRows, kStride1,
-                                                         Tile::kRowStride,
-                                                         Tile::kColStride>());
 
+        using TileLayout = tl::MatrixLayout<Tile::kRows, kStride1,
+                                            Tile::kRowStride, Tile::kColStride>;
         using NewTile = GlobalTile<DType, TileLayout>;
         using Iter = GTileIterator<NewTile, ChunkShape>;
         static_assert(Iter::sc1 == 1);

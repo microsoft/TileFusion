@@ -130,10 +130,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
 
-    DEVICE SharedToRegLoaderImpl()
-        : base_tiles_(BaseTilesLayout{})
-        , in_base_tile_(BaseTileSharedLayout{}) {}
-
     DEVICE void operator()(const DType* src, Reg& dst, int warp_offset,
                            int iterator_offset) {
         int global_offset = warp_offset + iterator_offset;
@@ -161,17 +157,7 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
 
   private:
     using BaseShape = traits::BaseTileShape<DType>;
-
     static constexpr int kSharedColStride = Shared::kColStride;
-
-    using BaseTilesLayout =
-        tl::MatrixLayout<kRowExec, kColExec, Shared::kRowStride,
-                         Shared::kColStride>;
-    BaseTilesLayout base_tiles_;
-
-    using BaseTileSharedLayout =
-        tl::SharedLayoutWrapper<Shared, LoadMat::kAccessInBits>::Layout;
-    BaseTileSharedLayout in_base_tile_;
 
     // Use 64x8 as a basic swizzle block shape.
     using SwizzleBaseShape =

@@ -1,6 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-
 #pragma once
 
 #include "cell/compute/mod.hpp"
@@ -8,8 +7,9 @@
 #include "types/mod.hpp"
 
 using namespace tilefusion;
-using namespace tilefusion::cell;
-using namespace tilefusion::cell::copy;
+using namespace cell;
+using namespace cell::copy;
+using namespace compute;
 namespace tl = tile_layout;
 
 template <typename InType, typename AccType, typename WholeShape,
@@ -152,6 +152,8 @@ __global__ void KeBack2BackGemm(const InType* dA, const InType* dB,
     RegAcc acc;
     RegAccCast acc_half;
 
+    ConvertAcc cast_acc;  // Convert acc to half precision
+
     for (int n = 0; n < GIteratorC::sc0; ++n) {
         load_sc(gCs(n), sC);
 
@@ -165,15 +167,14 @@ __global__ void KeBack2BackGemm(const InType* dA, const InType* dB,
             load_rb(sB, rB);
             __syncthreads();
 
-            compute::gemm(rA, rB, acc);
+            gemm(rA, rB, acc);
         }
         load_rc(sC, rC);
         __syncthreads();
 
-        ConvertAcc cast_acc;  // Convert acc to half precision
         cast_acc(acc, acc_half);
 
-        compute::gemm(acc_half, rC, rD);
+        gemm(acc_half, rC, rD);
         acc.clear();
     }
     __syncthreads();

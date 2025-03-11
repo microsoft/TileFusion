@@ -7,7 +7,7 @@ has_children: false
 
 This project is developed and maintained by the following authors:
 
-- [Ying Cao](https://github.com/lcy.seso)
+- [Ying Cao](https://github.com/lcy-seso)
 - [Chengxiang Qi](https://github.com/KuangjuX)
 
 ## Contributing

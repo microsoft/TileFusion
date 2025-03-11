@@ -3,8 +3,8 @@
 # MIT License.
 # --------------------------------------------------------------------------
 
-cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
-project(flash_attn_example LANGUAGES C CXX CUDA)
+cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
+project(flash_attn_example LANGUAGES CXX CUDA)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
                       "${PROJECT_SOURCE_DIR}/../../../cmake")

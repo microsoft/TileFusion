@@ -90,9 +90,7 @@ TEST(TESTSwizzle, test_nested_basetile_swizzle_layout) {
     const int kRows = 1 << kB;
     const int kCols = 1 << (kM + kS);
 
-    using NestedBaseTileLayout =
-        tl::detail::SharedLayout<kRows, kCols, kCols * 16, 16,
-                                 tl::Layout::kRowMajor>;
+    using NestedBaseTileLayout = tl::MatrixLayout<kRows, kCols, kCols * 16, 16>;
     using NestedBaseTileSwizzledLayout =
         SwizzledLayout<NestedBaseTileLayout, kB, kM, kS, tl::Layout::kRowMajor>;
 
