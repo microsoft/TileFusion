@@ -71,6 +71,19 @@ struct SwizzleBaseTileShape<__half, 128> {
 };
 
 template <>
+struct SwizzleBaseTileShape<__bfloat16, 128> {
+    using DType = __bfloat16;
+
+    static constexpr int kRows = 8;
+    static constexpr int kCols = 64;
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 3;
+    static constexpr int M = 3;
+    static constexpr int S = 3;
+};
+
+template <>
 struct SwizzleBaseTileShape<float, 128> {
     using DType = float;
 
@@ -86,6 +99,19 @@ struct SwizzleBaseTileShape<float, 128> {
 template <>
 struct SwizzleBaseTileShape<__half, 64> {
     using DType = __half;
+
+    static constexpr int kRows = 4;
+    static constexpr int kCols = 32;
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 2;
+    static constexpr int M = 3;
+    static constexpr int S = 2;
+};
+
+template <>
+struct SwizzleBaseTileShape<__bfloat16, 64> {
+    using DType = __bfloat16;
 
     static constexpr int kRows = 4;
     static constexpr int kCols = 32;

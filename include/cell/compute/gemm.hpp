@@ -115,13 +115,12 @@ struct Gemm {
 
     using BaseShape = traits::BaseTileShape<InTypeA>;
 
-    static_assert(std::is_same_v<InTypeA, cutlass::half_t> ||
-                      std::is_same_v<InTypeA, __half>,
+    static_assert(std::is_same_v<InTypeA, __half> ||
+                      std::is_same_v<InTypeA, __bfloat16>,
                   "This GEMM implementation supports only half-precision as "
                   "the input element type.");
     static_assert(std::is_same_v<OutType, float> ||
-                      std::is_same_v<OutType, __half> ||
-                      std::is_same_v<OutType, cutlass::half_t>,
+                      std::is_same_v<OutType, __half>,
                   "The output type must be float or half.");
     static_assert(std::is_same_v<InTypeA, InTypeB>,
                   "Mismatched data type for operand A and B.");

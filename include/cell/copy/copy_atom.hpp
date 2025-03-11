@@ -151,7 +151,7 @@ DEVICE void ld_shared_st_global<16>(void* dst, uint32_t src) {
 
 template <typename Element>
     requires std::is_same_v<Element, __half> ||
-             std::is_same_v<Element, cutlass::half_t>
+             std::is_same_v<Element, __bfloat16>
 struct LoadMatBase {
     using DType = Element;
     using ThreadLayout = tile_layout::ColMajor<16, 2>;

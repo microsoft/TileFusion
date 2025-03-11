@@ -226,8 +226,6 @@ TEST(TestWmma, test_m16n16k16_f) {
     run_test<16, 16, 64, tl::RowMajor<1, 1>>();
     run_test<32, 32, 64, tl::RowMajor<1, 1>>();
     run_test<64, 64, 64, tl::RowMajor<1, 1>>();
-    // TODO(KuangjuX): It doesn't seem to be executed.
-    // run_test<64, 128, 128, tl::RowMajor<1, 1>>();
 
     run_test<32, 64, 64, tl::RowMajor<2, 1>>();
     run_test<32, 64, 64, tl::RowMajor<2, 1>>();
