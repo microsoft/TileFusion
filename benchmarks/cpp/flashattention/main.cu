@@ -16,8 +16,6 @@ void run(bool check = true) {
     static constexpr int kBatch = 1;
     static constexpr int kThreads = kWarpPerCol * kWarpPerRow * 32;
 
-    // static_assert(kK == kTK,
-    //               "The current implementation requires kTK == K for now.");
     static_assert(kP == kTP,
                   "The current implementation requires kTP == P for now.");
 

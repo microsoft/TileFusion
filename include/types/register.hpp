@@ -62,9 +62,9 @@ class RegTile {
     using DType = Element_;
     using Layout = Layout_;
 
-    static constexpr int kNumel = tl::get_numel<Layout>;
-    static constexpr int kRows = tl::num_rows<Layout>;
-    static constexpr int kCols = tl::num_cols<Layout>;
+    static constexpr int kNumel = Layout::kNumel;
+    static constexpr int kRows = Layout::kRows;
+    static constexpr int kCols = Layout::kCols;
 
     // FIXME(haruhi): this is a hack to fix the layout type deduction for when
     // the shape is 1x1. This is a workaround. Fix this to be more robust.

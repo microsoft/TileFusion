@@ -3,51 +3,72 @@
 
 #pragma once
 
+#include "traits/base.hpp"
 #include "types/layout.hpp"
 #include "util/debug.hpp"
 
 namespace tilefusion::cell {
 namespace tl = tile_layout;
 
-/// @brief Print a tile of single-precision floating point numbers. NOTE: when
-// use print in the device function, do add (if(thread0())) to avoid printing
-// multiple times by multiple threads. usage:
-// if(thread0()) {
-//   print_tile(data, layout);
-// }
-template <typename Layout>
-DEVICE void print_tile(const float* data, const Layout& layout) {
-    for (int i = 0; i < tl::num_rows<Layout>; ++i) {
-        for (int j = 0; j < tl::num_cols<Layout>; ++j) {
-            printf("%.2f, ", data[layout(i, j)]);
-        }
+template <typename DType>
+DEVICE DType from_float(float v, DType vv) {
+    if constexpr (std::is_same<DType, __bfloat16>::value) {
+        return vv = __float2bfloat16(v);
+    } else if constexpr (std::is_same<DType, float>::value) {
+        return vv = v;
+    } else {
+        static_assert(std::is_same<DType, __half>::value);
+        return vv = __float2half(v);
+    }
+}
+
+template <typename DType>
+DEVICE float to_float(DType v) {
+    if constexpr (std::is_same<DType, __bfloat16>::value) {
+        return __bfloat162float(v);
+    } else if constexpr (std::is_same<DType, float>::value) {
+        return v;
+    } else {
+        static_assert(std::is_same<DType, __half>::value);
+        return __half2float(v);
+    }
+}
+
+namespace {
+template <typename DType, typename Layout>
+    requires traits::BaseType<DType>
+DEVICE void print_numeric_tile(const DType* data, const Layout& layout) {
+    for (int i = 0; i < Layout::kRows; ++i) {
+        for (int j = 0; j < Layout::kCols; ++j)
+            printf("%.2f, ", to_float(data[layout(i, j)]));
         printf("\n");
 
         if (i && (i + 1) % 16 == 0) printf("\n");
     }
 }
+}  // namespace
 
-/// @brief Print a tile of half-precision floating point numbers.
-template <typename Layout>
-DEVICE void print_tile(const __half* data, const Layout& layout) {
-    for (int i = 0; i < tl::num_rows<Layout>; ++i) {
-        for (int j = 0; j < tl::num_cols<Layout>; ++j) {
-            printf("%.2f, ", __half2float(data[layout(i, j)]));
-        }
-        printf("\n");
-
-        if (i && (i + 1) % 16 == 0) printf("\n");
-    }
-}
-
-/// @brief Print a register tile. Since register tile is a nested array-like
-///        structure. printing resigter tile hits this function.
+/// @brief Print a tile of floating point numbers. NOTE: when
+//         use print in the device function, do add (if(thread0())) to avoid
+//         printing multiple times by multiple threads.
+//  usage:
+//         if(thread0()) {
+//             print_tile(data, layout);
+//         }
 template <typename DType, typename Layout>
 DEVICE void print_tile(const DType* data, const Layout& layout) {
-    for (int i = 0; i < tl::num_rows<Layout>; ++i) {
-        for (int j = 0; j < tl::num_cols<Layout>; ++j) {
-            auto tile = data[layout(i, j)];
-            print_tile(tile.data(), tile.layout());
+    if constexpr (std::is_same<DType, float>::value ||
+                  std::is_same<DType, __half>::value ||
+                  std::is_same<DType, __bfloat16>::value) {
+        print_numeric_tile(data, layout);
+    } else {
+        /// Since register tile is a nested array-like structure. printing
+        /// resigter tile hits this function.
+        for (int i = 0; i < Layout::kRows; ++i) {
+            for (int j = 0; j < Layout::kCols; ++j) {
+                auto tile = data[layout(i, j)];
+                print_numeric_tile(tile.data(), tile.layout());
+            }
         }
     }
 }
@@ -60,7 +81,7 @@ struct RegVecPrinter {
         int lane_id = tid % 32;
         for (int i = 0; i < kRows; ++i) {
             if (lane_id % 4 == 0) {
-                printf("%.2f, ", __half2float(tile(i, 0)));
+                printf("%.2f, ", to_float(tile(i, 0)));
             }
 
 #if defined(__CUDA_ARCH__)
@@ -68,7 +89,7 @@ struct RegVecPrinter {
             __syncthreads();
 #endif
             if (lane_id % 4 == 0) {
-                printf("%.2f, ", __half2float(tile(i, 1)));
+                printf("%.2f, ", to_float(tile(i, 1)));
             }
         }
 
@@ -95,19 +116,15 @@ struct RegTilePrinter<RegTile, tl::Layout::kRowMajor> {
                                bool is_top) {
         for (int col_num = 0; col_num < kCols; ++col_num) {
             if (is_top) {
-                printf("%.2f, %.2f, ",
-                       __half2float(tile(row_num, col_num)(0, 0)),
-                       __half2float(tile(row_num, col_num)(0, 1)));
-                printf("%.2f, %.2f, ",
-                       __half2float(tile(row_num, col_num)(1, 0)),
-                       __half2float(tile(row_num, col_num)(1, 1)));
+                printf("%.2f, %.2f, ", to_float(tile(row_num, col_num)(0, 0)),
+                       to_float(tile(row_num, col_num)(0, 1)));
+                printf("%.2f, %.2f, ", to_float(tile(row_num, col_num)(1, 0)),
+                       to_float(tile(row_num, col_num)(1, 1)));
             } else {
-                printf("%.2f, %.2f, ",
-                       __half2float(tile(row_num, col_num)(0, 2)),
-                       __half2float(tile(row_num, col_num)(0, 3)));
-                printf("%.2f, %.2f, ",
-                       __half2float(tile(row_num, col_num)(1, 2)),
-                       __half2float(tile(row_num, col_num)(1, 3)));
+                printf("%.2f, %.2f, ", to_float(tile(row_num, col_num)(0, 2)),
+                       to_float(tile(row_num, col_num)(0, 3)));
+                printf("%.2f, %.2f, ", to_float(tile(row_num, col_num)(1, 2)),
+                       to_float(tile(row_num, col_num)(1, 3)));
             }
         }
         if (lane_id % 4 == 0) printf("\n");
@@ -139,7 +156,6 @@ struct RegTilePrinter<RegTile, tl::Layout::kRowMajor> {
             // Sync Threads to print in-order data.
             __syncthreads();
 #endif
-
             // Print bottom row.
             if (lane_id >= 0 && lane_id <= 3)
                 print_tile_col(tile, lane_id, i, false);
@@ -161,4 +177,5 @@ struct RegTilePrinter<RegTile, tl::Layout::kRowMajor> {
         if (lane_id == 0) printf("\n");
     }
 };
+
 }  // namespace tilefusion::cell

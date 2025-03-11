@@ -15,6 +15,10 @@ concept BaseType =
     std::is_same_v<Element, float> || std::is_same_v<Element, __half> ||
     std::is_same_v<Element, __bfloat16>;
 
+template <typename Element>
+concept HalfType =
+    std::is_same_v<Element, __half> || std::is_same_v<Element, __bfloat16>;
+
 /// @brief Architecture-specific magic numbers.
 /// @tparam Element: the data type of the elements.
 template <typename Element>
@@ -52,22 +56,10 @@ template <typename Element, int kBytes>
     requires BaseType<Element>
 struct SwizzleBaseTileShape;
 
-template <>
-struct SwizzleBaseTileShape<__half, 128> {
-    using DType = __half;
-
-    static constexpr int kRows = 8;
-    static constexpr int kCols = 64;
-    static constexpr int kNumel = kRows * kCols;
-
-    static constexpr int B = 3;
-    static constexpr int M = 3;
-    static constexpr int S = 3;
-};
-
-template <>
-struct SwizzleBaseTileShape<__bfloat16, 128> {
-    using DType = __bfloat16;
+template <typename Element>
+    requires HalfType<Element>
+struct SwizzleBaseTileShape<Element, 128> {
+    using DType = Element;
 
     static constexpr int kRows = 8;
     static constexpr int kCols = 64;
@@ -91,22 +83,10 @@ struct SwizzleBaseTileShape<float, 128> {
     static constexpr int S = 3;
 };
 
-template <>
-struct SwizzleBaseTileShape<__half, 64> {
-    using DType = __half;
-
-    static constexpr int kRows = 4;
-    static constexpr int kCols = 32;
-    static constexpr int kNumel = kRows * kCols;
-
-    static constexpr int B = 2;
-    static constexpr int M = 3;
-    static constexpr int S = 2;
-};
-
-template <>
-struct SwizzleBaseTileShape<__bfloat16, 64> {
-    using DType = __bfloat16;
+template <typename Element>
+    requires HalfType<Element>
+struct SwizzleBaseTileShape<Element, 64> {
+    using DType = Element;
 
     static constexpr int kRows = 4;
     static constexpr int kCols = 32;
