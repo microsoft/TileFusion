@@ -10,12 +10,23 @@
 
 namespace tilefusion::cell {
 
-template <const int kM, const int kN, const int kTM, const int kTN>
+struct Coord {
+    int x, y, z;
+
+    HOST_DEVICE Coord() : x(0), y(0), z(0) {}
+
+    HOST_DEVICE Coord(int x, int y, int z) : x(x), y(y), z(z) {}
+
+    HOST_DEVICE Coord(dim3 const& d) : x(d.x), y(d.y), z(d.z) {}
+
+    HOST_DEVICE operator dim3() const { return dim3(x, y, z); }
+};
+
+template <const int kM, const int kN, const int kTM, const int kTN,
+          const int N = 8>
 struct GemmThreadBlockSwizzle {
     static constexpr int kTiledBlockM = (kM + kTM - 1) / kTM;
     static constexpr int kTiledBlockN = (kN + kTN - 1) / kTN;
-
-    static constexpr int N = 8;
 
     /// @brief Computes CUDA grid dimensions given a size in units of logical
     /// tiles
@@ -24,6 +35,8 @@ struct GemmThreadBlockSwizzle {
         return dim3(kTiledBlockM * tile, (kTiledBlockN + tile - 1) / tile, 1);
     }
 
+    /// @brief Obtains the threadblock offset(in units of threadblodk-scoped
+    /// tiles)
     DEVICE static dim3 get_tile_offset() {
         int block_idx = blockIdx.x;
         int block_idy = blockIdx.y;
@@ -31,9 +44,9 @@ struct GemmThreadBlockSwizzle {
 
         int log_tile = get_log_tile();
 
-        return dim3((block_idx >> log_tile),
-                    (block_idy << log_tile) + block_idx % (1 << (log_tile)),
-                    block_idz);
+        return Coord((block_idx >> log_tile),
+                     (block_idy << log_tile) + block_idx % (1 << (log_tile)),
+                     block_idz);
     }
 
   private:
