@@ -22,7 +22,8 @@ __global__ void test_thread_block_swizzle() {
     int offset_A =
         offset.y * block_m * kTM * kK + (offset.x / cta_n) * kTM * kK;
     int offset_B = (offset.x % cta_n) * kTN * kK;
-    int offset_C = offset.y * block_m * kTM * kN + offset.x * kTN;
+    int offset_C = offset.y * block_m * kTM * kN +
+                   (offset.x / cta_n) * kTM * kN + (offset.x % cta_n) * kTN;
 
     if (threadIdx.x == 0) {
         printf(
