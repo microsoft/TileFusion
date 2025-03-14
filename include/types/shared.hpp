@@ -25,7 +25,8 @@ struct SharedTilePrettyPrinter {
 
 }  // namespace
 
-template <typename Element_, typename Layout_, const bool kSwizzled_ = false>
+template <typename Element_, typename Layout_, const bool kSwizzled_ = false,
+          const int SwizzleBytes = 128>
 class SharedTile {
   public:
     using DType = Element_;
@@ -42,8 +43,26 @@ class SharedTile {
 
     static constexpr bool kSwizzled = kSwizzled_;
 
-    // This Ctor is to enable the use of the pretty printer of SharedTile in the
-    // host code.
+    using SwizzleBaseTileShape = SwizzleBaseTileShape<DType, SwizzleBytes>;
+
+    using NonSwizzled = tl::MatrixLayout<SwizzleBaseTileShape::kRows,
+                                         SwizzleBaseTileShape::kCols,
+                                         SwizzleBaseTileShape::kRowStride, 1>;
+    using Swizzled =
+        SwizzledLayout<NonSwizzled, SwizzleBaseTileShape::B,
+                       SwizzleBaseTileShape::M, SwizzleBaseTileShape::S,
+                       tl::Layout::kRowMajor>;
+
+    using InTileLayout = std::conditional_t<kSwizzled, Swizzled, NonSwizzled>;
+    using TileLayout =
+        tl::MatrixLayout<kRows / SwizzleBaseTileShape::kRows,
+                         kCols / SwizzleBaseTileShape::kCols,
+                         kRowStride * SwizzleBaseTileShape::kRows,
+                         SwizzleBaseTileShape::kCols>;
+    
+
+    // This Ctor is to enable the use of the pretty printer of SharedTile
+    // in the host code.
     HOST SharedTile() : data_(nullptr), layout_(Layout{}), offset_(0) {}
 
     DEVICE SharedTile(DType* data)
