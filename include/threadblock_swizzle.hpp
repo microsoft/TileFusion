@@ -8,7 +8,7 @@
 
 #include "cuda_utils.hpp"
 
-namespace tilefusion::cell {
+namespace tilefusion {
 
 struct Coord {
     int x, y, z;
@@ -63,4 +63,4 @@ struct GemmThreadBlockSwizzle {
     }
 };
 
-}  // namespace tilefusion::cell
+}  // namespace tilefusion

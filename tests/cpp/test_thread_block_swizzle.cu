@@ -2,11 +2,9 @@
 // Licensed under the MIT License.
 
 #include "common/test_utils.hpp"
-#include "types/mod.hpp"
+#include "threadblock_swizzle.hpp"
 
 namespace tilefusion::testing {
-using namespace cell;
-namespace tl = tile_layout;
 
 template <int kM, int kN, int kK, int kTM, int kTN, int kTK>
 __global__ void test_thread_block_swizzle() {
