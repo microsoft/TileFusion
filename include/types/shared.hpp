@@ -74,6 +74,9 @@ class SharedTile {
         tl::MatrixLayout<kRows / kSwizzleRows, kCols / kSwizzleCols,
                          kSwizzleRows, kColStride * kSwizzleCols>>;
 
+    InTileLayout in_tile_layout_;
+    TileLayout tile_layout_;
+
     // This Ctor is to enable the use of the pretty printer of SharedTile
     // in the host code.
     HOST SharedTile() : data_(nullptr), layout_(Layout{}), offset_(0) {}
@@ -99,12 +102,51 @@ class SharedTile {
     DEVICE
     const DType& operator()(int x, int y) const { return data_[layout_(x, y)]; }
 
+    DEVICE DType& operator()(int offset) const {}
+
     DEVICE void dump_value() { print_tile(data_, layout_); }
 
   private:
     DType* data_;
     Layout layout_;
     int offset_;
+
+    DEVICE int2 swizzle_tile_id(int offset) {
+        int swizzle_tile_row = kType == tl::Layout::kRowMajor
+                                   ? (offset / kRowStride) / kSwizzleRows
+                                   : (offset % kColStride) / kSwizzleRows;
+
+        int swizzle_tile_col = kType == tl::Layout::kRowMajor
+                                   ? (offset % kRowStride) / kSwizzleCols
+                                   : (offset / kColStride) / kSwizzleCols;
+
+        return make_int2(swizzle_tile_row, swizzle_tile_col);
+    }
+
+    DEVICE int2 in_swizzle_tile_id(int offset) {
+        int row = kType == tl::Layout::kRowMajor ? offset / kRowStride
+                                                 : offset % kColStride;
+        int col = kType == tl::Layout::kRowMajor ? offset % kRowStride
+                                                 : offset / kColStride;
+
+        int in_swizzle_tile_row = row % kSwizzleRows;
+        int in_swizzle_tile_col = col % kSwizzleCols;
+
+        return make_int2(in_swizzle_tile_row, in_swizzle_tile_col);
+    }
+
+    DEVICE int swizzle_offset(int offset) {
+        auto swizzle_tile_id = swizzle_tile_id(offset);
+        auto in_swizzle_tile_id = in_swizzle_tile_id(offset);
+        int swizzle_tile_offset =
+            tile_layout_(swizzle_tile_id.x, swizzle_tile_id.y);
+        int in_swizzle_tile_offset =
+            in_tile_layout_(in_swizzle_tile_id.x, in_swizzle_tile_id.y);
+
+        int offset_ = swizzled_tile_offset + in_swizzled_tile_offset;
+
+        return offset_;
+    }
 };
 
 /// @brief Pretty printer for the static shape information of a SharedTile.
