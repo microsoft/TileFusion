@@ -3,11 +3,15 @@
 
 #pragma once
 
+#include "traits/base.hpp"
 #include "types/layout.hpp"
+#include "types/swizzle.hpp"
 #include "util/print.hpp"
 
 namespace tilefusion::cell {
 namespace tl = tile_layout;
+
+using namespace tilefusion::traits;
 
 namespace {
 
@@ -43,23 +47,32 @@ class SharedTile {
 
     static constexpr bool kSwizzled = kSwizzled_;
 
-    using SwizzleBaseTileShape = SwizzleBaseTileShape<DType, SwizzleBytes>;
+    using SwizzleBaseShape = SwizzleBaseTileShape<DType, SwizzleBytes>;
 
-    using NonSwizzled = tl::MatrixLayout<SwizzleBaseTileShape::kRows,
-                                         SwizzleBaseTileShape::kCols,
-                                         SwizzleBaseTileShape::kRowStride, 1>;
+    static constexpr int kSwizzleRows = (kType == tl::Layout::kRowMajor)
+                                            ? SwizzleBaseShape::kRows
+                                            : SwizzleBaseShape::kCols;
+    static constexpr int kSwizzleCols = (kType == tl::Layout::kRowMajor)
+                                            ? SwizzleBaseShape::kCols
+                                            : SwizzleBaseShape::kRows;
+
+    using NonSwizzled = std::conditional_t<
+        (kType == tl::Layout::kRowMajor),
+        tl::MatrixLayout<kSwizzleRows, kSwizzleCols, kRowStride, 1>,
+        tl::MatrixLayout<kSwizzleRows, kSwizzleCols, 1, kColStride>>;
+
     using Swizzled =
-        SwizzledLayout<NonSwizzled, SwizzleBaseTileShape::B,
-                       SwizzleBaseTileShape::M, SwizzleBaseTileShape::S,
-                       tl::Layout::kRowMajor>;
+        SwizzledLayout<NonSwizzled, SwizzleBaseShape::B, SwizzleBaseShape::M,
+                       SwizzleBaseShape::S, kType>;
 
     using InTileLayout = std::conditional_t<kSwizzled, Swizzled, NonSwizzled>;
-    using TileLayout =
-        tl::MatrixLayout<kRows / SwizzleBaseTileShape::kRows,
-                         kCols / SwizzleBaseTileShape::kCols,
-                         kRowStride * SwizzleBaseTileShape::kRows,
-                         SwizzleBaseTileShape::kCols>;
-    
+
+    using TileLayout = std::conditional_t<
+        (kType == tl::Layout::kRowMajor),
+        tl::MatrixLayout<kRows / kSwizzleRows, kCols / kSwizzleCols,
+                         kRowStride * kSwizzleRows, kSwizzleCols>,
+        tl::MatrixLayout<kRows / kSwizzleRows, kCols / kSwizzleCols,
+                         kSwizzleRows, kColStride * kSwizzleCols>>;
 
     // This Ctor is to enable the use of the pretty printer of SharedTile
     // in the host code.
