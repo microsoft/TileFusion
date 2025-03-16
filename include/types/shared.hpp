@@ -98,11 +98,17 @@ class SharedTile {
     // for write access
     DEVICE DType& operator()(int x, int y) { return data_[layout_(x, y)]; }
 
+    DEVICE DType& operator()(int offset) {
+        return data_[swizzle_offset(offset)];
+    }
+
     // for read access
     DEVICE
     const DType& operator()(int x, int y) const { return data_[layout_(x, y)]; }
 
-    DEVICE DType& operator()(int offset) const {}
+    DEVICE DType& operator()(int offset) const {
+        return data_[swizzle_offset(offset)];
+    }
 
     DEVICE void dump_value() { print_tile(data_, layout_); }
 
