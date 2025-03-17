@@ -20,7 +20,8 @@ using GemmShape = TileShape<kM, kN, kK>;
 using namespace cute;
 
 template <typename InType, typename AccType, typename WholeShape,
-          typename CtaTileShape, const int kRK, typename WarpLayout>
+          typename CtaTileShape, const int kRK, const int kSharedAccess,
+          typename WarpLayout>
 struct KeGemmTraits {
     using BaseShape = traits::BaseTileShape<InType>;
 
@@ -43,7 +44,8 @@ struct KeGemmTraits {
     using GIteratorA = GTileIterator<GlobalA, TileShape<kTM, kTK>>;
 
     // Shared Tile for operand A
-    using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kSwizzled>;
+    using SharedA =
+        SharedTile<InType, tl::RowMajor<kTM, kTK>, kSwizzled, kSharedAccess>;
     using LoadSharedA =
         tilefusion::cell::copy::GlobalToSharedLoader<SharedA, WarpLayout>;
 
@@ -64,7 +66,8 @@ struct KeGemmTraits {
     using GIteratorB = GTileIterator<GlobalB, TileShape<kTK, kTN>>;
 
     // Shared Tile for operand B
-    using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, kSwizzled>;
+    using SharedB =
+        SharedTile<InType, tl::ColMajor<kTK, kTN>, kSwizzled, kSharedAccess>;
     using LoadSharedB =
         tilefusion::cell::copy::GlobalToSharedLoader<SharedB, WarpLayout>;
 

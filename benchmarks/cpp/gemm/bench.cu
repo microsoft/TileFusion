@@ -18,6 +18,7 @@ using WholeShape = GemmShape<4096, 4096, 128>;
 using CtaTileShape = GemmShape<64, 128, 128>;
 using WarpLayout = tl::RowMajor<kWarpPerRow, kWarpPerCol>;
 static constexpr int kRK = 64;
+static constexpr int kSharedAccess = 64;
 
 void run_test(std::ofstream& fout) {
     //// =============== Declaration =============== ////
@@ -33,7 +34,7 @@ void run_test(std::ofstream& fout) {
     using AccType = float;
 
     using Config = KeGemmTraits<InType, AccType, WholeShape, CtaTileShape, kRK,
-                                WarpLayout>;
+                                kSharedAccess, WarpLayout>;
     auto tilefusion_gemm =
         &gemm<InType, AccType, kM, kN, kK, kTM, kTN, kTK,
               typename Config::GIteratorA, typename Config::SIteratorA,
