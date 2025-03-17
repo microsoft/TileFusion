@@ -30,7 +30,7 @@ struct SharedTilePrettyPrinter {
 }  // namespace
 
 template <typename Element_, typename Layout_, const bool kSwizzled_ = false,
-          const int SwizzleBytes = 128>
+          const int SwizzleBytes_ = 128>
 class SharedTile {
   public:
     using DType = Element_;
@@ -42,6 +42,7 @@ class SharedTile {
     static constexpr int kCols = Layout::kCols;
     static constexpr int kRowStride = Layout::kRowStride;
     static constexpr int kColStride = Layout::kColStride;
+    static constexpr int SwizzleBytes = SwizzleBytes_;
 
     static constexpr tl::Layout kType = Layout::kType;
 
@@ -49,16 +50,15 @@ class SharedTile {
 
     using SwizzleBaseShape = SwizzleBaseTileShape<DType, SwizzleBytes>;
 
-    static constexpr int kSwizzleRows = (kType == tl::Layout::kRowMajor)
-                                            ? SwizzleBaseShape::kRows
-                                            : SwizzleBaseShape::kCols;
-    static constexpr int kSwizzleCols = (kType == tl::Layout::kRowMajor)
-                                            ? SwizzleBaseShape::kCols
-                                            : SwizzleBaseShape::kRows;
+    static constexpr bool isRowMajor = (kType == tl::Layout::kRowMajor);
+
+    static constexpr int kSwizzleRows =
+        isRowMajor ? SwizzleBaseShape::kRows : SwizzleBaseShape::kCols;
+    static constexpr int kSwizzleCols =
+        isRowMajor ? SwizzleBaseShape::kCols : SwizzleBaseShape::kRows;
 
     using NonSwizzled = std::conditional_t<
-        (kType == tl::Layout::kRowMajor),
-        tl::MatrixLayout<kSwizzleRows, kSwizzleCols, kRowStride, 1>,
+        isRowMajor, tl::MatrixLayout<kSwizzleRows, kSwizzleCols, kRowStride, 1>,
         tl::MatrixLayout<kSwizzleRows, kSwizzleCols, 1, kColStride>>;
 
     using Swizzled =
@@ -68,7 +68,7 @@ class SharedTile {
     using InTileLayout = std::conditional_t<kSwizzled, Swizzled, NonSwizzled>;
 
     using TileLayout = std::conditional_t<
-        (kType == tl::Layout::kRowMajor),
+        isRowMajor,
         tl::MatrixLayout<kRows / kSwizzleRows, kCols / kSwizzleCols,
                          kRowStride * kSwizzleRows, kSwizzleCols>,
         tl::MatrixLayout<kRows / kSwizzleRows, kCols / kSwizzleCols,
@@ -79,7 +79,7 @@ class SharedTile {
 
     // This Ctor is to enable the use of the pretty printer of SharedTile
     // in the host code.
-    HOST SharedTile() : data_(nullptr), layout_(Layout{}), offset_(0) {}
+    DEVICE SharedTile() : data_(nullptr), layout_(Layout{}), offset_(0) {}
 
     DEVICE SharedTile(DType* data)
         : data_(data), layout_(Layout{}), offset_(0) {}
@@ -98,16 +98,12 @@ class SharedTile {
     // for write access
     DEVICE DType& operator()(int x, int y) { return data_[layout_(x, y)]; }
 
-    DEVICE DType& operator()(int offset) {
-        return data_[swizzle_offset(offset)];
-    }
-
     // for read access
     DEVICE
     const DType& operator()(int x, int y) const { return data_[layout_(x, y)]; }
 
-    DEVICE DType& operator()(int offset) const {
-        return data_[swizzle_offset(offset)];
+    DEVICE int fetch_physical_offset(int offset) {
+        return swizzle_offset(offset);
     }
 
     DEVICE void dump_value() { print_tile(data_, layout_); }
@@ -142,16 +138,13 @@ class SharedTile {
     }
 
     DEVICE int swizzle_offset(int offset) {
-        auto swizzle_tile_id = swizzle_tile_id(offset);
-        auto in_swizzle_tile_id = in_swizzle_tile_id(offset);
-        int swizzle_tile_offset =
-            tile_layout_(swizzle_tile_id.x, swizzle_tile_id.y);
+        auto tile_id = swizzle_tile_id(offset);
+        auto in_tile_id = in_swizzle_tile_id(offset);
+        int swizzle_tile_offset = tile_layout_(tile_id.x, tile_id.y);
         int in_swizzle_tile_offset =
-            in_tile_layout_(in_swizzle_tile_id.x, in_swizzle_tile_id.y);
+            in_tile_layout_(in_tile_id.x, in_tile_id.y);
 
-        int offset_ = swizzled_tile_offset + in_swizzled_tile_offset;
-
-        return offset_;
+        return swizzle_tile_offset + in_swizzle_tile_offset;
     }
 };
 
