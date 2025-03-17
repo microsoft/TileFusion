@@ -107,7 +107,7 @@ void cublas_hgemm(int m, int n, int k, const __half* A, const __half* B,
 //                   memory tile.
 template <typename Element, typename ElementAcc, const int kM, const int kN,
           const int kK, typename WarpLayout_, const int kChunkK,
-          const bool kSwizzled>
+          const bool kSwizzled, const int kSharedAccessInBytes>
 struct TestTraits {
     using BaseShape = traits::BaseTileShape<Element>;
 
@@ -119,11 +119,13 @@ struct TestTraits {
 
     /// == 2. configure tile transfer between global and shared using CuTe ==
     using GlobalA = GlobalTile<Element, tl::RowMajor<kM, kK>>;
-    using SharedA = SharedTile<Element, tl::RowMajor<kM, kK>, kSwizzled>;
+    using SharedA = SharedTile<Element, tl::RowMajor<kM, kK>, kSwizzled,
+                               kSharedAccessInBytes>;
     using LoadSharedA = GlobalToSharedLoader<SharedA, WarpLayout>;
 
     using GlobalB = GlobalTile<Element, tl::ColMajor<kK, kN>>;
-    using SharedB = SharedTile<Element, tl::ColMajor<kK, kN>, kSwizzled>;
+    using SharedB = SharedTile<Element, tl::ColMajor<kK, kN>, kSwizzled,
+                               kSharedAccessInBytes>;
     using LoadSharedB = GlobalToSharedLoader<SharedB, WarpLayout>;
 
     /// === 3. configure tile transfer between shared and register loader ===
@@ -216,7 +218,8 @@ __global__ void test_gemm(const Element* ga, const Element* gb,
 }  // namespace
 
 template <const int kM, const int kN, const int kK, typename WarpLayout,
-          const int kChunkK, const bool kSwizzled>
+          const int kChunkK, const bool kSwizzled,
+          const int kSharedAccessInBytes>
 void run_test() {
     // unittest for register-level gemm by calling into wmma PTX
     using Element = __half;
@@ -250,7 +253,7 @@ void run_test() {
 
     // define the configuration of the test
     using config = TestTraits<Element, ElementAcc, kM, kN, kK, WarpLayout,
-                              kChunkK, kSwizzled>;
+                              kChunkK, kSwizzled, kSharedAccessInBytes>;
 
     LOG(INFO) << "[" << kM << ", " << kN << ", " << kK << "], warps: ["
               << config::kWarpPerRow << ", " << config::kWarpPerCol
@@ -317,43 +320,71 @@ TEST(TestGemm, test) {
     // For example, on A100, do not test GEMM larger than [128, 128, 128],
     // as this will cause a shared memory overflow.
 
-    // 1 warp
-    run_test<16, 16, 64, tl::RowMajor<1, 1>, 64, true>();  // minimal shape
-    run_test<32, 16, 64, tl::RowMajor<1, 1>, 64, true>();
-    run_test<16, 32, 64, tl::RowMajor<1, 1>, 64, true>();
-    run_test<32, 32, 64, tl::RowMajor<1, 1>, 64, true>();
-    run_test<64, 64, 64, tl::RowMajor<1, 1>, 64, true>();
-    run_test<128, 64, 64, tl::RowMajor<1, 1>, 64, true>();
-    run_test<128, 64, 128, tl::RowMajor<1, 1>, 64, true>();
+    {
+        static constexpr int kSharedAccessInBytes = 128;
+        // 1 warp
+        run_test<16, 16, 64, tl::RowMajor<1, 1>, 64, true,
+                 kSharedAccessInBytes>();  // minimal shape
+        run_test<32, 16, 64, tl::RowMajor<1, 1>, 64, true,
+                 kSharedAccessInBytes>();
+        run_test<16, 32, 64, tl::RowMajor<1, 1>, 64, true,
+                 kSharedAccessInBytes>();
+        run_test<32, 32, 64, tl::RowMajor<1, 1>, 64, true,
+                 kSharedAccessInBytes>();
+        run_test<64, 64, 64, tl::RowMajor<1, 1>, 64, true,
+                 kSharedAccessInBytes>();
+        run_test<128, 64, 64, tl::RowMajor<1, 1>, 64, true,
+                 kSharedAccessInBytes>();
+        run_test<128, 64, 128, tl::RowMajor<1, 1>, 64, true,
+                 kSharedAccessInBytes>();
 
-    // smaller chunk size
-    run_test<128, 64, 128, tl::RowMajor<1, 1>, 32, true>();
-    run_test<128, 64, 128, tl::RowMajor<1, 1>, 16, true>();
+        // smaller chunk size
+        run_test<128, 64, 128, tl::RowMajor<1, 1>, 32, true,
+                 kSharedAccessInBytes>();
+        run_test<128, 64, 128, tl::RowMajor<1, 1>, 16, true,
+                 kSharedAccessInBytes>();
 
-    // Swizzle<2, 3, 3>
-    run_test<32, 32, 32, tl::RowMajor<1, 1>, 32, true>();
-    run_test<64, 64, 64, tl::RowMajor<2, 2>, 64, true>();
-    run_test<128, 128, 64, tl::RowMajor<2, 2>, 64, true>();
+        // 2 x 1 warps
+        run_test<32, 64, 128, tl::RowMajor<2, 1>, 128, true,
+                 kSharedAccessInBytes>();
+        run_test<64, 64, 128, tl::RowMajor<2, 1>, 128, true,
+                 kSharedAccessInBytes>();
+        run_test<32, 128, 128, tl::RowMajor<2, 1>, 128, true,
+                 kSharedAccessInBytes>();
+        run_test<32, 128, 128, tl::RowMajor<2, 1>, 64, true,
+                 kSharedAccessInBytes>();
 
-    // 2 x 1 warps
-    run_test<32, 64, 128, tl::RowMajor<2, 1>, 128, true>();
-    run_test<64, 64, 128, tl::RowMajor<2, 1>, 128, true>();
-    run_test<32, 128, 128, tl::RowMajor<2, 1>, 128, true>();
-    run_test<32, 128, 128, tl::RowMajor<2, 1>, 64, true>();
+        // 1 x 2 warps
+        run_test<32, 128, 128, tl::RowMajor<1, 2>, 128, true,
+                 kSharedAccessInBytes>();
 
-    // 1 x 2 warps
-    run_test<32, 128, 128, tl::RowMajor<1, 2>, 128, true>();
+        // 2 x 2 warps
+        run_test<64, 64, 128, tl::RowMajor<2, 2>, 128, true,
+                 kSharedAccessInBytes>();
+        run_test<64, 64, 128, tl::RowMajor<2, 2>, 64, true,
+                 kSharedAccessInBytes>();
 
-    // 2 x 2 warps
-    run_test<64, 64, 128, tl::RowMajor<2, 2>, 128, true>();
-    run_test<64, 64, 128, tl::RowMajor<2, 2>, 64, true>();
+        // smaller chunk size
+        run_test<64, 64, 128, tl::RowMajor<2, 2>, 32, true,
+                 kSharedAccessInBytes>();
+        run_test<64, 64, 128, tl::RowMajor<2, 2>, 16, true,
+                 kSharedAccessInBytes>();
 
-    // smaller chunk size
-    run_test<64, 64, 128, tl::RowMajor<2, 2>, 32, true>();
-    run_test<64, 64, 128, tl::RowMajor<2, 2>, 16, true>();
+        // 4 x 1 warps
+        run_test<64, 16, 256, tl::RowMajor<4, 1>, 256, true,
+                 kSharedAccessInBytes>();
+    }
 
-    // 4 x 1 warps
-    run_test<64, 16, 256, tl::RowMajor<4, 1>, 256, true>();
+    {
+        static constexpr int kSharedAccessInBytes = 64;
+        // Swizzle<2, 3, 3>
+        run_test<32, 32, 32, tl::RowMajor<1, 1>, 32, true,
+                 kSharedAccessInBytes>();
+        run_test<64, 64, 64, tl::RowMajor<2, 2>, 64, true,
+                 kSharedAccessInBytes>();
+        run_test<128, 128, 64, tl::RowMajor<2, 2>, 64, true,
+                 kSharedAccessInBytes>();
+    }
 }
 
 }  // namespace tilefusion::testing
