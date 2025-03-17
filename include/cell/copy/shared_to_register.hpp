@@ -263,13 +263,7 @@ struct SharedToRegLoader {
                       "The current implementation requires Shared::kCols must "
                       "be divisible by WarpLayout::kCols");
 
-        // static constexpr int kSharedContInBytes =
-        //     Shared::kType == tl::Layout::kRowMajor
-        //         ? Shared::kRowStride * sizeof(DType) / WarpLayout::kCols
-        //         : Shared::kColStride * sizeof(DType) / WarpLayout::kRows;
-
         static constexpr int kSharedAccessInBytes = Shared::SwizzleBytes;
-
         static_assert(kSharedAccessInBytes % 32 == 0,
                       "The number of bytes in a warp tile must be divisible by "
                       "32.");
@@ -332,11 +326,6 @@ struct RegToSharedStorer {
         static_assert(Shared::kCols % BaseShape::kCols == 0,
                       "The number of shared memory columns must be divisible "
                       "by the base tile column.");
-
-        // static constexpr int kSharedContInBytes =
-        //     Shared::kType == tl::Layout::kRowMajor
-        //         ? Shared::kRowStride * sizeof(DType) / WarpLayout::kCols
-        //         : Shared::kColStride * sizeof(DType) / WarpLayout::kRows;
 
         static constexpr int kSharedAccessInBytes = Shared::SwizzleBytes;
 

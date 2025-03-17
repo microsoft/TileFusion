@@ -419,9 +419,9 @@ struct GlobalToSharedLoader {
             ? Shared::kCols * sizeof(DType) / WarpLayout::kCols
             : Shared::kRows * sizeof(DType) / WarpLayout::kRows;
 
-    // static_assert(kSharedAccessInBytes <= kSharedContInBytes,
-    //               "kSharedAccessInBytes must be less than or equal to "
-    //               "kSharedContInBytes");
+    static_assert(kSharedAccessInBytes <= kSharedContInBytes,
+                  "kSharedAccessInBytes must be less than or equal to "
+                  "kSharedContInBytes");
     static_assert(kSharedAccessInBytes % 32 == 0,
                   "The number of bytes in a warp tile must be divisible by "
                   "32.");
@@ -486,9 +486,9 @@ struct SharedToGlobalStorer {
             ? Shared::kCols * sizeof(DType) / WarpLayout::kCols
             : Shared::kRows * sizeof(DType) / WarpLayout::kRows;
 
-    // static_assert(kSharedAccessInBytes <= kSharedContInBytes,
-    //               "kSharedAccessInBytes must be less than or equal to "
-    //               "kSharedContInBytes");
+    static_assert(kSharedAccessInBytes <= kSharedContInBytes,
+                  "kSharedAccessInBytes must be less than or equal to "
+                  "kSharedContInBytes");
     static_assert(kSharedAccessInBytes % 32 == 0,
                   "The number of bytes in a warp tile must be divisible by "
                   "32.");
