@@ -71,7 +71,8 @@ class STileIterator {
         using TileLayout = tl::MatrixLayout<kChunkRows, kChunkCols,
                                             kTileRowStride, kTileColStride>;
 
-        using NewTile = SharedTile<DType, TileLayout, Tile::kSwizzled>;
+        using NewTile =
+            SharedTile<DType, TileLayout, Tile::kSwizzled, Tile::SwizzleBytes>;
 
         // TODO(KuangjuX): hotfix for `offset1` and `offset2`.
         int offset1 = x * (kChunkRows * Tile::kRowStride) +

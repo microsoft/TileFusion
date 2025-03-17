@@ -94,7 +94,8 @@ __global__ void swizzled_copy(const Element* data, G2S1& g2s,
 /// @brief This unit test verifies the correctness of the swizzled row-major
 ///        format for loading operand A in GEMM.
 template <typename WarpLayout, const int kRows, const int kCols,
-          const int kShmRows, const int kShmCols, const int kChunkShm>
+          const int kShmRows, const int kShmCols, const int kChunkShm,
+          const int kSharedAccessInBytes>
 void run_test_rowmajor() {
     static_assert(kShmRows == kRows, "kShmRows must be equal to kRows");
 
@@ -106,12 +107,13 @@ void run_test_rowmajor() {
     using GIterator = GTileIterator<Global, TileShape<kRows, kShmCols>>;
 
     // for non-swizzled layout
-    using Shared1 =
-        SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, false>;
+    using Shared1 = SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, false,
+                               kSharedAccessInBytes>;
     using SIterator1 = STileIterator<Shared1, TileShape<kShmRows, kChunkShm>>;
 
     // for swizzled layout
-    using Shared2 = SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, true>;
+    using Shared2 = SharedTile<Element, tl::RowMajor<kShmRows, kShmCols>, true,
+                               kSharedAccessInBytes>;
     using SIterator2 = STileIterator<Shared2, TileShape<kShmRows, kChunkShm>>;
 
     using BaseShape = traits::BaseTileShape<Element>;
@@ -182,7 +184,8 @@ void run_test_rowmajor() {
 /// @brief This unit test verifies the correctness of the swizzled column-major
 ///        format for loading operand B in GEMM.
 template <typename WarpLayout, const int kRows /*K*/, const int kCols /*N*/,
-          const int kShmRows, const int kShmCols, const int kChunkShm>
+          const int kShmRows, const int kShmCols, const int kChunkShm,
+          const int kSharedAccessInBytes>
 void run_test_colmajor() {
     using Element = __half;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
@@ -195,12 +198,14 @@ void run_test_colmajor() {
 
     // for non-swizzled layout
     using Shared1 = SharedTile<Element, tl::ColMajor<kShmRows, kShmCols>,
-                               false /*disable swizzled layout on shared*/>;
+                               false /*disable swizzled layout on shared*/,
+                               kSharedAccessInBytes>;
     using SIterator1 = STileIterator<Shared1, TileShape<kChunkShm, kShmCols>>;
 
     // for swizzled layout
     using Shared2 = SharedTile<Element, tl::ColMajor<kShmRows, kShmCols>,
-                               true /*enable swizzled layout on shared*/>;
+                               true /*enable swizzled layout on shared*/,
+                               kSharedAccessInBytes>;
     using SIterator2 = STileIterator<Shared2, TileShape<kChunkShm, kShmCols>>;
 
     using BaseShape = traits::BaseTileShape<Element>;
@@ -304,7 +309,7 @@ __global__ void swizzled_store(const Element* src, Element* dst) {
 }
 
 template <typename Element, typename WarpLayout, const int kRows,
-          const int kCols, const bool kSwizzled>
+          const int kCols, const bool kSwizzled, const int kSharedAccessInBytes>
 void test_row_major_store() {
     using BaseShape = traits::BaseTileShape<Element>;
 
@@ -319,7 +324,8 @@ void test_row_major_store() {
 
     using Reg = RegTile<BaseTileRowMajor<Element>,
                         tl::RowMajor<kRowRepeats, kColRepeats>>;
-    using Shared = SharedTile<Element, tl::RowMajor<kRows, kCols>, kSwizzled>;
+    using Shared = SharedTile<Element, tl::RowMajor<kRows, kCols>, kSwizzled,
+                              kSharedAccessInBytes>;
 
     // define loader and storer
     using Loader = GlobalToRegLoader<Reg, WarpLayout, copy::WarpReuse::kCont>;
@@ -408,102 +414,192 @@ void test_col_major_store() {
 }  // namespace
 
 TEST(TestSwizzledLoad, test_load_row_major) {
-    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 64, 32, 64, 64>();
-    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 128, 32, 64, 64>();
-    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 128, 32, 128, 64>();
-    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 256, 32, 256, 64>();
-    run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 64>();
+    {
+        static constexpr int kSharedAccessInBytes = 128;
 
-    // smaller chunk
-    run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 32>();
-    run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 16>();
+        run_test_rowmajor<tl::RowMajor<1, 1>, 32, 64, 32, 64, 64,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<1, 1>, 32, 128, 32, 64, 64,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<1, 1>, 32, 128, 32, 128, 64,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<1, 1>, 32, 256, 32, 256, 64,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 64,
+                          kSharedAccessInBytes>();
 
-    run_test_rowmajor<tl::RowMajor<2, 1>, 128, 128, 128, 64, 64>();
-    run_test_rowmajor<tl::RowMajor<4, 1>, 128, 128, 128, 128, 128>();
-    run_test_rowmajor<tl::RowMajor<4, 2>, 128, 128, 128, 128, 128>();
+        // smaller chunk
+        run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 32,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<1, 1>, 64, 64, 64, 64, 16,
+                          kSharedAccessInBytes>();
 
-    run_test_rowmajor<tl::RowMajor<1, 2>, 16, 256, 16, 128, 128>();
-    run_test_rowmajor<tl::RowMajor<1, 2>, 32, 256, 32, 128, 128>();
+        run_test_rowmajor<tl::RowMajor<2, 1>, 128, 128, 128, 64, 64,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<4, 1>, 128, 128, 128, 128, 128,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<4, 2>, 128, 128, 128, 128, 128,
+                          kSharedAccessInBytes>();
 
-    run_test_rowmajor<tl::RowMajor<2, 1>, 32, 128, 32, 128, 128>();
-    run_test_rowmajor<tl::RowMajor<2, 1>, 64, 128, 64, 128, 128>();
-    run_test_rowmajor<tl::RowMajor<2, 1>, 64, 256, 64, 128, 128>();
+        run_test_rowmajor<tl::RowMajor<1, 2>, 16, 256, 16, 128, 128,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<1, 2>, 32, 256, 32, 128, 128,
+                          kSharedAccessInBytes>();
 
-    run_test_rowmajor<tl::RowMajor<2, 2>, 32, 128, 32, 128, 128>();
-    run_test_rowmajor<tl::RowMajor<2, 2>, 64, 256, 64, 128, 128>();
-    run_test_rowmajor<tl::RowMajor<2, 2>, 64, 256, 64, 128, 64>();
-    run_test_rowmajor<tl::RowMajor<2, 2>, 64, 256, 64, 128, 32>();
+        run_test_rowmajor<tl::RowMajor<2, 1>, 32, 128, 32, 128, 128,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<2, 1>, 64, 128, 64, 128, 128,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<2, 1>, 64, 256, 64, 128, 128,
+                          kSharedAccessInBytes>();
 
-    run_test_rowmajor<tl::RowMajor<2, 1>, 32, 64, 32, 64, 64>();
-    run_test_rowmajor<tl::RowMajor<2, 1>, 64, 64, 64, 64, 64>();
+        run_test_rowmajor<tl::RowMajor<2, 2>, 32, 128, 32, 128, 128,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<2, 2>, 64, 256, 64, 128, 128,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<2, 2>, 64, 256, 64, 128, 64,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<2, 2>, 64, 256, 64, 128, 32,
+                          kSharedAccessInBytes>();
 
-    // Swizzle <2, 3, 3>
-    run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 32>();
-    run_test_rowmajor<tl::RowMajor<1, 1>, 32, 32, 32, 32, 32>();
-    run_test_rowmajor<tl::RowMajor<2, 2>, 32, 64, 32, 64, 64>();
+        run_test_rowmajor<tl::RowMajor<2, 1>, 32, 64, 32, 64, 64,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<2, 1>, 64, 64, 64, 64, 64,
+                          kSharedAccessInBytes>();
+    }
+
+    {
+        static constexpr int kSharedAccessInBytes = 64;
+        // Swizzle <2, 3, 3>
+        run_test_rowmajor<tl::RowMajor<1, 1>, 16, 32, 16, 32, 32,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<1, 1>, 32, 32, 32, 32, 32,
+                          kSharedAccessInBytes>();
+        run_test_rowmajor<tl::RowMajor<2, 2>, 32, 64, 32, 64, 64,
+                          kSharedAccessInBytes>();
+    }
 }
 
 TEST(TestSwizzledLoad, test_load_col_major) {
-    run_test_colmajor<tl::RowMajor<1, 1>, 64, 32, 64, 32, 32>();
-    run_test_colmajor<tl::RowMajor<1, 1>, 128, 64, 64, 64, 32>();
-    run_test_colmajor<tl::RowMajor<1, 1>, 128, 64, 64, 64, 32>();
+    {
+        static constexpr int kSharedAccessInBytes = 128;
 
-    run_test_colmajor<tl::RowMajor<2, 1>, 128, 64, 128, 64, 64>();
-    run_test_colmajor<tl::RowMajor<1, 2>, 64, 128, 64, 128, 64>();
+        run_test_colmajor<tl::RowMajor<1, 1>, 64, 32, 64, 32, 32,
+                          kSharedAccessInBytes>();
+        run_test_colmajor<tl::RowMajor<1, 1>, 128, 64, 64, 64, 32,
+                          kSharedAccessInBytes>();
+        run_test_colmajor<tl::RowMajor<1, 1>, 128, 64, 64, 64, 32,
+                          kSharedAccessInBytes>();
 
-    run_test_colmajor<tl::RowMajor<2, 2>, 128, 128, 128, 128, 64>();
-    run_test_colmajor<tl::RowMajor<4, 2>, 256, 128, 256, 128, 64>();
+        run_test_colmajor<tl::RowMajor<2, 1>, 128, 64, 128, 64, 64,
+                          kSharedAccessInBytes>();
+        run_test_colmajor<tl::RowMajor<1, 2>, 64, 128, 64, 128, 64,
+                          kSharedAccessInBytes>();
 
-    // Swizzle <2, 3, 3>
-    run_test_colmajor<tl::RowMajor<1, 1>, 32, 16, 32, 16, 16>();
-    run_test_colmajor<tl::RowMajor<1, 1>, 32, 32, 32, 32, 32>();
-    run_test_colmajor<tl::RowMajor<2, 2>, 64, 32, 64, 32, 32>();
+        run_test_colmajor<tl::RowMajor<2, 2>, 128, 128, 128, 128, 64,
+                          kSharedAccessInBytes>();
+        run_test_colmajor<tl::RowMajor<4, 2>, 256, 128, 256, 128, 64,
+                          kSharedAccessInBytes>();
+    }
+
+    {
+        static constexpr int kSharedAccessInBytes = 64;
+        // Swizzle <2, 3, 3>
+        run_test_colmajor<tl::RowMajor<1, 1>, 32, 16, 32, 16, 16,
+                          kSharedAccessInBytes>();
+        run_test_colmajor<tl::RowMajor<1, 1>, 32, 32, 32, 32, 32,
+                          kSharedAccessInBytes>();
+        run_test_colmajor<tl::RowMajor<2, 2>, 64, 32, 64, 32, 32,
+                          kSharedAccessInBytes>();
+    }
 }
 
 TEST(TestNonSwizzledStore, test_row_major) {
     static constexpr int kSwizzled = false;
 
-    test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 64, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<2, 1>, 32, 64, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<2, 1>, 64, 64, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<1, 2>, 64, 128, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+    {
+        static constexpr int kSharedAccessInBytes = 128;
+        test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<2, 1>, 32, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<2, 1>, 64, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<1, 2>, 64, 128, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<2, 2>, 64, 128, kSwizzled,
+                             kSharedAccessInBytes>();
 
-    test_row_major_store<float, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
-    test_row_major_store<float, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
-    test_row_major_store<float, tl::RowMajor<1, 1>, 32, 64, kSwizzled>();
-    test_row_major_store<float, tl::RowMajor<2, 1>, 64, 64, kSwizzled>();
-    test_row_major_store<float, tl::RowMajor<1, 2>, 64, 128, kSwizzled>();
-    test_row_major_store<float, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+        test_row_major_store<float, tl::RowMajor<1, 1>, 16, 32, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<float, tl::RowMajor<1, 1>, 16, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<float, tl::RowMajor<1, 1>, 32, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<float, tl::RowMajor<2, 1>, 64, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<float, tl::RowMajor<1, 2>, 64, 128, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<float, tl::RowMajor<2, 2>, 64, 128, kSwizzled,
+                             kSharedAccessInBytes>();
+    }
 
-    // Swizzle <2, 3, 3>
-    test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 32, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<2, 2>, 32, 64, kSwizzled>();
+    {
+        static constexpr int kSharedAccessInBytes = 64;
+        // Swizzle <2, 3, 3>
+        test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 32, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 32, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<2, 2>, 32, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+    }
 }
 
 TEST(TestSwizzledStored, test_row_major) {
     static constexpr int kSwizzled = true;
 
-    test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 64, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<2, 1>, 32, 64, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<2, 1>, 64, 64, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<1, 2>, 64, 128, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+    {
+        static constexpr int kSharedAccessInBytes = 128;
+        test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<2, 1>, 32, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<2, 1>, 64, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<1, 2>, 64, 128, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<2, 2>, 64, 128, kSwizzled,
+                             kSharedAccessInBytes>();
 
-    test_row_major_store<float, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
-    test_row_major_store<float, tl::RowMajor<1, 1>, 16, 64, kSwizzled>();
-    test_row_major_store<float, tl::RowMajor<1, 1>, 32, 64, kSwizzled>();
-    test_row_major_store<float, tl::RowMajor<2, 1>, 64, 64, kSwizzled>();
-    test_row_major_store<float, tl::RowMajor<1, 2>, 64, 128, kSwizzled>();
-    test_row_major_store<float, tl::RowMajor<2, 2>, 64, 128, kSwizzled>();
+        test_row_major_store<float, tl::RowMajor<1, 1>, 16, 32, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<float, tl::RowMajor<1, 1>, 16, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<float, tl::RowMajor<1, 1>, 32, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<float, tl::RowMajor<2, 1>, 64, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<float, tl::RowMajor<1, 2>, 64, 128, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<float, tl::RowMajor<2, 2>, 64, 128, kSwizzled,
+                             kSharedAccessInBytes>();
+    }
 
-    // Swizzle <2, 3, 3>
-    test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 32, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 32, kSwizzled>();
-    test_row_major_store<__half, tl::RowMajor<2, 2>, 32, 64, kSwizzled>();
+    {
+        static constexpr int kSharedAccessInBytes = 64;
+        // Swizzle <2, 3, 3>
+        test_row_major_store<__half, tl::RowMajor<1, 1>, 16, 32, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<1, 1>, 32, 32, kSwizzled,
+                             kSharedAccessInBytes>();
+        test_row_major_store<__half, tl::RowMajor<2, 2>, 32, 64, kSwizzled,
+                             kSharedAccessInBytes>();
+    }
 }
 
 TEST(TestNonSwizzledStored, test_col_major) {
