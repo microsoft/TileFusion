@@ -4,7 +4,8 @@
 #include "flash_decoding.hpp"
 #include "util.hpp"
 
-template <typename WholeShape, typename CtaTileShape, const int kBatch>
+template <typename WholeShape, typename CtaTileShape, const int kBatch,
+          const int kSharedAccess>
 void run(bool check = true) {
     using InType = __half;
     using AccType = float;
@@ -86,8 +87,8 @@ void run(bool check = true) {
     const InType* C = thrust::raw_pointer_cast(d_c.data());
     InType* D = thrust::raw_pointer_cast(d_d.data());
 
-    using Config =
-        FlashAttentionTraits<InType, AccType, WholeShape, CtaTileShape>;
+    using Config = FlashAttentionTraits<InType, AccType, WholeShape,
+                                        CtaTileShape, kSharedAccess>;
 
     using RegA = typename Config::RegA;
     using RegB = typename Config::RegB;
@@ -174,21 +175,21 @@ void run(bool check = true) {
     cudaDeviceSynchronize();
 
     // Call host-side reference implementation.
-    host_flash_attn(kM, kN, kK, kP, kBatch,
-                    thrust::raw_pointer_cast(h_a.data()),
-                    thrust::raw_pointer_cast(h_b.data()),
-                    thrust::raw_pointer_cast(h_c.data()),
-                    thrust::raw_pointer_cast(h_o.data()),
-                    thrust::raw_pointer_cast(acc.data()),
-                    thrust::raw_pointer_cast(exp_values.data()),
-                    thrust::raw_pointer_cast(cur_row_max.data()),
-                    thrust::raw_pointer_cast(prev_row_max.data()),
-                    thrust::raw_pointer_cast(new_row_max.data()),
-                    thrust::raw_pointer_cast(prev_norm_vec.data()),
-                    thrust::raw_pointer_cast(new_norm_vec.data()),
-                    thrust::raw_pointer_cast(prev_sum_vec.data()),
-                    thrust::raw_pointer_cast(cur_sum_vec.data()),
-                    thrust::raw_pointer_cast(new_sum_vec.data()));
+    host_flash_decoding(kM, kN, kK, kP, kBatch,
+                        thrust::raw_pointer_cast(h_a.data()),
+                        thrust::raw_pointer_cast(h_b.data()),
+                        thrust::raw_pointer_cast(h_c.data()),
+                        thrust::raw_pointer_cast(h_o.data()),
+                        thrust::raw_pointer_cast(acc.data()),
+                        thrust::raw_pointer_cast(exp_values.data()),
+                        thrust::raw_pointer_cast(cur_row_max.data()),
+                        thrust::raw_pointer_cast(prev_row_max.data()),
+                        thrust::raw_pointer_cast(new_row_max.data()),
+                        thrust::raw_pointer_cast(prev_norm_vec.data()),
+                        thrust::raw_pointer_cast(new_norm_vec.data()),
+                        thrust::raw_pointer_cast(prev_sum_vec.data()),
+                        thrust::raw_pointer_cast(cur_sum_vec.data()),
+                        thrust::raw_pointer_cast(new_sum_vec.data()));
 
     h_d = d_d;
 
@@ -201,10 +202,11 @@ void run(bool check = true) {
 }
 
 int main() {
+    static constexpr int kSharedAccess = 64;
     run<FlashAttentionShape<64 /*M*/, 128 /*N*/, 128 /*K*/, 128 /*P*/>,
         FlashAttentionShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128
                             /*kTP*/>,
-        1>();
+        1, kSharedAccess>();
 
     // run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
     //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
