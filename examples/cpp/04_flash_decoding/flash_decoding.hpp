@@ -6,6 +6,7 @@
 #include "cell/compute/mod.hpp"
 #include "cell/mod.hpp"
 #include "types/mod.hpp"
+#include "util.hpp"
 
 using namespace tilefusion;
 using namespace tilefusion::cell;
@@ -147,13 +148,16 @@ template <typename InType,
           typename BroadcastDiv, typename BlockExp, typename BlockAdd,
           typename VecMax, typename VecAdd, typename VecSub, typename VecMul,
           typename VecExp, typename VecLog>
-__global__ void ke_flash_decoding_split_kv_fwd(
-    const InType* dQ, const InType* dK, const InType* dV, InType* dO, int kM,
-    int kN, int kK, int kP, int kTM, int kTN, int kTK, int kTP) {
+__global__ void ke_flash_decoding_split_kv_fwd(const InType* dQ,
+                                               const InType* dK,
+                                               const InType* dV, OutType* dO,
+                                               OutType* dLSE, int kM, int kN,
+                                               int kK, int kP, int kTM, int kTN,
+                                               int kTK, int kTP, int kChunkN) {
     // Advance to the global data tile to the current CTA.
     const InType* Q = dQ + blockIdx.x * (kTM * kK);
-    const InType* K = dK;
-    const InType* gV_ptr = dV + blockIdx.y * (kTP * kN);
+    const InType* K = dK + blockIdx.z * kChunkN * kK;
+    const InType* gV_ptr = dV + blockIdx.y * (kTP * kN) + blockIdx.z * kChunkN;
 
     OutType* gO_ptr = dO + blockIdx.x * (kTM * kP) + (blockIdx.y * kTP);
 
@@ -299,7 +303,31 @@ __global__ void ke_flash_decoding_split_kv_fwd(
     storer_o(rO, gO);
 }
 
-__global__ void ke_flash_decoding_split_kv_fwd_combine() {}
+template <typename Element, typename GlobalLse, typename GlobalO,
+          typename LseReg, const int kLogMaxSplits>
+__global__ void ke_flash_decoding_split_kv_fwd_combine(Element* gLse,
+                                                       Element* gO) {
+    constexpr int kMaxSplits = 1 << kLogMaxSplits;
+
+    int bid = blockIdx.x;
+    int tid = threadIdx.x;
+
+    // Shared memory for LSE.
+    __shared__ Element sLSE[kMaxSplits];
+
+    GlobalLse gLSE(gLse);
+    LseReg lse_accum;
+    constexpr int kNLsePerThread = CeilDiv<kMaxSplits, kThreads>;
+
+    // TODO: Read the LSE values from gmem and store into shared memory.
+
+    // Compute the logsumexp of the LSE along the split dimension.
+    Element lse_max = lse_accum(0);
+
+#pragma unroll
+    for (int l = 1; l < kNLsePerThread; ++l)
+        lse_max = max(lse_max, lse_accum(l));
+}
 
 template <typename InType, typename AccType, typename OutType,
           typename WholeShape, typename CtaTileShape, const int kChunkN,
@@ -396,10 +424,24 @@ void run_flash_decoding_fwd(const InType* dQ, const InType* dK,
                              shm_size);
     }
 
+    OutType* dLSE = nullptr;
+
     flash_decoding_split_kv_fwd<<<grid, block, shm_size, 0>>>(
-        dQ, dK, dV, dO, kM, kN, kK, kP, kTM, kTN, kTK, kTP);
+        dQ, dK, dV, dO, dLSE, kM, kN, kK, kP, kTM, kTN, kTK, kTP, kChunkN);
 
     if (split_kv_nums > 1) {
         // TODO: Implement the combine kernel.
+
+        // In flashdecoding,
+        // We want kBlockM to be as small as possible for more parallelism.
+        // With 128 threads we can load 512 elements at a time, so if headdim is
+        // divisible by 128, kBlockM = 4. If headdim is divisible by 64, then we
+        // set kBlockM = 8, etc.
+
+        dim3 grid(1, 1, 1);
+        dim3 block(Config::kThreads, 1, 1);
+
+        // ke_flash_decoding_split_kv_fwd_combine<<<grid, block, 0, 0>>>(dLSE,
+        // dO);
     }
 }
