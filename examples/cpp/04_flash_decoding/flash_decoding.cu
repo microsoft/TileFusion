@@ -4,7 +4,8 @@
 #include "flash_decoding.hpp"
 #include "util.hpp"
 
-template <typename WholeShape, typename CtaTileShape, const int kSharedAccess>
+template <typename WholeShape, typename CtaTileShape, const int kChunkN,
+          const int kSharedAccess>
 void run(bool check = true) {
     using InType = __half;
     using AccType = float;
@@ -81,96 +82,13 @@ void run(bool check = true) {
     thrust::device_vector<InType> d_c = h_c;
     thrust::device_vector<InType> d_d = h_d;
 
-    const InType* A = thrust::raw_pointer_cast(d_a.data());
-    const InType* B = thrust::raw_pointer_cast(d_b.data());
-    const InType* C = thrust::raw_pointer_cast(d_c.data());
-    InType* D = thrust::raw_pointer_cast(d_d.data());
+    const InType* Q = thrust::raw_pointer_cast(d_a.data());
+    const InType* K = thrust::raw_pointer_cast(d_b.data());
+    const InType* V = thrust::raw_pointer_cast(d_c.data());
+    InType* O = thrust::raw_pointer_cast(d_d.data());
 
-    using Config = FlashDecodingTraits<InType, AccType, WholeShape,
-                                       CtaTileShape, kSharedAccess>;
-
-    using RegA = typename Config::RegA;
-    using RegB = typename Config::RegB;
-    using RegC = typename Config::RegC;
-    using RegD = typename Config::RegD;
-    using RegDCast = typename Config::RegDCast;
-    using RegAcc = typename Config::RegAcc;
-    using RegAccCast = typename Config::RegAccCast;
-
-    using GIteratorA = typename Config::GIteratorA;
-    using SharedA = typename Config::SharedA;
-    using SharedALoader = typename Config::SharedALoader;
-    using RegALoader = typename Config::RegALoader;
-
-    using GIteratorB = typename Config::GIteratorB;
-    using SharedB = typename Config::SharedB;
-    using SharedBLoader = typename Config::SharedBLoader;
-    using RegBLoader = typename Config::RegBLoader;
-
-    using GIteratorC = typename Config::GIteratorC;
-    using SharedC = typename Config::SharedC;
-    using SharedCLoader = typename Config::SharedCLoader;
-    using RegCLoader = typename Config::RegCLoader;
-
-    using DStorer = typename Config::DStorer;
-
-    using ConvertAcc = typename Config::ConvertHalf;
-    using ConvertO = typename Config::ConvertO;
-
-    using RegVec = typename Config::RegVec;
-
-    using CopyVec = typename Config::CopyVec;
-    using RowMax = typename Config::RowMax;
-    using RowSum = typename Config::RowSum;
-
-    using BroadcastSub = typename Config::BroadcastSub;
-    using BroadcastMul = typename Config::BroadcastMul;
-    using BroadcastDiv = typename Config::BroadcastDiv;
-
-    using BlockExp = typename Config::BlockExp;
-    using BlockAdd = typename Config::BlockAdd;
-
-    using VecMax = typename Config::VecMax;
-    using VecAdd = typename Config::VecAdd;
-    using VecSub = typename Config::VecSub;
-    using VecMul = typename Config::VecMul;
-    using VecExp = typename Config::VecExp;
-    using VecLog = typename Config::VecLog;
-
-    int block_x = CeilDiv<kM, kTM>;
-    int block_y = CeilDiv<kP, kTP>;
-    int block_z = 1;
-
-    dim3 grid(block_x, block_y, block_z);
-    dim3 block(Config::kThreads, 1, 1);
-
-    int shm_input = (kTM * kTK + kTK * kTN + kTN * kTP);
-    int shm_output = kTM * kTP;
-    int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
-                                          : shm_input * sizeof(InType);
-
-    auto flash_decoding_split_kv_fwd = &ke_flash_decoding_split_kv_fwd<
-        InType, AccType,
-        OutType,                    //
-        GIteratorA, SharedA, RegA,  //
-        SharedALoader, RegALoader,  //
-        GIteratorB, SharedB, RegB,  //
-        SharedBLoader, RegBLoader,  //
-        GIteratorC, SharedC, RegC,  //
-        SharedCLoader, RegCLoader,  //
-        RegAcc, RegAccCast, typename Config::GlobalD, RegD, RegDCast, DStorer,
-        ConvertAcc, ConvertO, RegVec, CopyVec, RowMax, RowSum, BroadcastSub,
-        BroadcastMul, BroadcastDiv, BlockExp, BlockAdd, VecMax, VecAdd, VecSub,
-        VecMul, VecExp, VecLog>;
-
-    if (shm_size > 48 * 1024) {
-        cudaFuncSetAttribute(flash_decoding_split_kv_fwd,
-                             cudaFuncAttributeMaxDynamicSharedMemorySize,
-                             shm_size);
-    }
-
-    flash_decoding_split_kv_fwd<<<grid, block, shm_size, 0>>>(
-        A, B, C, D, kM, kN, kK, kP, kTM, kTN, kTK, kTP);
+    run_flash_decoding_fwd<InType, AccType, OutType, WholeShape, CtaTileShape,
+                           kChunkN, kSharedAccess>(Q, K, V, O);
 
     cudaDeviceSynchronize();
 
@@ -205,7 +123,7 @@ int main() {
     run<FlashDecodingShape<64 /*M*/, 128 /*N*/, 128 /*K*/, 128 /*P*/>,
         FlashDecodingShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128
                            /*kTP*/>,
-        kSharedAccess>();
+        128, /*kChunkN*/ kSharedAccess>();
 
     // run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
     //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
