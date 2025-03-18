@@ -13,7 +13,7 @@ using namespace tilefusion::cell::copy;
 namespace tl = tile_layout;
 
 template <const int kM, const int kN, const int kK, const int kP>
-using FlashAttentionShape = TileShape<kM, kN, kK, kP>;
+using FlashDecodingShape = TileShape<kM, kN, kK, kP>;
 
 template <typename InType, typename AccType, typename WholeShape,
           typename CtaTileShape, const int kSharedAccess>
@@ -147,18 +147,15 @@ template <typename InType,
           typename BroadcastDiv, typename BlockExp, typename BlockAdd,
           typename VecMax, typename VecAdd, typename VecSub, typename VecMul,
           typename VecExp, typename VecLog>
-__global__ void ke_flash_decoding_split_kv(const InType* dQ, const InType* dK,
-                                           const InType* dV, InType* dO, int kM,
-                                           int kN, int kK, int kP, int kTM,
-                                           int kTN, int kTK, int kTP) {
+__global__ void ke_flash_decoding_split_kv_fwd(
+    const InType* dQ, const InType* dK, const InType* dV, InType* dO, int kM,
+    int kN, int kK, int kP, int kTM, int kTN, int kTK, int kTP) {
     // Advance to the global data tile to the current CTA.
-    const InType* Q = dQ + blockIdx.z * (kM * kK) + blockIdx.x * (kTM * kK);
-    const InType* K = dK + blockIdx.z * (kK * kN);
-    const InType* gV_ptr =
-        dV + blockIdx.z * (kN * kP) + blockIdx.y * (kTP * kN);
+    const InType* Q = dQ + blockIdx.x * (kTM * kK);
+    const InType* K = dK;
+    const InType* gV_ptr = dV + blockIdx.y * (kTP * kN);
 
-    OutType* gO_ptr = dO + blockIdx.z * (kM * kP) + blockIdx.x * (kTM * kP) +
-                      (blockIdx.y * kTP);
+    OutType* gO_ptr = dO + blockIdx.x * (kTM * kP) + (blockIdx.y * kTP);
 
     extern __shared__ __align__(sizeof(double)) unsigned char shared_buf[];
     auto* shm = reinterpret_cast<InType*>(shared_buf);
@@ -300,4 +297,109 @@ __global__ void ke_flash_decoding_split_kv(const InType* dQ, const InType* dK,
     GlobalO gO(gO_ptr);
     OStorer storer_o;  // Store O tile from register to global.
     storer_o(rO, gO);
+}
+
+__global__ void ke_flash_decoding_split_kv_fwd_combine() {}
+
+template <typename InType, typename AccType, typename OutType,
+          typename WholeShape, typename CtaTileShape, const int kChunkN,
+          const int kSharedAccess>
+void run_flash_decoding_fwd(const InType* dQ, const InType* dK,
+                            const InType* dV, OutType* dO) {
+    static constexpr int kM = dim_size<0, WholeShape>;
+    static constexpr int kN = dim_size<1, WholeShape>;
+    static constexpr int kK = dim_size<2, WholeShape>;
+    static constexpr int kP = dim_size<3, WholeShape>;
+
+    static constexpr int kTM = dim_size<0, CtaTileShape>;
+    static constexpr int kTN = dim_size<1, CtaTileShape>;
+    static constexpr int kTK = dim_size<2, CtaTileShape>;
+    static constexpr int kTP = dim_size<3, CtaTileShape>;
+
+    int split_kv_nums = CeilDiv<kN, kChunkN>;
+    int block_x = CeilDiv<kM, kTM>;
+    int block_y = CeilDiv<kP, kTP>;
+    int block_z = split_kv_nums;
+
+    using Config = FlashDecodingTraits<InType, AccType, WholeShape,
+                                       CtaTileShape, kSharedAccess>;
+
+    using RegQ = typename Config::RegA;
+    using RegK = typename Config::RegB;
+    using RegV = typename Config::RegC;
+    using RegO = typename Config::RegD;
+    using RegOCast = typename Config::RegDCast;
+    using RegAcc = typename Config::RegAcc;
+    using RegAccCast = typename Config::RegAccCast;
+
+    using GIteratorQ = typename Config::GIteratorA;
+    using SharedQ = typename Config::SharedA;
+    using SharedQLoader = typename Config::SharedALoader;
+    using RegQLoader = typename Config::RegALoader;
+
+    using GIteratorK = typename Config::GIteratorB;
+    using SharedK = typename Config::SharedB;
+    using SharedKLoader = typename Config::SharedBLoader;
+    using RegKLoader = typename Config::RegBLoader;
+
+    using GIteratorV = typename Config::GIteratorC;
+    using SharedV = typename Config::SharedC;
+    using SharedVLoader = typename Config::SharedCLoader;
+    using RegVLoader = typename Config::RegCLoader;
+
+    using OStorer = typename Config::DStorer;
+    using GlobalO = typename Config::GlobalD;
+
+    using ConvertAcc = typename Config::ConvertHalf;
+    using ConvertO = typename Config::ConvertO;
+
+    using RegVec = typename Config::RegVec;
+
+    using CopyVec = typename Config::CopyVec;
+    using RowMax = typename Config::RowMax;
+    using RowSum = typename Config::RowSum;
+
+    using BroadcastSub = typename Config::BroadcastSub;
+    using BroadcastMul = typename Config::BroadcastMul;
+    using BroadcastDiv = typename Config::BroadcastDiv;
+
+    using BlockExp = typename Config::BlockExp;
+    using BlockAdd = typename Config::BlockAdd;
+
+    using VecMax = typename Config::VecMax;
+    using VecAdd = typename Config::VecAdd;
+    using VecSub = typename Config::VecSub;
+    using VecMul = typename Config::VecMul;
+    using VecExp = typename Config::VecExp;
+    using VecLog = typename Config::VecLog;
+
+    dim3 grid(block_x, block_y, block_z);
+    dim3 block(Config::kThreads, 1, 1);
+
+    int shm_input = (kTM * kTK + kTK * kTN + kTN * kTP);
+    int shm_output = kTM * kTP;
+    int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
+                                          : shm_input * sizeof(InType);
+
+    auto flash_decoding_split_kv_fwd = &ke_flash_decoding_split_kv_fwd<
+        InType, AccType, OutType, GIteratorQ, SharedQ, RegQ, SharedQLoader,
+        RegQLoader, GIteratorK, SharedK, RegK, SharedKLoader, RegKLoader,
+        GIteratorV, SharedV, RegV, SharedVLoader, RegVLoader, RegAcc,
+        RegAccCast, GlobalO, RegO, RegOCast, OStorer, ConvertAcc, ConvertO,
+        RegVec, CopyVec, RowMax, RowSum, BroadcastSub, BroadcastMul,
+        BroadcastDiv, BlockExp, BlockAdd, VecMax, VecAdd, VecSub, VecMul,
+        VecExp, VecLog>;
+
+    if (shm_size > 48 * 1024) {
+        cudaFuncSetAttribute(flash_decoding_split_kv_fwd,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize,
+                             shm_size);
+    }
+
+    flash_decoding_split_kv_fwd<<<grid, block, shm_size, 0>>>(
+        dQ, dK, dV, dO, kM, kN, kK, kP, kTM, kTN, kTK, kTP);
+
+    if (split_kv_nums > 1) {
+        // TODO: Implement the combine kernel.
+    }
 }
