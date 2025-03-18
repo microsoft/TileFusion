@@ -87,8 +87,8 @@ void run(bool check = true) {
     const InType* C = thrust::raw_pointer_cast(d_c.data());
     InType* D = thrust::raw_pointer_cast(d_d.data());
 
-    using Config = FlashAttentionTraits<InType, AccType, WholeShape,
-                                        CtaTileShape, kSharedAccess>;
+    using Config = FlashDecodingTraits<InType, AccType, WholeShape,
+                                       CtaTileShape, kSharedAccess>;
 
     using RegA = typename Config::RegA;
     using RegB = typename Config::RegB;
@@ -136,6 +136,7 @@ void run(bool check = true) {
     using VecSub = typename Config::VecSub;
     using VecMul = typename Config::VecMul;
     using VecExp = typename Config::VecExp;
+    using VecLog = typename Config::VecLog;
 
     int block_x = CeilDiv<kM, kTM>;
     int block_y = CeilDiv<kP, kTP>;
@@ -149,28 +150,28 @@ void run(bool check = true) {
     int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
                                           : shm_input * sizeof(InType);
 
-    auto kernel =
-        &KeFlashAttention<InType, AccType,
-                          OutType,                    //
-                          GIteratorA, SharedA, RegA,  //
-                          SharedALoader, RegALoader,  //
-                          GIteratorB, SharedB, RegB,  //
-                          SharedBLoader, RegBLoader,  //
-                          GIteratorC, SharedC, RegC,  //
-                          SharedCLoader, RegCLoader,  //
-                          RegAcc, RegAccCast, typename Config::GlobalD, RegD,
-                          RegDCast, DStorer, ConvertAcc, ConvertO, RegVec,
-                          CopyVec, RowMax, RowSum, BroadcastSub, BroadcastMul,
-                          BroadcastDiv, BlockExp, BlockAdd, VecMax, VecAdd,
-                          VecSub, VecMul, VecExp>;
+    auto flash_decoding_split_kv = &ke_flash_decoding_split_kv<
+        InType, AccType,
+        OutType,                    //
+        GIteratorA, SharedA, RegA,  //
+        SharedALoader, RegALoader,  //
+        GIteratorB, SharedB, RegB,  //
+        SharedBLoader, RegBLoader,  //
+        GIteratorC, SharedC, RegC,  //
+        SharedCLoader, RegCLoader,  //
+        RegAcc, RegAccCast, typename Config::GlobalD, RegD, RegDCast, DStorer,
+        ConvertAcc, ConvertO, RegVec, CopyVec, RowMax, RowSum, BroadcastSub,
+        BroadcastMul, BroadcastDiv, BlockExp, BlockAdd, VecMax, VecAdd, VecSub,
+        VecMul, VecExp, VecLog>;
 
     if (shm_size > 48 * 1024) {
-        cudaFuncSetAttribute(
-            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
+        cudaFuncSetAttribute(flash_decoding_split_kv,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize,
+                             shm_size);
     }
 
-    kernel<<<grid, block, shm_size, 0>>>(A, B, C, D, kM, kN, kK, kP, kTM, kTN,
-                                         kTK, kTP);
+    flash_decoding_split_kv<<<grid, block, shm_size, 0>>>(
+        A, B, C, D, kM, kN, kK, kP, kTM, kTN, kTK, kTP);
 
     cudaDeviceSynchronize();
 

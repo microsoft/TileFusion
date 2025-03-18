@@ -17,7 +17,7 @@ using FlashAttentionShape = TileShape<kM, kN, kK, kP>;
 
 template <typename InType, typename AccType, typename WholeShape,
           typename CtaTileShape, const int kSharedAccess>
-struct FlashAttentionTraits {
+struct FlashDecodingTraits {
     using BaseShape = traits::BaseTileShape<InType>;
 
     using WarpLayout = tl::RowMajor<4, 1>;
@@ -128,6 +128,7 @@ struct FlashAttentionTraits {
     using VecSub = compute::BaseTileSub<RegVec>;
     using VecMul = compute::BaseTileMul<RegVec>;
     using VecExp = compute::BaseTileExp<RegVec>;
+    using VecLog = compute::BaseTileLog<RegVec>;
 };
 
 template <typename InType,
@@ -145,11 +146,11 @@ template <typename InType,
           typename RowSum, typename BroadcastSub, typename BroadcastMul,
           typename BroadcastDiv, typename BlockExp, typename BlockAdd,
           typename VecMax, typename VecAdd, typename VecSub, typename VecMul,
-          typename VecExp>
-__global__ void KeFlashAttention(const InType* dQ, const InType* dK,
-                                 const InType* dV, InType* dO, int kM, int kN,
-                                 int kK, int kP, int kTM, int kTN, int kTK,
-                                 int kTP) {
+          typename VecExp, typename VecLog>
+__global__ void ke_flash_decoding_split_kv(const InType* dQ, const InType* dK,
+                                           const InType* dV, InType* dO, int kM,
+                                           int kN, int kK, int kP, int kTM,
+                                           int kTN, int kTK, int kTP) {
     // Advance to the global data tile to the current CTA.
     const InType* Q = dQ + blockIdx.z * (kM * kK) + blockIdx.x * (kTM * kK);
     const InType* K = dK + blockIdx.z * (kK * kN);
@@ -187,28 +188,27 @@ __global__ void KeFlashAttention(const InType* dQ, const InType* dK,
     RegVLoader load_rv;
     RegV rV;
 
-    RegO exp_values_f32;
-
     RegOCast rO;
-    RegOCast exp_values;
 
-    RegAcc attn_block_f32;
-    RegAccCast attn_block;
+    RegAcc qk_float;
+    RegAccCast qk;
 
-    RegVec prev_norm_vec;
-    RegVec cur_norm_vec;
+    // The LogSumExp(LSE) is a smooth maximum,
+    // LSE(x1, x2, ..., xn) = log(exp(x1) + exp(x2) + ... + exp(xn))
+    // = c + log(exp(x1 - c) + exp(x2 - c) + ... + exp(xn - c))
+    // c = max(x1, x2, ..., xn)
+    RegVec lse_vec;
+    RegVec l_ij;
+    RegVec acc_o_scale;
+    RegVec l_i_new;
+    RegVec temp_vec;
+    RegVec o_scale;
+
+    RegO pv_float;
+    RegOCast pv;
 
     RegVec prev_max_vec;
     RegVec cur_max_vec;
-    RegVec new_max_vec;
-
-    RegVec prev_sum_vec;
-    RegVec cur_sum_vec;
-    RegVec new_sum_vec;
-
-    RegVec prev_norm_mul_sum;
-    RegVec cur_norm_mul_sum;
-    RegVec prev_sum_mul_norm;
 
     RowMax row_max;
     RowSum row_sum;
@@ -229,7 +229,7 @@ __global__ void KeFlashAttention(const InType* dQ, const InType* dK,
     VecSub vec_sub;
     VecMul vec_mul;
     VecExp vec_exp;
-
+    VecLog vec_log;
     for (int n = 0; n < GIteratorV::sc0; ++n) {
         load_sv(gVs(n), sV);
 
@@ -243,64 +243,59 @@ __global__ void KeFlashAttention(const InType* dQ, const InType* dK,
             load_rk(sK, rK);
             __syncthreads();
 
-            compute::gemm(rQ, rK, attn_block_f32);
+            compute::gemm(rQ, rK, qk_float);
         }
         load_rv(sV, rV);
         __syncthreads();
 
-        cast_acc(attn_block_f32, attn_block);
+        cast_acc(qk_float, qk);
 
-        // Compute row max.
-        row_max(attn_block, cur_max_vec);
+        // Compute current row max vector.
+        row_max(qk, cur_max_vec);
 
-        // Broadcast subtract from `attn_block`.
-        broadcast_sub(cur_max_vec, attn_block);
+        // Compute cur_max_vec with lse.
+        vec_max(cur_max_vec, lse_vec, cur_max_vec);
 
-        // Compute exp in `attn_block`.
-        block_exp(attn_block, attn_block);
+        // p = torch.exp(qk - cur_max_vec)
+        broadcast_sub(cur_max_vec, qk);
+        block_exp(qk, qk);
 
-        // Compute `cur_sum_vec` by reduce sum of `attn_block`.
-        row_sum(attn_block, cur_sum_vec);
+        // l_ij = torch.sum(p, dim=-1, keepdim=True)
+        row_sum(qk, l_ij);
 
-        // Compute new max vector.
-        vec_max(cur_max_vec, prev_max_vec, new_max_vec);
+        // Renormalize o
+        // acc_o_scale = torch.exp(prev_max_vec - cur_max_vec)
+        // output = acc_o_scale * output + p @ v
+        vec_sub(prev_max_vec, cur_max_vec, acc_o_scale);
+        vec_exp(acc_o_scale, acc_o_scale);
 
-        // Renormalization for the previous block.
-        vec_sub(prev_max_vec, new_max_vec, prev_norm_vec);
-        vec_exp(prev_norm_vec, prev_norm_vec);
+        compute::gemm(qk, rV, pv_float);
+        cast_o(pv_float, pv);
+        broadcast_mul(acc_o_scale, rO);
+        block_add(rO, pv, rO);
 
-        // Renormalization for the current block.
-        vec_sub(cur_max_vec, new_max_vec, cur_norm_vec);
-        vec_exp(cur_norm_vec, cur_norm_vec);
-
-        // Update normalization factor l(x)
-        vec_mul(prev_norm_vec, prev_sum_vec, prev_norm_mul_sum);
-        vec_mul(cur_norm_vec, cur_sum_vec, cur_norm_mul_sum);
-        vec_add(prev_norm_mul_sum, cur_norm_mul_sum, new_sum_vec);
-
-        // Compute unnormized attention block.
-        compute::gemm(attn_block, rV, exp_values_f32);
-
-        cast_o(exp_values_f32, exp_values);
-
-        broadcast_mul(prev_norm_mul_sum, rO);
-
-        broadcast_mul(cur_norm_vec, exp_values);
-
-        block_add(rO, exp_values, rO);
-
-        // Normalize the attention block.
-        broadcast_div(new_sum_vec, rO);
-
-        // Update max vector and sum vector.
-        copy_vec(new_max_vec, prev_max_vec);
-        copy_vec(new_sum_vec, prev_sum_vec);
+        // Update statistics
+        // prev_max_vec = cur_max_vec
+        // l_i_new = torch.exp(lse - cur_maxes) + l_ij
+        // lse = cur_max_vec + torch.log(l_i_new)
+        copy_vec(prev_max_vec, cur_max_vec);
+        vec_sub(lse_vec, cur_max_vec, temp_vec);
+        vec_exp(temp_vec, l_i_new);
+        vec_add(l_i_new, l_ij, l_i_new);
+        vec_log(l_i_new, temp_vec);
+        vec_add(cur_max_vec, temp_vec, lse_vec);
 
         // Clear the accumulator.
-        attn_block_f32.clear();
-        exp_values_f32.clear();
+        qk_float.clear();
+        pv_float.clear();
     }
     __syncthreads();
+
+    // o_scale = torch.exp(prev_max_vec - lse)
+    // output = o_scale * output
+    vec_sub(prev_max_vec, lse_vec, o_scale);
+    vec_exp(o_scale, o_scale);
+    broadcast_mul(o_scale, rO);
 
     GlobalO gO(gO_ptr);
     OStorer storer_o;  // Store O tile from register to global.
