@@ -303,30 +303,64 @@ __global__ void ke_flash_decoding_split_kv_fwd(const InType* dQ,
     storer_o(rO, gO);
 }
 
-template <typename Element, typename GlobalLse, typename GlobalO,
-          typename LseReg, const int kLogMaxSplits>
-__global__ void ke_flash_decoding_split_kv_fwd_combine(Element* gLse,
-                                                       Element* gO) {
-    constexpr int kMaxSplits = 1 << kLogMaxSplits;
+template <typename Element, typename GlobalLse, typename GlobalO, typename RegO,
+          typename LseVec, typename VecMax, typename VecExp, typename ReduceSum,
+          typename BroadcastSub, typename AllReduceMax, typename AllReduceSum,
+          typename StoreLse, typename LoadO, typename StoreO>
+__global__ void ke_flash_decoding_split_kv_fwd_combine(
+    Element* gLse, Element* gO, const int split_kv_nums) {
+    extern __shared__ Element smem[];
+    GlobalO gO(gO);
+    RegO rO;
 
-    int bid = blockIdx.x;
-    int tid = threadIdx.x;
+    VecMax vec_max;
+    BroadcastSub broadcast_sub;
+    VecExp vec_exp;
+    ReduceSum reduce_sum;
 
-    // Shared memory for LSE.
-    __shared__ Element sLSE[kMaxSplits];
+    AllReduceMax all_reduce_max;
 
+    StoreLse store_lse;
+
+    LoadO load_o;
+    StoreO store_o;
+
+    // A naive implementation of the combine kernel.
     GlobalLse gLSE(gLse);
-    LseReg lse_accum;
-    constexpr int kNLsePerThread = CeilDiv<kMaxSplits, kThreads>;
+    LseVec lse;
+    LseVec lse_sub_max;
+    LseVec scale;
 
-    // TODO: Read the LSE values from gmem and store into shared memory.
+    Element lse_max;
+    Element lse_sum;
+    Element lse_log_sum;
 
-    // Compute the logsumexp of the LSE along the split dimension.
-    Element lse_max = lse_accum(0);
+    // find the max logsumexp in the current warp.
+    vec_max(lse, lse_max);
+    all_reduce_max(lse_max, lse_max);
 
-#pragma unroll
-    for (int l = 1; l < kNLsePerThread; ++l)
-        lse_max = max(lse_max, lse_accum(l));
+    // rescale the logsumexp.
+    broadcast_sub(lse, lse_max, lse_sub_max);
+    vec_exp(lse_sub_max, lse_sub_max);
+    reduce_sum(lse_sub_max, lse_sum);
+    all_reduce_sum(lse_sum, lse_sum);
+
+    lse_log_sum = logf(lse_sum) + lse_max;
+
+    // Store the scales exp(lse - lse_logsum) in shared memory.
+    broadcast_sub(lse, lse_log_sum, scale);
+    vec_exp(scale, scale);
+    store_lse(scale, smem);
+
+    __syncthreads();
+
+    // Load O into register.
+    load_o(gO, rO);
+
+    // TODO: Scale the output.
+
+    // Store the output into global memory.
+    store_o(rO, gO);
 }
 
 template <typename InType, typename AccType, typename OutType,
