@@ -160,6 +160,8 @@ __global__ void ke_flash_decoding_split_kv_fwd(const InType* dQ,
     const InType* gV_ptr = dV + blockIdx.y * (kTP * kN) + blockIdx.z * kChunkN;
 
     OutType* gO_ptr = dO + blockIdx.x * (kTM * kP) + (blockIdx.y * kTP);
+    // lse is a (M, 1) vector in a split dimension.
+    OutType* gLSE_ptr = dLSE + blockIdx.z * M + blockIdx.x * kTM;
 
     extern __shared__ __align__(sizeof(double)) unsigned char shared_buf[];
     auto* shm = reinterpret_cast<InType*>(shared_buf);
@@ -308,9 +310,9 @@ template <typename Element, typename GlobalLse, typename GlobalO, typename RegO,
           typename BroadcastSub, typename AllReduceMax, typename AllReduceSum,
           typename StoreLse, typename LoadO, typename StoreO>
 __global__ void ke_flash_decoding_split_kv_fwd_combine(
-    Element* gLse, Element* gO, const int split_kv_nums) {
+    Element* gLse_ptr, Element* gO_ptr, const int split_kv_nums) {
     extern __shared__ Element smem[];
-    GlobalO gO(gO);
+    GlobalO gO(gO_ptr);
     RegO rO;
 
     VecMax vec_max;
@@ -326,7 +328,7 @@ __global__ void ke_flash_decoding_split_kv_fwd_combine(
     StoreO store_o;
 
     // A naive implementation of the combine kernel.
-    GlobalLse gLSE(gLse);
+    GlobalLse gLSE(gLse_ptr);
     LseVec lse;
     LseVec lse_sub_max;
     LseVec scale;
@@ -458,10 +460,13 @@ void run_flash_decoding_fwd(const InType* dQ, const InType* dK,
                              shm_size);
     }
 
-    OutType* dLSE = nullptr;
+    = thrust::device_vector<OutType> dLSE(split_kv_nums * M);
+    thrust::fill(dLSE.begin(), dLSE.end(), 0.);
+
+    OutType* lse_ptr = thrust::raw_pointer_cast(dLSE.data());
 
     flash_decoding_split_kv_fwd<<<grid, block, shm_size, 0>>>(
-        dQ, dK, dV, dO, dLSE, kM, kN, kK, kP, kTM, kTN, kTK, kTP, kChunkN);
+        dQ, dK, dV, dO, lse_ptr, kM, kN, kK, kP, kTM, kTN, kTK, kTP, kChunkN);
 
     if (split_kv_nums > 1) {
         // TODO: Implement the combine kernel.
