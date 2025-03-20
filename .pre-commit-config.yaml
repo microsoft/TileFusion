@@ -1,26 +1,11 @@
 minimum_pre_commit_version: 3.0.0
 
 repos:
--   repo: https://github.com/Lucas-C/pre-commit-hooks.git
-    rev: v1.5.5
-    hooks:
-    -   id: remove-crlf
-        files: (?!.*third_party)^.*$ | (?!.*book)^.*$
--   repo: https://github.com/pre-commit/mirrors-yapf.git
-    rev: v0.32.0
-    hooks:
-    -   id: yapf
-        additional_dependencies: [toml]
-        files: (.*\.(py|bzl)|BUILD|.*\.BUILD|WORKSPACE)$
--   repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-    -   id: isort
-        name: isort (python)
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
     -   id: check-added-large-files
+        args: ['--maxkb=1024']
     -   id: check-merge-conflict
     -   id: check-symlinks
     -   id: detect-private-key
@@ -31,8 +16,24 @@ repos:
     -   id: check-ast
     -   id: check-executables-have-shebangs
     -   id: check-shebang-scripts-are-executable
-    -   id: detect-private-key
     -   id: debug-statements
+    -   id: mixed-line-ending
+        args: ['--fix=lf']
+        files: (?!.*third_party)^.*$ | (?!.*book)^.*$
+    -   id: check-case-conflict
+    -   id: check-json
+    -   id: check-merge-conflict
+    -   id: check-shebang-scripts-are-executable
+    -   id: detect-private-key
+    -   id: trailing-whitespace
+
+-   repo: https://github.com/pycqa/isort
+    rev: 6.0.1
+    hooks:
+    -   id: isort
+        name: isort (python)
+        args: ["--profile", "black"]
+
 -   repo: local
     hooks:
     -   id: clang-format-with-version-check
@@ -41,7 +42,73 @@ repos:
         entry: bash ./scripts/clang_format.hook -i
         language: system
         files: \.(c|cc|cxx|cpp|cu|h|cuh|hpp|hxx|proto)$
-- repo: https://github.com/iconmaster5326/cmake-format-pre-commit-hook
-  rev: v0.6.9
-  hooks:
-    - id: cmake-format
+
+-   repo: https://github.com/iconmaster5326/cmake-format-pre-commit-hook
+    rev: v0.6.13
+    hooks:
+    -   id: cmake-format
+
+-   repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+    -   id: black
+        args: [--line-length=80]
+        language_version: python3
+
+-   repo: https://github.com/PyCQA/flake8
+    rev: 7.1.2
+    hooks:
+    -   id: flake8
+        args: [--max-line-length=80]
+        additional_dependencies:
+            - flake8-bugbear
+            - flake8-comprehensions
+            - flake8-docstrings
+            - flake8-simplify
+            - flake8-unused-arguments
+            - flake8-variables-names
+            - flake8-return
+            - flake8-print
+
+-   repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.22
+    hooks:
+    -   id: mdformat
+        additional_dependencies:
+        -   mdformat-gfm
+        -   mdformat-frontmatter
+        -   mdformat-footnote
+        -   mdformat-tables
+
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.15.0
+    hooks:
+    -   id: mypy
+        additional_dependencies:
+            - types-setuptools
+            - types-requests
+            - types-urllib3
+            - types-six
+        args: [--ignore-missing-imports, --disallow-untyped-defs, --check-untyped-defs]
+
+-   repo: https://github.com/PyCQA/bandit
+    rev: 1.8.3
+    hooks:
+    -   id: bandit
+        args: ["-c", "pyproject.toml"]
+        additional_dependencies:
+            - bandit[toml]
+
+-   repo: https://github.com/asottile/pyupgrade
+    rev: v3.19.1
+    hooks:
+    -   id: pyupgrade
+        args: [--py39-plus]
+
+-   repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.4.1
+    hooks:
+    -   id: commitizen
+        stages: [commit-msg]
+    -   id: commitizen-branch
+        stages: [pre-push]

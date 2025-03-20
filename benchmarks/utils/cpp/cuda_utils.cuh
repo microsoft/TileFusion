@@ -15,13 +15,13 @@ template <int a, int b>
 inline constexpr int CeilDiv = (a + b - 1) / b;  // for compile-time values
 
 #if defined(__CUDA_ARCH__)
-#define HOST_DEVICE __forceinline__ __host__ __device__
-#define DEVICE __forceinline__ __device__
-#define HOST __forceinline__ __host__
+    #define HOST_DEVICE __forceinline__ __host__ __device__
+    #define DEVICE __forceinline__ __device__
+    #define HOST __forceinline__ __host__
 #else
-#define HOST_DEVICE inline
-#define DEVICE inline
-#define HOST inline
+    #define HOST_DEVICE inline
+    #define DEVICE inline
+    #define HOST inline
 #endif
 
 const char* cublasGetErrorString(cublasStatus_t status) {

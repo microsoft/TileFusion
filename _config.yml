@@ -1,7 +1,7 @@
 # Site settings
 title: TileFusion
 description: TileFusion is a highly efficient C++ macro kernel template library designed to elevate the level of abstraction in CUDA C for processing tiles.
-baseurl: "/TileFusion" 
+baseurl: "/TileFusion"
 url: "https://microsoft.github.io"
 authors:
   - name: "Ying Cao"
