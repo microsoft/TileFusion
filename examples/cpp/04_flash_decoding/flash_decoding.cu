@@ -125,23 +125,16 @@ int main() {
                            /*kTP*/>,
         128, /*kChunkN*/ kSharedAccess>();
 
-    // run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
-    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-    //                         /*kTP*/>,
-    //     2>();
+    run<FlashDecodingShape<64 /*M*/, 256 /*N*/, 128 /*K*/, 128 /*P*/>,
+        FlashDecodingShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128
+                           /*kTP*/>,
+        256, /*kChunkN*/ kSharedAccess>();
 
-    // run<FlashAttentionShape<64 /*M*/, 128 /*N*/, 128 /*K*/, 128 /*P*/>,
-    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-    //                         /*kTP*/>,
-    //     1>();
+    run<FlashDecodingShape<128 /*M*/, 256 /*N*/, 128 /*K*/, 128 /*P*/>,
+        FlashDecodingShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128
+                           /*kTP*/>,
+        256, /*kChunkN*/ kSharedAccess>();
 
-    // run<FlashAttentionShape<64 /*M*/, 256 /*N*/, 128 /*K*/, 128 /*P*/>,
-    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-    //     /*kTP*/>, 1>();
-
-    // run<FlashAttentionShape<64 /*M*/, 512 /*N*/, 128 /*K*/, 128 /*P*/>,
-    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-    //     /*kTP*/>, 1>();
 
     return 0;
 }

@@ -12,3 +12,4 @@
 #include "cell/copy/sync.hpp"
 #include "cell/copy/vectorize.hpp"
 #include "cell/copy/warp.hpp"
+#include "cell/copy/global_to_register_vec.hpp"

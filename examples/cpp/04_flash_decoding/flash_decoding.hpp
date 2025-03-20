@@ -13,6 +13,43 @@ using namespace tilefusion::cell;
 using namespace tilefusion::cell::copy;
 namespace tl = tile_layout;
 
+/**
+ * @brief Store LSE values from register to global memory.
+ * Since LSE values are reduced results, only first 8 threads in each warp need to store data.
+ * @tparam Global_ Global memory tile type.
+ * @tparam RegVec_ Register vector type.
+ * @tparam WarpLayout_ Warp layout type.
+ */
+template <typename Global_, typename RegVec_, typename WarpLayout_>
+struct RegToGlobalLseStorer {
+    using Global = Global_;
+    using RegVec = RegVec_;
+    using DType = typename Global::DType;
+    using WarpLayout = WarpLayout_;
+
+    DEVICE void operator()(const RegVec& src, Global& dst) {
+        // Get warp offset based on continuous mode
+        using GlobalOffset = warp::GlobalOffsetHelper<WarpLayout, WarpReuse::kCont>;
+        using BaseShape = traits::BaseTileShape<DType>;
+
+        GlobalOffset global_offset_;
+        int offset = global_offset_.template get_warp_offset<Global>();
+        DType* dst_ptr = dst.mutable_data() + offset;
+
+        int lane_id = threadIdx.x % WARP_SIZE;
+
+        // Thread index 0, 4, 8, 12, 16, 20, 24, 28 store 2 values per thread and 
+        // will handle BaseTile::kRows values.
+        if(lane_id % 4 == 0){
+            #pragma unroll
+            for(int i = 0; i < RegVec::kRows; ++i){
+                dst_ptr[i * BaseShape::kRows + lane_id / 4] = src(i, 0);
+                dst_ptr[i * BaseShape::kRows + lane_id / 4 + BaseShape::kRows / 2] = src(i, 1);
+            }
+        }
+    }
+};
+
 template <const int kM, const int kN, const int kK, const int kP>
 using FlashDecodingShape = TileShape<kM, kN, kK, kP>;
 
@@ -109,6 +146,9 @@ struct FlashDecodingTraits {
 
     using RegVec = RegTile<InType, tl::RowMajor<kAccMs, 2>>;
 
+    using GlobalLse = GlobalTile<InType, tl::RowMajor<kTM, 1>>;
+    using LseStorer = RegToGlobalLseStorer<GlobalLse, RegVec, WarpLayout>;
+
     using CopyVec = copy::BaseTileCopy<RegVec>;
     using RowMax = compute::MaxReduce<RegAccCast, tl::Layout::kRowMajor>;
 
@@ -132,6 +172,7 @@ struct FlashDecodingTraits {
     using VecLog = compute::BaseTileLog<RegVec>;
 };
 
+
 template <typename InType,
           typename AccType,                                      //
           typename OutType,                                      //
@@ -142,12 +183,7 @@ template <typename InType,
           typename GIteratorV, typename SharedV, typename RegV,  //
           typename SharedVLoader, typename RegVLoader,           //
           typename RegAcc, typename RegAccCast, typename GlobalO, typename RegO,
-          typename RegOCast, typename OStorer, typename ConvertAcc,
-          typename ConvertO, typename RegVec, typename CopyVec, typename RowMax,
-          typename RowSum, typename BroadcastSub, typename BroadcastMul,
-          typename BroadcastDiv, typename BlockExp, typename BlockAdd,
-          typename VecMax, typename VecAdd, typename VecSub, typename VecMul,
-          typename VecExp, typename VecLog>
+          typename RegOCast, typename OStorer, typename GlobalLse,typename LseStorer, typename ConvertAcc, typename ConvertO, typename RegVec, typename CopyVec, typename RowMax, typename RowSum, typename BroadcastSub, typename BroadcastMul, typename BroadcastDiv, typename BlockExp, typename BlockAdd, typename VecMax, typename VecAdd, typename VecSub, typename VecMul, typename VecExp, typename VecLog>
 __global__ void ke_flash_decoding_split_kv_fwd(const InType* dQ,
                                                const InType* dK,
                                                const InType* dV, OutType* dO,
@@ -161,7 +197,8 @@ __global__ void ke_flash_decoding_split_kv_fwd(const InType* dQ,
 
     OutType* gO_ptr = dO + blockIdx.x * (kTM * kP) + (blockIdx.y * kTP);
     // lse is a (M, 1) vector in a split dimension.
-    OutType* gLSE_ptr = dLSE + blockIdx.z * M + blockIdx.x * kTM;
+    // Each block handles a (kTM, 1) vector.
+    OutType* gLSE_ptr = dLSE + blockIdx.z * kM + blockIdx.x * kTM;
 
     extern __shared__ __align__(sizeof(double)) unsigned char shared_buf[];
     auto* shm = reinterpret_cast<InType*>(shared_buf);
@@ -303,11 +340,17 @@ __global__ void ke_flash_decoding_split_kv_fwd(const InType* dQ,
     GlobalO gO(gO_ptr);
     OStorer storer_o;  // Store O tile from register to global.
     storer_o(rO, gO);
+
+    // We only need 8 threads to store the LSE values in a warp because 
+    // the lse vector is the reduce result of 32 threads.
+    GlobalLse gLSE(gLSE_ptr);
+    LseStorer storer_lse;
+    storer_lse(lse_vec, gLSE);
 }
 
 template <typename Element, typename GlobalLse, typename GlobalO, typename RegO,
           typename LseVec, typename VecMax, typename VecExp, typename ReduceSum,
-          typename BroadcastSub, typename AllReduceMax, typename AllReduceSum,
+          typename BroadcastSub, typename AllReduceMax, typename AllReduceSum, typename LoadLse,
           typename StoreLse, typename LoadO, typename StoreO>
 __global__ void ke_flash_decoding_split_kv_fwd_combine(
     Element* gLse_ptr, Element* gO_ptr, const int split_kv_nums) {
@@ -321,13 +364,14 @@ __global__ void ke_flash_decoding_split_kv_fwd_combine(
     ReduceSum reduce_sum;
 
     AllReduceMax all_reduce_max;
+    AllReduceSum all_reduce_sum;
 
+    LoadLse load_lse;
     StoreLse store_lse;
-
     LoadO load_o;
     StoreO store_o;
 
-    // A naive implementation of the combine kernel.
+    // Load LSE values for current position
     GlobalLse gLSE(gLse_ptr);
     LseVec lse;
     LseVec lse_sub_max;
@@ -336,32 +380,42 @@ __global__ void ke_flash_decoding_split_kv_fwd_combine(
     Element lse_max;
     Element lse_sum;
     Element lse_log_sum;
+    
+    load_lse(gLSE, lse);
 
     // find the max logsumexp in the current warp.
     vec_max(lse, lse_max);
     all_reduce_max(lse_max, lse_max);
 
-    // rescale the logsumexp.
+    // Compute exp(lse - max_lse) for normalization
     broadcast_sub(lse, lse_max, lse_sub_max);
     vec_exp(lse_sub_max, lse_sub_max);
+    
+    // Sum up all the exponentials
     reduce_sum(lse_sub_max, lse_sum);
     all_reduce_sum(lse_sum, lse_sum);
 
+    // Compute final LSE value: max + log(sum(exp(lse - max)))
     lse_log_sum = logf(lse_sum) + lse_max;
 
-    // Store the scales exp(lse - lse_logsum) in shared memory.
+    // Compute final scale factors: exp(lse - lse_logsum)
     broadcast_sub(lse, lse_log_sum, scale);
     vec_exp(scale, scale);
+    
+    // Store the scales in shared memory for use in output scaling
     store_lse(scale, smem);
-
     __syncthreads();
 
-    // Load O into register.
+    // Load output values
     load_o(gO, rO);
 
-    // TODO: Scale the output.
+    // Scale the output values using the computed scales
+    // Each thread processes its portion of the output
+    // for (int i = 0; i < rO.size(); i++) {
+    //     rO[i] *= scale[i % scale.size()];
+    // }
 
-    // Store the output into global memory.
+    // Store the scaled output back to global memory
     store_o(rO, gO);
 }
 
@@ -414,6 +468,9 @@ void run_flash_decoding_fwd(const InType* dQ, const InType* dK,
     using OStorer = typename Config::DStorer;
     using GlobalO = typename Config::GlobalD;
 
+    using GlobalLse = typename Config::GlobalLse;
+    using LseStorer = typename Config::LseStorer;
+
     using ConvertAcc = typename Config::ConvertHalf;
     using ConvertO = typename Config::ConvertO;
 
@@ -449,7 +506,7 @@ void run_flash_decoding_fwd(const InType* dQ, const InType* dK,
         InType, AccType, OutType, GIteratorQ, SharedQ, RegQ, SharedQLoader,
         RegQLoader, GIteratorK, SharedK, RegK, SharedKLoader, RegKLoader,
         GIteratorV, SharedV, RegV, SharedVLoader, RegVLoader, RegAcc,
-        RegAccCast, GlobalO, RegO, RegOCast, OStorer, ConvertAcc, ConvertO,
+        RegAccCast, GlobalO, RegO, RegOCast, OStorer, GlobalLse, LseStorer, ConvertAcc, ConvertO,
         RegVec, CopyVec, RowMax, RowSum, BroadcastSub, BroadcastMul,
         BroadcastDiv, BlockExp, BlockAdd, VecMax, VecAdd, VecSub, VecMul,
         VecExp, VecLog>;
@@ -460,7 +517,7 @@ void run_flash_decoding_fwd(const InType* dQ, const InType* dK,
                              shm_size);
     }
 
-    = thrust::device_vector<OutType> dLSE(split_kv_nums * M);
+    thrust::device_vector<OutType> dLSE(split_kv_nums * kM);
     thrust::fill(dLSE.begin(), dLSE.end(), 0.);
 
     OutType* lse_ptr = thrust::raw_pointer_cast(dLSE.data());
@@ -481,6 +538,6 @@ void run_flash_decoding_fwd(const InType* dQ, const InType* dK,
         dim3 block(Config::kThreads, 1, 1);
 
         // ke_flash_decoding_split_kv_fwd_combine<<<grid, block, 0, 0>>>(dLSE,
-        // dO);
+        //                                                            dO);
     }
 }
