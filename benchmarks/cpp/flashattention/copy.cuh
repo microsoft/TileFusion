@@ -21,17 +21,17 @@ class G2SCopyQK {
     DEVICE G2SCopyQK(GQTensor& gQ, SQTensor& sQ, GKTensor& gK, SKTensor& sK,
                      TiledCopy tiled_copy, int gQ_stride, int sQ_stride,
                      int gK_stride, int sK_stride, int num_stage = 2)
-        : gQ(gQ)
-        , sQ(sQ)
-        , gK(gK)
-        , sK(sK)
-        , gQ_stride(gQ_stride)
-        , sQ_stride(sQ_stride)
-        , gK_stride(gK_stride)
-        , sK_stride(sK_stride)
-        , cur_iter(0)
-        , cur_iter_sk(0)
-        , num_stage(num_stage) {}
+        : gQ(gQ),
+          sQ(sQ),
+          gK(gK),
+          sK(sK),
+          gQ_stride(gQ_stride),
+          sQ_stride(sQ_stride),
+          gK_stride(gK_stride),
+          sK_stride(sK_stride),
+          cur_iter(0),
+          cur_iter_sk(0),
+          num_stage(num_stage) {}
 
     /**
      * @brief Update the pointer of the global K tensor.
@@ -189,12 +189,12 @@ class G2SCopyV {
   public:
     DEVICE G2SCopyV(GVTensor& gV, SVTensor& sV, TiledCopy tiled_copy,
                     int gV_stride, int sV_stride, int num_stage = 2)
-        : gV(gV)
-        , sV(sV)
-        , gV_stride(gV_stride)
-        , sV_stride(sV_stride)
-        , cur_iter(0)
-        , num_stage(num_stage) {}
+        : gV(gV),
+          sV(sV),
+          gV_stride(gV_stride),
+          sV_stride(sV_stride),
+          cur_iter(0),
+          num_stage(num_stage) {}
 
     DEVICE void prologue() {
 #pragma unroll
@@ -270,21 +270,21 @@ class S2RPipelineQK {
                          RAccTensor& acc, TiledCopyQ copy_q, TiledCopyK copy_k,
                          TiledMma tiled_mma, int sQ_stride, int sK_stride,
                          int num_stage = 2)
-        : sQ(sQ)
-        , rQ_mma_view(rQ_mma_view)
-        , rQ_copy_view(rQ_copy_view)
-        , sK(sK)
-        , rK_mma_view(rK_mma_view)
-        , rK_copy_view(rK_copy_view)
-        , acc(acc)
-        , copy_q(copy_q)
-        , copy_k(copy_k)
-        , tiled_mma(tiled_mma)
-        , sQ_stride(sQ_stride)
-        , sK_stride(sK_stride)
-        , num_stage(num_stage)
-        , cur_iter(0)
-        , cur_iter_sq(0) {}
+        : sQ(sQ),
+          rQ_mma_view(rQ_mma_view),
+          rQ_copy_view(rQ_copy_view),
+          sK(sK),
+          rK_mma_view(rK_mma_view),
+          rK_copy_view(rK_copy_view),
+          acc(acc),
+          copy_q(copy_q),
+          copy_k(copy_k),
+          tiled_mma(tiled_mma),
+          sQ_stride(sQ_stride),
+          sK_stride(sK_stride),
+          num_stage(num_stage),
+          cur_iter(0),
+          cur_iter_sq(0) {}
 
     DEVICE void prologue() {
         cur_iter = 0;
@@ -381,15 +381,15 @@ class S2RPipelineV {
                         RVCopyView& rV_copy_view, RegAcc& acc,
                         TiledCopy tiled_copy, TiledMma tiled_mma, int sV_stride,
                         int num_stage = 2)
-        : sV(sV)
-        , rV_mma_view(rV_mma_view)
-        , rV_copy_view(rV_copy_view)
-        , acc(acc)
-        , tiled_copy(tiled_copy)
-        , sV_stride(sV_stride)
-        , num_stage(num_stage)
-        , cur_iter(0)
-        , cur_iter_sv(0) {}
+        : sV(sV),
+          rV_mma_view(rV_mma_view),
+          rV_copy_view(rV_copy_view),
+          acc(acc),
+          tiled_copy(tiled_copy),
+          sV_stride(sV_stride),
+          num_stage(num_stage),
+          cur_iter(0),
+          cur_iter_sv(0) {}
 
     template <typename RegValue>
     DEVICE void prologue(RegValue& value) {

@@ -8,7 +8,7 @@ authors = [
 
 description = "TileFusion: Simplifying Kernel Fusion with Tile Processing"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -20,6 +20,29 @@ classifiers = [
  # Make sure to keep this field in sync with what is in `requirements.txt`.
 dependencies = [
     "torch",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black==25.1.0",
+    "flake8==7.1.2",
+    "flake8-bugbear",
+    "flake8-comprehensions",
+    "flake8-docstrings",
+    "flake8-simplify",
+    "flake8-unused-arguments",
+    "flake8-variables-names",
+    "flake8-return",
+    "flake8-print",
+    "isort==6.0.1",
+    "mypy==1.15.0",
+    "types-setuptools",
+    "types-requests",
+    "types-urllib3",
+    "types-six",
+    "bandit==1.8.3",
+    "pyupgrade==3.19.1",
+    "commitizen==4.4.1",
 ]
 
 [project.urls]
@@ -35,82 +58,13 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
-[tool.ruff]
+[tool.black]
 line-length = 80
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".ipynb_checkpoints",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pyenv",
-    ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    ".vscode",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "site-packages",
-    "venv",
-]
-include = ["*.py"]
-
-[tool.ruff.lint]
-select = [
-    # pycodestyle
-    "E",
-    # Pyflakes
-    "F",
-    # flake8-bugbear
-    "B",
-    # flake8-simplify
-    "SIM",
-    # isort
-    "G",
-]
-ignore = [
-    # star imports
-    "F405", "F403",
-    # lambda expression assignment
-    "E731",
-    # Loop control variable not used within loop body
-    "B007",
-    # f-string format
-    "UP032",
-]
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-skip-magic-trailing-comma = false
-line-ending = "auto"
-
-[tool.yapf]
-column_limit = 80
-indent_width = 4
-based_on_style = "google"
-split_before_logical_operator = false
-dedent_closing_brackets = true
-coalesce_brackets = true
-
-[tool.codespell]
-ignore-words-list = "ist"
+target-version = ['py39']
+include = '\.pyi?$'
 
 [tool.isort]
-use_parentheses = true
-skip_gitignore = true
+profile = "black"
 line_length = 80
 multi_line_output = 3
 include_trailing_comma = true
@@ -119,7 +73,7 @@ combine_as_imports = true
 ensure_newline_before_comments = true
 
 [tool.flake8]
-max-line-length = 100
+max-line-length = 80
 extend-ignore = ["E203", "W503"]
 exclude = [".git", "__pycache__", "build", "dist"]
 per-file-ignores = [
@@ -127,6 +81,33 @@ per-file-ignores = [
     "tests/*: D100,D101,D102,D103",
     "examples/*: D100,D101,D102,D103",
     "setup.py: D100,D101,D102,D103",
+]
+docstring-convention = "google"
+ignore = [
+    "D100",  # Missing docstring in public module
+    "D101",  # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in public function
+    "D104",  # Missing docstring in public package
+    "D105",  # Missing docstring in magic method
+    "D106",  # Missing docstring in public nested class
+    "D107",  # Missing docstring in __init__
+    "D203",  # 1 blank line required before class docstring
+    "D213",  # Multi-line docstring summary should start at the second line
+    "D406",  # Section name should end with a period
+    "D407",  # Missing dashed underline after section
+    "D408",  # Section underline should match the length of its name
+    "D409",  # Section underline should be in the same line as the section name
+    "D410",  # Missing blank line after section
+    "D411",  # Missing blank line before section
+    "D412",  # No blank lines allowed between a section header and its content
+    "D413",  # Missing blank line after last section
+    "D414",  # Section has no content
+    "D415",  # First line should end with a period
+    "D416",  # Section name should end with a period
+    "D417",  # Missing argument descriptions in the docstring
+    "D418",  # Missing blank line after function decorator
+    "D419",  # First line should be in imperative mood
 ]
 
 [tool.mypy]
@@ -143,8 +124,46 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_optional = true
+ignore_missing_imports = true
 
 [tool.bandit]
 exclude_dirs = ["tests"]
 skips = ["B101", "B311", "B404", "B603", "B607"]
 ignore_nosec = false
+
+[tool.flake8.bugbear]
+extend-select = ["B"]
+ignore = ["B007"]  # Loop control variable not used within loop body
+
+[tool.flake8.comprehensions]
+extend-select = ["C4"]
+
+[tool.flake8.simplify]
+extend-select = ["SIM"]
+
+[tool.flake8.unused-arguments]
+extend-select = ["ARG"]
+
+[tool.flake8.variables-names]
+extend-select = ["N"]
+
+[tool.flake8.return]
+extend-select = ["RET"]
+
+[tool.flake8.print]
+extend-select = ["T"]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.0.0"
+tag_format = "v$version"
+bump_message = "bump: version $current_version → $new_version [skip ci]"
+update_changelog_on_bump = true
+major_version_zero = true
+version_files = [
+    "pyproject.toml:version",
+    "setup.py:version",
+]
+
+[tool.pyupgrade]
+py39-plus = true

@@ -1,3 +1,5 @@
+"""Entry point for GEMM example."""
+
 # -------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.

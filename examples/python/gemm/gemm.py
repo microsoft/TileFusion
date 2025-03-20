@@ -41,7 +41,8 @@ class GemmFunc(torch.autograd.Function):
             matrix_c: Output matrix.
             matrix_m: Size of first dimension of matrix A.
             matrix_n: Size of second dimension of matrix B.
-            matrix_k: Size of second dimension of matrix A and first dimension of matrix B.
+            matrix_k: Size of second dimension of matrix A and first dimension
+                      of matrix B.
             tile_m: Tile size for M dimension.
             tile_n: Tile size for N dimension.
             chunk_k: Chunk size for K dimension.

@@ -5,28 +5,30 @@
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
-import os
+import ctypes
+from typing import Any
 
 import torch
 
 
-def _load_library(filename: str) -> bool:
-    """Load a shared library from the given filename.
+def _load_library(filename: str) -> Any:
+    """Load the C++ library.
 
     Args:
-        filename: Name of the library file to load.
+        filename: Name of the library file.
 
     Returns:
-        bool: True if library was loaded successfully, False otherwise.
+        Any: The loaded library.
+
+    Raises:
+        RuntimeError: If the library cannot be loaded.
     """
     try:
-        libdir = os.path.dirname(os.path.dirname(__file__))
-        torch.ops.load_library(os.path.join(libdir, "pytilefusion", filename))
-        print(f"Successfully loaded: '{filename}'")
-        return True
-    except Exception as error:
-        print(f"Fail to load library: '{filename}', {error}\n")
-        return False
+        return ctypes.CDLL(filename)
+    except OSError as e:
+        print(f"Failed to load library: {filename}")  # noqa: T201
+        print(f"Error: {e}")  # noqa: T201
+        raise RuntimeError(f"Failed to load library: {filename}") from e
 
 
 _load_library("libtilefusion.so")
@@ -44,7 +46,9 @@ def scatter_nd(
         scatter_indices: The indices where updates should be scattered.
         scatter_updates: The updates to scatter.
     """
-    torch.ops.tilefusion.scatter_nd(scatter_data, scatter_updates, scatter_indices)
+    torch.ops.tilefusion.scatter_nd(
+        scatter_data, scatter_updates, scatter_indices
+    )
 
 
 def flash_attention_fwd(
