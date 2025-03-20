@@ -55,7 +55,7 @@ using FlashDecodingShape = TileShape<kM, kN, kK, kP>;
 
 template <typename InType, typename AccType, typename WholeShape,
           typename CtaTileShape, const int kSharedAccess>
-struct FlashDecodingTraits {
+struct FlashDecodingSplitKvTraits {
     using BaseShape = traits::BaseTileShape<InType>;
 
     using WarpLayout = tl::RowMajor<4, 1>;
@@ -170,6 +170,19 @@ struct FlashDecodingTraits {
     using VecMul = compute::BaseTileMul<RegVec>;
     using VecExp = compute::BaseTileExp<RegVec>;
     using VecLog = compute::BaseTileLog<RegVec>;
+};
+
+template <typename Element, typename WholeShape,
+          typename CtaTileShape, const int kSharedAccess>
+struct FlashDecodingCombineTraits {
+    using BaseShape = traits::BaseTileShape<Element>;
+    using WarpLayout = tl::RowMajor<4, 1>;
+
+    static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
+    static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
+    static_assert(kWarpPerCol == 1, "WarpPerCol must be 1");
+
+    static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
 };
 
 
@@ -349,27 +362,29 @@ __global__ void ke_flash_decoding_split_kv_fwd(const InType* dQ,
 }
 
 template <typename Element, typename GlobalLse, typename GlobalO, typename RegO,
-          typename LseVec, typename VecMax, typename VecExp, typename ReduceSum,
+          typename LseVec, typename VecMax, typename VecExp, typename VecSum,
           typename BroadcastSub, typename AllReduceMax, typename AllReduceSum, typename LoadLse,
-          typename StoreLse, typename LoadO, typename StoreO>
+          typename StoreLse, typename OLoader, typename OStorer>
 __global__ void ke_flash_decoding_split_kv_fwd_combine(
     Element* gLse_ptr, Element* gO_ptr, const int split_kv_nums) {
+    // Now we have split_kv_nums Lse vectors and each vector's length is kM;
+    // We need to combine them into one Lse vector and one O vector.
     extern __shared__ Element smem[];
-    GlobalO gO(gO_ptr);
-    RegO rO;
+
+    // Now one block will handles a (kTM, kTP) tile of O and a (kTM, 1) tile of LSE. 
+    // So we need to compute the scale factor for each thread block.
+
 
     VecMax vec_max;
     BroadcastSub broadcast_sub;
     VecExp vec_exp;
-    ReduceSum reduce_sum;
+    VecSum vec_sum;
 
     AllReduceMax all_reduce_max;
     AllReduceSum all_reduce_sum;
 
     LoadLse load_lse;
     StoreLse store_lse;
-    LoadO load_o;
-    StoreO store_o;
 
     // Load LSE values for current position
     GlobalLse gLSE(gLse_ptr);
@@ -392,7 +407,7 @@ __global__ void ke_flash_decoding_split_kv_fwd_combine(
     vec_exp(lse_sub_max, lse_sub_max);
     
     // Sum up all the exponentials
-    reduce_sum(lse_sub_max, lse_sum);
+    vec_sum(lse_sub_max, lse_sum);
     all_reduce_sum(lse_sum, lse_sum);
 
     // Compute final LSE value: max + log(sum(exp(lse - max)))
@@ -407,6 +422,11 @@ __global__ void ke_flash_decoding_split_kv_fwd_combine(
     __syncthreads();
 
     // Load output values
+    OLoader load_o;
+    OStorer store_o;
+    GlobalO gO(gO_ptr);
+    RegO rO;
+
     load_o(gO, rO);
 
     // Scale the output values using the computed scales
@@ -439,7 +459,7 @@ void run_flash_decoding_fwd(const InType* dQ, const InType* dK,
     int block_y = CeilDiv<kP, kTP>;
     int block_z = split_kv_nums;
 
-    using Config = FlashDecodingTraits<InType, AccType, WholeShape,
+    using Config = FlashDecodingSplitKvTraits<InType, AccType, WholeShape,
                                        CtaTileShape, kSharedAccess>;
 
     using RegQ = typename Config::RegA;
@@ -524,6 +544,15 @@ void run_flash_decoding_fwd(const InType* dQ, const InType* dK,
 
     flash_decoding_split_kv_fwd<<<grid, block, shm_size, 0>>>(
         dQ, dK, dV, dO, lse_ptr, kM, kN, kK, kP, kTM, kTN, kTK, kTP, kChunkN);
+
+    thrust::host_vector<OutType> h_lse(split_kv_nums * kM);
+    thrust::copy(dLSE.begin(), dLSE.end(), h_lse.begin());
+
+#ifdef DEBUG
+    for (int i = 0; i < split_kv_nums * kM; ++i) {
+        printf("h_lse[%d] = %f\n", i, __half2float(h_lse[i]));
+    }
+#endif
 
     if (split_kv_nums > 1) {
         // TODO: Implement the combine kernel.
