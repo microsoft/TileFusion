@@ -14,7 +14,7 @@ DYNAMIC_LIB	:= $(BUILD_DIR)/libtilefusion.so
 .PHONY: build example unit_test clean
 
 build:
-	@mkdir -p build 
+	@mkdir -p build
 	@cd build && cmake -DWITH_TESTING=$(WITH_TEST) .. && make -j$(proc)
 
 $(DYNAMIC_LIB): build

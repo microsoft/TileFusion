@@ -64,9 +64,9 @@ body {
   .footer-content {
     flex-direction: column;
   }
-  
+
   .footer-col {
     width: 100%;
     padding: 0;
   }
-} 
+}

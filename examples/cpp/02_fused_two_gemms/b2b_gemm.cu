@@ -161,6 +161,5 @@ int main() {
         B2BGemmShape<64 /*kTM*/, 64 /*kTN*/, 64 /*kTK*/, 64 /*kTP*/>,
         WarpLayout1, 1>(5e-3);
 
-
     return 0;
 }

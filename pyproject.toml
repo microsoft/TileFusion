@@ -117,3 +117,34 @@ include_trailing_comma = true
 force_grid_wrap = 0
 combine_as_imports = true
 ensure_newline_before_comments = true
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "W503"]
+exclude = [".git", "__pycache__", "build", "dist"]
+per-file-ignores = [
+    "__init__.py: F401",
+    "tests/*: D100,D101,D102,D103",
+    "examples/*: D100,D101,D102,D103",
+    "setup.py: D100,D101,D102,D103",
+]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_optional = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101", "B311", "B404", "B603", "B607"]
+ignore_nosec = false

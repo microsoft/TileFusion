@@ -64,7 +64,7 @@ extern "C" int kernel_entry(__half* parameter1, __half* parameter2,
     auto kernel =
         &gemm<InType, AccType, kM, kN, kK, kTM, kTN, IteratorA, RegA, ALoader,
               IteratorB, RegB, BLoader, GlobalC, RegC, CStorer>;
- 
+
     kernel<<<dim3(block_x, block_y, 1), dim3(kThreads, 1, 1)>>>(
         parameter1, parameter2, paramter3);
 
