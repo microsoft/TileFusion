@@ -56,4 +56,4 @@ jobs:
         bandit -c pyproject.toml -r .
     - name: Run pyupgrade
       run: |
-        pyupgrade --py39-plus .
+        find . -type f -name "*.py" -exec pyupgrade --py39-plus {} +
