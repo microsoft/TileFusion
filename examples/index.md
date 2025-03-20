@@ -42,6 +42,7 @@ __global__ void simple_gemm(const InType* dA, const InType* dB, AccType* dC) {
     storer_c(acc, gC);
 }
 ```
+
 - The `TileIterator` is used to divide the `GlobalTile` into smaller sub-tiles and iterate over them. Various warp reuse methods are provided to support efficient repeated loading of data by warps within a thread block. TileFusion provides efficient loading and storing methods that transfer data between memory hierarchies by utilizing specialized hardware-accelerated instructions. Tiles of data are then cooperatively loaded into the `RegTile`, which is stored in each thread's local register file.
 
 - Once the data is loaded into a thread's local register file, `gemm` performs matrix multiplication using TensorCore's warp-level matrix multiply-and-accumulate (wmma) instruction on the `BaseTile`s. The specialized data distribution required by TensorCore is automatically maintained by TileFusion's `RegTile` layout.
@@ -73,4 +74,4 @@ using CStorer = RegToGlobalStorer<GlobalC, RegC, WarpLayout>;
 
 ## More Examples
 
-Check out our [examples directory](https://github.com/microsoft/TileFusion/tree/main/examples) for more complete examples. 
+Check out our [examples directory](https://github.com/microsoft/TileFusion/tree/main/examples) for more complete examples.

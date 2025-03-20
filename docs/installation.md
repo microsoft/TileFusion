@@ -20,37 +20,39 @@ cd TileFusion && git submodule update --init --recursive
 
 1. To build the project using the provided `Makefile`, simply run:
 
-    ```bash
-    make
-    ```
+   ```bash
+   make
+   ```
 
-2. Run the C++ unit tests:
+1. Run the C++ unit tests:
 
-    - **Run a single C++ unit test**: 
-      ```bash
-      make unit_test_cpp CPP_UT=test_gemm
-      ```
-    - **Run all C++ unit tests**: 
-      ```bash
-      make unit_test_cpps
-      ```
+   - **Run a single C++ unit test**:
+     ```bash
+     make unit_test_cpp CPP_UT=test_gemm
+     ```
+   - **Run all C++ unit tests**:
+     ```bash
+     make unit_test_cpps
+     ```
 
 ### Building the Python Wrapper
 
 1. Build the wheel:
-    ```bash
-    python3 setup.py build bdist_wheel
-    ```
 
-2. Clean the build:
-    ```bash
-    python3 setup.py clean
-    ```
+   ```bash
+   python3 setup.py build bdist_wheel
+   ```
 
-3. Install the Python wrapper in editable mode (recommended for development):
+1. Clean the build:
 
-    ```bash
-    python3 setup.py develop
-    ```
+   ```bash
+   python3 setup.py clean
+   ```
 
-    This allows you to edit the source code directly without needing to reinstall it repeatedly.
+1. Install the Python wrapper in editable mode (recommended for development):
+
+   ```bash
+   python3 setup.py develop
+   ```
+
+   This allows you to edit the source code directly without needing to reinstall it repeatedly.

@@ -47,6 +47,7 @@ __global__ void simple_gemm(const InType* dA, const InType* dB, AccType* dC) {
     storer_c(acc, gC);
 }
 ```
+
 - The `TileIterator` is used to divide the `GlobalTile` into smaller sub-tiles and iterate over them. Various warp reuse methods are provided to support efficient repeated loading of data by warps within a thread block. TileFusion provides efficient loading and storing methods that transfer data between memory hierarchies by utilizing specialized hardware-accelerated instructions. Tiles of data are then cooperatively loaded into the `RegTile`, which is stored in each thread's local register file.
 
 - Once the data is loaded into a thread's local register file, `gemm` performs matrix multiplication using TensorCore's warp-level matrix multiply-and-accumulate (wmma) instruction on the `BaseTile`s. The specialized data distribution required by TensorCore is automatically maintained by TileFusion's `RegTile` layout.
@@ -93,40 +94,42 @@ TileFusion requires a C++20 host compiler, CUDA 12.0 or later, and GCC version 1
 
 1. To build the project using the provided `Makefile`, simply run:
 
-    ```bash
-    make
-    ```
+   ```bash
+   make
+   ```
 
-2. Run the C++ unit tests:
+1. Run the C++ unit tests:
 
-    - **Run a single C++ unit test**: 
-      ```bash
-      make unit_test_cpp CPP_UT=test_gemm
-      ```
-    - **Run all C++ unit tests**: 
-      ```bash
-      make unit_test_cpps
-      ```
+   - **Run a single C++ unit test**:
+     ```bash
+     make unit_test_cpp CPP_UT=test_gemm
+     ```
+   - **Run all C++ unit tests**:
+     ```bash
+     make unit_test_cpps
+     ```
 
 #### Building the Python Wrapper
 
 1. Build the wheel:
-    ```bash
-    python3 setup.py build bdist_wheel
-    ```
 
-2. Clean the build:
-    ```bash
-    python3 setup.py clean
-    ```
+   ```bash
+   python3 setup.py build bdist_wheel
+   ```
 
-3. Install the Python wrapper in editable mode (recommended for development):
+1. Clean the build:
 
-    ```bash
-    python3 setup.py develop
-    ```
+   ```bash
+   python3 setup.py clean
+   ```
 
-    This allows you to edit the source code directly without needing to reinstall it repeatedly.
+1. Install the Python wrapper in editable mode (recommended for development):
+
+   ```bash
+   python3 setup.py develop
+   ```
+
+   This allows you to edit the source code directly without needing to reinstall it repeatedly.
 
 ## Contributing
 
@@ -144,8 +147,8 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ## Trademarks
 
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft 
-trademarks or logos is subject to and must follow 
+This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
+trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
