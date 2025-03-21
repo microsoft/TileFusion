@@ -173,16 +173,30 @@ struct FlashDecodingSplitKvTraits {
 };
 
 template <typename Element, typename WholeShape,
-          typename CtaTileShape, const int kSharedAccess>
+          typename CtaTileShape, const int kSharedAccess,const int kChunkN>
 struct FlashDecodingCombineTraits {
     using BaseShape = traits::BaseTileShape<Element>;
     using WarpLayout = tl::RowMajor<4, 1>;
+
+    static constexpr int kM = dim_size<0, WholeShape>;
+    static constexpr int kN = dim_size<1, WholeShape>;
+
+    static constexpr int kTM = dim_size<0, CtaTileShape>;
+
+    static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
+
+    static constexpr int kBlockM = CeilDiv<kM, kTM>;
+    static constexpr int kSplitKvNums = CeilDiv<kN, kChunkN>;
+
+    static constexpr int kLsePerThread = CeilDiv<kSplitKvNums * kTM, kThreads>;
 
     static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
     static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
     static_assert(kWarpPerCol == 1, "WarpPerCol must be 1");
 
     static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
+
+    using SharedLse = SharedTile<Element, tl::RowMajor<kTM, 1>, true, kSharedAccess>;
 };
 
 
@@ -195,8 +209,13 @@ template <typename InType,
           typename SharedKLoader, typename RegKLoader,           //
           typename GIteratorV, typename SharedV, typename RegV,  //
           typename SharedVLoader, typename RegVLoader,           //
-          typename RegAcc, typename RegAccCast, typename GlobalO, typename RegO,
-          typename RegOCast, typename OStorer, typename GlobalLse,typename LseStorer, typename ConvertAcc, typename ConvertO, typename RegVec, typename CopyVec, typename RowMax, typename RowSum, typename BroadcastSub, typename BroadcastMul, typename BroadcastDiv, typename BlockExp, typename BlockAdd, typename VecMax, typename VecAdd, typename VecSub, typename VecMul, typename VecExp, typename VecLog>
+          typename RegAcc, typename RegAccCast, typename GlobalO, typename RegO, 
+          typename RegOCast, typename OStorer, typename GlobalLse,typename LseStorer, 
+          typename ConvertAcc, typename ConvertO, typename RegVec, typename CopyVec,
+          typename RowMax, typename RowSum, typename BroadcastSub, typename BroadcastMul, 
+          typename BroadcastDiv, typename BlockExp, typename BlockAdd, 
+          typename VecMax, typename VecAdd, typename VecSub, 
+          typename VecMul, typename VecExp, typename VecLog>
 __global__ void ke_flash_decoding_split_kv_fwd(const InType* dQ,
                                                const InType* dK,
                                                const InType* dV, OutType* dO,
@@ -369,7 +388,12 @@ __global__ void ke_flash_decoding_split_kv_fwd_combine(
     Element* gLse_ptr, Element* gO_ptr, const int split_kv_nums) {
     // Now we have split_kv_nums Lse vectors and each vector's length is kM;
     // We need to combine them into one Lse vector and one O vector.
-    extern __shared__ Element smem[];
+    // extern __shared__ Element smem[];
+
+    // `kBlockM` represents the number of sequence rows processed by each thread
+    // block.
+    static constexpr int kBlockM = 4;
+    __shared__ Element sLSE[split_kv_nums][kBlockM + 1];
 
     // Now one block will handles a (kTM, kTP) tile of O and a (kTM, 1) tile of LSE. 
     // So we need to compute the scale factor for each thread block.
