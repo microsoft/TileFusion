@@ -4,7 +4,7 @@
 #include "flash_attn.hpp"
 #include "util.hpp"
 
-template <typename WholeShape, typename CtaTileShape, const int kBatch>
+template <typename WholeShape, typename CtaTileShape, const int kBatch, const int kSharedAccess>
 void run(bool check = true) {
     using InType = __half;
     using AccType = float;
@@ -87,7 +87,7 @@ void run(bool check = true) {
     InType* D = thrust::raw_pointer_cast(d_d.data());
 
     using Config =
-        FlashAttentionTraits<InType, AccType, WholeShape, CtaTileShape>;
+        FlashAttentionTraits<InType, AccType, WholeShape, CtaTileShape, kSharedAccess>;
 
     using RegA = typename Config::RegA;
     using RegB = typename Config::RegB;
@@ -201,10 +201,11 @@ void run(bool check = true) {
 }
 
 int main() {
+    static constexpr int kSharedAccess = 64;
     run<FlashAttentionShape<64 /*M*/, 128 /*N*/, 128 /*K*/, 128 /*P*/>,
         FlashAttentionShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128
                             /*kTP*/>,
-        1>();
+        1, kSharedAccess>();
 
     // run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
     //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128

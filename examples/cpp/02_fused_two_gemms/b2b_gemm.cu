@@ -5,7 +5,7 @@
 #include "util.hpp"
 
 template <typename WholeShape, typename CtaTileShape, typename WarpLayout,
-          const int kBatch>
+          const int kBatch, const int kSharedAccess>
 void run(float epsilon = 1e-3) {
     using InType = __half;
     using AccType = float;
@@ -155,11 +155,12 @@ void run(float epsilon = 1e-3) {
 }
 
 int main() {
-    using WarpLayout1 = tl::RowMajor<2, 1>;
+    using WarpLayout1 = tl::RowMajor<1, 1>;
+    static constexpr int kSharedAccess = 64;
 
     run<B2BGemmShape<256 /*M*/, 128 /*N*/, 64 /*K*/, 64 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 64 /*kTN*/, 64 /*kTK*/, 64 /*kTP*/>,
-        WarpLayout1, 1>(5e-3);
+        WarpLayout1, 1, kSharedAccess>(5e-3);
 
     return 0;
 }
