@@ -53,7 +53,7 @@ void run(float epsilon = 1e-3) {
     AccType* D = thrust::raw_pointer_cast(d_d.data());
 
     using Config =
-        B2BGemmTraits<InType, AccType, WholeShape, CtaTileShape, WarpLayout>;
+        B2BGemmTraits<InType, AccType, WholeShape, CtaTileShape, WarpLayout, kSharedAccess>;
 
     using RegA = typename Config::RegA;
     using RegB = typename Config::RegB;
@@ -155,7 +155,7 @@ void run(float epsilon = 1e-3) {
 }
 
 int main() {
-    using WarpLayout1 = tl::RowMajor<1, 1>;
+    using WarpLayout1 = tl::RowMajor<2, 1>;
     static constexpr int kSharedAccess = 64;
 
     run<B2BGemmShape<256 /*M*/, 128 /*N*/, 64 /*K*/, 64 /*P*/>,

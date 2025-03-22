@@ -13,7 +13,7 @@ using namespace compute;
 namespace tl = tile_layout;
 
 template <typename InType, typename AccType, typename WholeShape,
-          typename CtaTileShape, typename WarpLayout>
+          typename CtaTileShape, typename WarpLayout, const int kSharedAccess>
 struct B2BGemmTraits {
     using BaseShape = traits::BaseTileShape<InType>;
 
@@ -40,7 +40,7 @@ struct B2BGemmTraits {
 
     static const bool kUseSwizzling = true;
 
-    using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kUseSwizzling>;
+    using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kUseSwizzling, kSharedAccess>;
 
     static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kAKs = kTK / BaseShape::kCols;
@@ -53,7 +53,7 @@ struct B2BGemmTraits {
     // operand B
     using GlobalB = GlobalTile<InType, tl::ColMajor<kK, kN>>;
     using GIteratorB = GTileIterator<GlobalB, TileShape<kTK, kTN>>;
-    using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, kUseSwizzling>;
+    using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, kUseSwizzling, kSharedAccess>;
 
     static constexpr int kBKs = kTK / BaseShape::kRows;
     static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kCols;
@@ -67,7 +67,7 @@ struct B2BGemmTraits {
     using GlobalC = GlobalTile<InType, tl::ColMajor<kN, kTP>>;
     // chunk the N dimension to fit into shared memory
     using GIteratorC = GTileIterator<GlobalC, TileShape<kTN, kTP>>;
-    using SharedC = SharedTile<InType, tl::ColMajor<kTN, kTP>, kUseSwizzling>;
+    using SharedC = SharedTile<InType, tl::ColMajor<kTN, kTP>, kUseSwizzling, kSharedAccess>;
 
     static constexpr int kCNs = kTN / BaseShape::kRows;
     static constexpr int kCPs = kTP / kWarpPerCol / BaseShape::kCols;
