@@ -43,7 +43,8 @@ struct FlashAttentionTraits {
     // chunk the K dimension to fit into shared memory
     using GIteratorA = GTileIterator<GlobalA, TileShape<kTM, kTK>>;
 
-    using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, true, kSharedAccess>;
+    using SharedA =
+        SharedTile<InType, tl::RowMajor<kTM, kTK>, true, kSharedAccess>;
 
     static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kAKs = kTK / BaseShape::kCols;
@@ -56,7 +57,8 @@ struct FlashAttentionTraits {
     // operand B
     using GlobalB = GlobalTile<InType, tl::ColMajor<kK, kN>>;
     using GIteratorB = GTileIterator<GlobalB, TileShape<kTK, kTN>>;
-    using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, true, kSharedAccess>;
+    using SharedB =
+        SharedTile<InType, tl::ColMajor<kTK, kTN>, true, kSharedAccess>;
 
     static constexpr int kBKs = kTK / BaseShape::kRows;
     static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kCols;
@@ -70,7 +72,8 @@ struct FlashAttentionTraits {
     using GlobalC = GlobalTile<InType, tl::ColMajor<kN, kTP>>;
     // chunk the N dimension to fit into shared memory
     using GIteratorC = GTileIterator<GlobalC, TileShape<kTN, kTP>>;
-    using SharedC = SharedTile<InType, tl::ColMajor<kTN, kTP>, true, kSharedAccess>;
+    using SharedC =
+        SharedTile<InType, tl::ColMajor<kTN, kTP>, true, kSharedAccess>;
 
     static constexpr int kCNs = kTN / BaseShape::kRows;
     static constexpr int kCPs = kTP / kWarpPerCol / BaseShape::kCols;
