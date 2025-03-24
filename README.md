@@ -98,7 +98,7 @@ TileFusion requires a C++20 host compiler, CUDA 12.0 or later, and GCC version 1
    make
    ```
 
-1. Run the C++ unit tests:
+2. Run the C++ unit tests:
 
    - **Run a single C++ unit test**:
      ```bash
@@ -117,13 +117,13 @@ TileFusion requires a C++20 host compiler, CUDA 12.0 or later, and GCC version 1
    python3 setup.py build bdist_wheel
    ```
 
-1. Clean the build:
+2. Clean the build:
 
    ```bash
    python3 setup.py clean
    ```
 
-1. Install the Python wrapper in editable mode (recommended for development):
+3. Install the Python wrapper in editable mode (recommended for development):
 
    ```bash
    python3 setup.py develop

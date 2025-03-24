@@ -9,7 +9,7 @@ repos:
     -   id: check-merge-conflict
     -   id: check-symlinks
     -   id: detect-private-key
-        files: (?!.*third_party)^.*$ | (?!.*book)^.*$
+        files: (?!.*3rd-party)^.*$ # ignore 3rd-party files
     -   id: end-of-file-fixer
     -   id: check-yaml
     -   id: check-toml
@@ -18,13 +18,10 @@ repos:
     -   id: check-shebang-scripts-are-executable
     -   id: debug-statements
     -   id: mixed-line-ending
-        args: ['--fix=lf']
-        files: (?!.*third_party)^.*$ | (?!.*book)^.*$
+        args: ['--fix=lf'] # fix line endings to unix style
+        files: (?!.*3rd-party)^.*$ # ignore 3rd-party files
     -   id: check-case-conflict
     -   id: check-json
-    -   id: check-merge-conflict
-    -   id: check-shebang-scripts-are-executable
-    -   id: detect-private-key
     -   id: trailing-whitespace
 
 -   repo: https://github.com/pycqa/isort
@@ -74,11 +71,14 @@ repos:
     rev: 0.7.22
     hooks:
     -   id: mdformat
+        args: ["--number"]
         additional_dependencies:
-        -   mdformat-gfm
-        -   mdformat-frontmatter
-        -   mdformat-footnote
-        -   mdformat-tables
+          - mdformat-gfm
+          - mdformat-frontmatter
+          - mdformat-myst
+          - mdformat-tables
+          - mdformat-toc
+          - mdformat-black
 
 -   repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.15.0

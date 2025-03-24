@@ -52,8 +52,8 @@ void run(float epsilon = 1e-3) {
     const InType* C = thrust::raw_pointer_cast(d_c.data());
     AccType* D = thrust::raw_pointer_cast(d_d.data());
 
-    using Config =
-        B2BGemmTraits<InType, AccType, WholeShape, CtaTileShape, WarpLayout, kSharedAccess>;
+    using Config = B2BGemmTraits<InType, AccType, WholeShape, CtaTileShape,
+                                 WarpLayout, kSharedAccess>;
 
     using RegA = typename Config::RegA;
     using RegB = typename Config::RegB;
