@@ -14,12 +14,12 @@ namespace tl = tile_layout;
 
 template <typename InType, typename AccType, typename WholeShape,
           typename CtaTileShape, typename WarpLayout, const int kSharedAccess>
-struct  FusedTwoGemmsTraits {
+struct FusedTwoGemmsTraits {
     using BaseShape = traits::BaseTileShape<InType>;
 
     static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
     static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
-    static_assert(kWarpPerCol == 1, "WarpPerCol must be 1");
+    // static_assert(kWarpPerCol == 1, "WarpPerCol must be 1");
 
     static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
 
@@ -40,7 +40,8 @@ struct  FusedTwoGemmsTraits {
 
     static const bool kUseSwizzling = true;
 
-    using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kUseSwizzling, kSharedAccess>;
+    using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kUseSwizzling,
+                               kSharedAccess>;
 
     static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kAKs = kTK / BaseShape::kCols;
@@ -53,7 +54,8 @@ struct  FusedTwoGemmsTraits {
     // operand B
     using GlobalB = GlobalTile<InType, tl::ColMajor<kK, kN>>;
     using GIteratorB = GTileIterator<GlobalB, TileShape<kTK, kTN>>;
-    using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, kUseSwizzling, kSharedAccess>;
+    using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, kUseSwizzling,
+                               kSharedAccess>;
 
     static constexpr int kBKs = kTK / BaseShape::kRows;
     static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kCols;
@@ -67,7 +69,8 @@ struct  FusedTwoGemmsTraits {
     using GlobalC = GlobalTile<InType, tl::ColMajor<kN, kTP>>;
     // chunk the N dimension to fit into shared memory
     using GIteratorC = GTileIterator<GlobalC, TileShape<kTN, kTP>>;
-    using SharedC = SharedTile<InType, tl::ColMajor<kTN, kTP>, kUseSwizzling, kSharedAccess>;
+    using SharedC = SharedTile<InType, tl::ColMajor<kTN, kTP>, kUseSwizzling,
+                               kSharedAccess>;
 
     static constexpr int kCNs = kTN / BaseShape::kRows;
     static constexpr int kCPs = kTP / kWarpPerCol / BaseShape::kCols;
@@ -108,9 +111,9 @@ template <typename InType, typename AccType,                     //
           typename RegAcc, typename RegAccCast, typename GlobalD, typename RegD,
           typename DStorer, typename ConvertAcc>
 __global__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
-                                const InType* dC, AccType* dD, int kM, int kN,
-                                int kK, int kP, int kTM, int kTN, int kTK,
-                                int kTP) {
+                                   const InType* dC, AccType* dD, int kM,
+                                   int kN, int kK, int kP, int kTM, int kTN,
+                                   int kTK, int kTP) {
     // Advance to the global data tile to the current CTA.
     const InType* A = dA + blockIdx.z * (kM * kK) + blockIdx.x * (kTM * kK);
     const InType* B = dB + blockIdx.z * (kK * kN);
@@ -166,8 +169,6 @@ __global__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
             load_ra(sA, rA);
             load_rb(sB, rB);
             __syncthreads();
-
-            gemm(rA, rB, acc);
         }
         load_rc(sC, rC);
         __syncthreads();

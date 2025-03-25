@@ -52,8 +52,8 @@ void run(float epsilon = 1e-3) {
     const InType* C = thrust::raw_pointer_cast(d_c.data());
     AccType* D = thrust::raw_pointer_cast(d_d.data());
 
-    using Config =
-        FusedTwoGemmsTraits<InType, AccType, WholeShape, CtaTileShape, WarpLayout, kSharedAccess>;
+    using Config = FusedTwoGemmsTraits<InType, AccType, WholeShape,
+                                       CtaTileShape, WarpLayout, kSharedAccess>;
 
     using RegA = typename Config::RegA;
     using RegB = typename Config::RegB;
@@ -93,23 +93,25 @@ void run(float epsilon = 1e-3) {
     int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
                                           : shm_input * sizeof(InType);
 
-    auto kernel = &ke_fused_two_gemms<InType, AccType,            //
-                                   GIteratorA, SharedA, RegA,  //
-                                   SharedALoader, RegALoader,  //
-                                   GIteratorB, SharedB, RegB,  //
-                                   SharedBLoader, RegBLoader,  //
-                                   GIteratorC, SharedC, RegC,  //
-                                   SharedCLoader, RegCLoader,  //
-                                   RegAcc, RegAccCast, typename Config::GlobalD,
-                                   RegD, DStorer, ConvertAcc>;
+    auto ke_tilefusion =
+        &ke_fused_two_gemms<InType, AccType,            //
+                            GIteratorA, SharedA, RegA,  //
+                            SharedALoader, RegALoader,  //
+                            GIteratorB, SharedB, RegB,  //
+                            SharedBLoader, RegBLoader,  //
+                            GIteratorC, SharedC, RegC,  //
+                            SharedCLoader, RegCLoader,  //
+                            RegAcc, RegAccCast, typename Config::GlobalD, RegD,
+                            DStorer, ConvertAcc>;
 
     if (shm_size > 48 * 1024) {
-        cudaFuncSetAttribute(
-            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
+        cudaFuncSetAttribute(ke_tilefusion,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize,
+                             shm_size);
     }
 
-    kernel<<<grid, block, shm_size, 0>>>(A, B, C, D, kM, kN, kK, kP, kTM, kTN,
-                                         kTK, kTP);
+    ke_tilefusion<<<grid, block, shm_size, 0>>>(A, B, C, D, kM, kN, kK, kP, kTM,
+                                                kTN, kTK, kTP);
     cudaDeviceSynchronize();
 
     h_d = d_d;
@@ -124,7 +126,7 @@ void run(float epsilon = 1e-3) {
 
     cublas_two_gemms(kM, kN, kK, kP, kBatch, A, B, C,
                      thrust::raw_pointer_cast(d_d2.data()),
-                     thrust::raw_pointer_cast(d_acc.data()));
+                     thrust::raw_pointer_cast(d_acc.data()), false);
     cudaDeviceSynchronize();
     h_acc = d_acc;
     h_d2 = d_d2;
@@ -152,15 +154,52 @@ void run(float epsilon = 1e-3) {
         std::cout << "[" << kM << ", " << kN << ", " << kK << ", " << kP
                   << "], batch = " << kBatch << ", failed." << std::endl;
     }
+
+    CudaTimer timer;
+    const int warm_up = 10;
+    const int iters = 50;
+
+    for (int i = 0; i < warm_up; ++i) {
+        ke_tilefusion<<<grid, block, shm_size, 0>>>(A, B, C, D, kM, kN, kK, kP,
+                                                    kTM, kTN, kTK, kTP);
+    }
+    cudaDeviceSynchronize();
+
+    timer.start();
+    for (int i = 0; i < iters; ++i) {
+        ke_tilefusion<<<grid, block, shm_size, 0>>>(A, B, C, D, kM, kN, kK, kP,
+                                                    kTM, kTN, kTK, kTP);
+    }
+    cudaDeviceSynchronize();
+    float tilefusion_time = timer.stop() / iters;
+
+    float cublas_time = cublas_two_gemms(
+        kM, kN, kK, kP, kBatch, A, B, C, thrust::raw_pointer_cast(d_d2.data()),
+        thrust::raw_pointer_cast(d_acc.data()), true);
+
+    std::cout << "[" << kM << ", " << kN << ", " << kK << ", " << kP << "]\t["
+              << kTM << ", " << kTN << ", " << kTK << ", " << kTP << "]\t"
+              << cublas_time << "\t" << tilefusion_time << "("
+              << tilefusion_time / cublas_time << ")" << std::endl;
 }
 
 int main() {
-    using WarpLayout1 = tl::RowMajor<2, 1>;
-    static constexpr int kSharedAccess = 64;
+    // using WarpLayout1 = tl::RowMajor<2, 1>;
+    // static constexpr int kSharedAccess0 = 64;
 
-    run<B2BGemmShape<256 /*M*/, 128 /*N*/, 64 /*K*/, 64 /*P*/>,
-        B2BGemmShape<64 /*kTM*/, 64 /*kTN*/, 64 /*kTK*/, 64 /*kTP*/>,
-        WarpLayout1, 1, kSharedAccess>(5e-3);
+    // std::cout << "[kM, kN, kK, kP]\t[kTM, kTN, kTK, kTP]\t[cublas "
+    //              "time]\t[tilefusion time(Radio)]"
+    //           << std::endl;
+
+    // run<B2BGemmShape<256 /*M*/, 128 /*N*/, 64 /*K*/, 64 /*P*/>,
+    //     B2BGemmShape<64 /*kTM*/, 64 /*kTN*/, 64 /*kTK*/, 64 /*kTP*/>,
+    //     WarpLayout1, 1, kSharedAccess0>(5e-3);
+
+    using WarpLayout2 = tl::RowMajor<4, 1>;
+    static constexpr int kSharedAccess1 = 128;
+    run<B2BGemmShape<4096 /*M*/, 4096 /*N*/, 128 /*K*/, 64 /*P*/>,
+        B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 64 /*kTP*/>,
+        WarpLayout2, 1, 64>(5e-3);
 
     return 0;
 }
