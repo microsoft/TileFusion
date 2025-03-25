@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+#include "cutlass_fused_two_gemms.cuh"
 #include "tilefusion_fused_two_gemms.cuh"
 #include "util.cuh"
 
@@ -23,34 +24,47 @@ void run(float epsilon = 1e-3) {
     static_assert(kK == kTK, "The current implementation requires kTK == K.");
     static_assert(kP == kTP, "The current implementation requires kTP == P.");
 
-    thrust::host_vector<InType> h_a(kM * kK * kBatch);
+    static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
+    static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
+
+    thrust::host_vector<cutlass::half_t> h_a(kM * kK * kBatch);
 
     for (int i = 0; i < h_a.size(); ++i) {
-        h_a[i] = static_cast<InType>(rand_float());
+        h_a[i] = static_cast<cutlass::half_t>(rand_float());
     }
 
-    thrust::host_vector<InType> h_b(kK * kN * kBatch);
+    thrust::host_vector<cutlass::half_t> h_b(kK * kN * kBatch);
     for (int i = 0; i < h_b.size(); ++i) {
-        h_b[i] = static_cast<InType>(rand_float());
+        h_b[i] = static_cast<cutlass::half_t>(rand_float());
     }
 
-    thrust::host_vector<InType> h_c(kN * kP * kBatch);
+    thrust::host_vector<cutlass::half_t> h_c(kN * kP * kBatch);
     for (int i = 0; i < h_c.size(); ++i) {
-        h_c[i] = static_cast<InType>(rand_float());
+        h_c[i] = static_cast<cutlass::half_t>(rand_float());
     }
 
-    thrust::host_vector<InType> h_d(kM * kP * kBatch);
+    thrust::host_vector<cutlass::half_t> h_d(kM * kP * kBatch);
     thrust::fill(h_d.begin(), h_d.end(), 0.);
 
-    thrust::device_vector<InType> d_a = h_a;
-    thrust::device_vector<InType> d_b = h_b;
-    thrust::device_vector<InType> d_c = h_c;
-    thrust::device_vector<InType> d_d = h_d;
+    thrust::device_vector<cutlass::half_t> d_a = h_a;
+    thrust::device_vector<cutlass::half_t> d_b = h_b;
+    thrust::device_vector<cutlass::half_t> d_c = h_c;
+    thrust::device_vector<cutlass::half_t> d_d = h_d;
 
-    const InType* A = thrust::raw_pointer_cast(d_a.data());
-    const InType* B = thrust::raw_pointer_cast(d_b.data());
-    const InType* C = thrust::raw_pointer_cast(d_c.data());
-    InType* D = thrust::raw_pointer_cast(d_d.data());
+    // const InType* A = thrust::raw_pointer_cast(d_a.data());
+    // const InType* B = thrust::raw_pointer_cast(d_b.data());
+    // const InType* C = thrust::raw_pointer_cast(d_c.data());
+    // InType* D = thrust::raw_pointer_cast(d_d.data());
+
+    const cutlass::half_t* CA = thrust::raw_pointer_cast(d_a.data());
+    const cutlass::half_t* CB = thrust::raw_pointer_cast(d_b.data());
+    const cutlass::half_t* CC = thrust::raw_pointer_cast(d_c.data());
+    cutlass::half_t* CD = thrust::raw_pointer_cast(d_d.data());
+
+    const InType* A = reinterpret_cast<const InType*>(CA);
+    const InType* B = reinterpret_cast<const InType*>(CB);
+    const InType* C = reinterpret_cast<const InType*>(CC);
+    InType* D = reinterpret_cast<InType*>(CD);
 
     using Config = FusedTwoGemmsTraits<InType, AccType, WholeShape,
                                        CtaTileShape, WarpLayout, kSharedAccess>;
@@ -109,6 +123,10 @@ void run(float epsilon = 1e-3) {
                             SharedD, RegD, RegDHalf, StoreRegD, StoreSharedD,
                             ConvertAcc, ConvertD>;
 
+    auto cutlass_fused_gemm =
+        &cute_fused_gemm<cutlass::half_t, kWarpPerRow, kWarpPerCol, kM, kN, kK,
+                         kP, kTM, kTN, kTK, kTP>;
+
     if (shm_size > 48 * 1024) {
         cudaFuncSetAttribute(ke_tilefusion,
                              cudaFuncAttributeMaxDynamicSharedMemorySize,
@@ -136,10 +154,10 @@ void run(float epsilon = 1e-3) {
     h_acc = d_acc;
     h_d2 = d_d2;
 
+#ifdef DEBUG
     InType* data = thrust::raw_pointer_cast(h_d.data());
     __half* ground_truth = thrust::raw_pointer_cast(h_d2.data());
 
-#ifdef DEBUG
     printf("ours:\n");
     for (int i = 0; i < h_d.size(); ++i) {
         printf("%.3f, ", __half2float(data[i]));
@@ -150,7 +168,6 @@ void run(float epsilon = 1e-3) {
         printf("%.3f, ", __half2float(ground_truth[i]));
         if (i && (i + 1) % 16 == 0) printf("\n");
     }
-#endif
 
     if (check_results(data, ground_truth, kM * kP, epsilon)) {
         std::cout << "[" << kM << ", " << kN << ", " << kK << ", " << kP
@@ -159,6 +176,7 @@ void run(float epsilon = 1e-3) {
         std::cout << "[" << kM << ", " << kN << ", " << kK << ", " << kP
                   << "], batch = " << kBatch << ", failed." << std::endl;
     }
+#endif
 
     CudaTimer timer;
     const int warm_up = 10;
@@ -178,14 +196,18 @@ void run(float epsilon = 1e-3) {
     cudaDeviceSynchronize();
     float tilefusion_time = timer.stop() / iters;
 
+    float cutlass_time =
+        cutlass_fused_gemm(CA, CB, CC, CD, true, warm_up, iters);
+
     float cublas_time = cublas_two_gemms(
         kM, kN, kK, kP, kBatch, A, B, C, thrust::raw_pointer_cast(d_d2.data()),
         thrust::raw_pointer_cast(d_acc.data()), true);
 
     std::cout << "[" << kM << ", " << kN << ", " << kK << ", " << kP << "]\t["
               << kTM << ", " << kTN << ", " << kTK << ", " << kTP << "]\t"
-              << cublas_time << "\t" << tilefusion_time << "("
-              << tilefusion_time / cublas_time << ")" << std::endl;
+              << cublas_time << "\t" << cutlass_time << "("
+              << cutlass_time / cublas_time << ")" << "\t" << tilefusion_time
+              << "(" << tilefusion_time / cublas_time << ")" << std::endl;
 }
 
 int main() {
@@ -202,8 +224,16 @@ int main() {
 
     using WarpLayout2 = tl::RowMajor<4, 1>;
     static constexpr int kSharedAccess1 = 128;
-    run<B2BGemmShape<4096 /*M*/, 1024 /*N*/, 128 /*K*/, 64 /*P*/>,
-        B2BGemmShape<128 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 64 /*kTP*/>,
+    run<B2BGemmShape<2048 /*M*/, 2048 /*N*/, 128 /*K*/, 128 /*P*/>,
+        B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
+        WarpLayout2, 1, 64>(5e-3);
+
+    run<B2BGemmShape<1024 /*M*/, 1024 /*N*/, 128 /*K*/, 128 /*P*/>,
+        B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
+        WarpLayout2, 1, 64>(5e-3);
+
+    run<B2BGemmShape<512 /*M*/, 512 /*N*/, 128 /*K*/, 128 /*P*/>,
+        B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
         WarpLayout2, 1, 64>(5e-3);
 
     return 0;
