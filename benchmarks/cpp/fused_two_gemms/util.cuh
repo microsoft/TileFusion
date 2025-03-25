@@ -125,3 +125,35 @@ bool check_results(const float* values1, const __half* values2, int numel,
 
     return passed;
 }
+
+bool check_results(const __half* values1, const __half* values2, int numel,
+                   float epsilon) {
+    bool passed = true;
+
+    float v1 = 0.;
+    float v2 = 0.;
+
+    double total_diff = 0.;
+    double max_abs_diff = FLT_MIN;
+    double diff = 0.;
+
+    for (int i = 0; i < numel; ++i) {
+        v1 = __half2float(values1[i]);
+        v2 = __half2float(values2[i]);
+        diff = abs(v1 - v2);
+        max_abs_diff = max_abs_diff < diff ? diff : max_abs_diff;
+        total_diff += diff;
+
+#ifdef DEBUG
+        if (diff > epsilon) {
+            printf("%d-th value has large differences: %.3f vs. %.3f\n", i,
+                   values1[i], v2);
+        }
+#endif
+    }
+
+    double avg_diff = total_diff / numel;
+    if (avg_diff > epsilon) passed = false;
+
+    return passed;
+}
