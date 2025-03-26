@@ -36,8 +36,18 @@ __global__ void ke_scatter_nd(const T* in, T* out, const int64_t* indices,
                               unsigned int const* __restrict__ strides,
                               size_t n, size_t rank, size_t slice_size);
 
+#if defined(_MSC_VER)
+    #define TILEFUSION_EXPORT __declspec(dllexport)
+#else
+    #define TILEFUSION_EXPORT __attribute__((visibility("default")))
+#endif
+
+// Export the function with C linkage
+extern "C" {
+TILEFUSION_EXPORT
 void scatter_nd(at::Tensor& data, const at::Tensor& updates,
                 const at::Tensor& indices);
+}
 
 }  // namespace kernels
 }  // namespace tilefusion

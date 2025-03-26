@@ -30,8 +30,10 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
                                    int kK, int kP, int kTM, int kTN, int kTK,
                                    int kTP);
 
-void flash_attention(const torch::Tensor& Q, const torch::Tensor& K,
-                     const torch::Tensor& V, torch::Tensor& O, int64_t m,
-                     int64_t n, int64_t k, int64_t p);
+extern "C" {
+__attribute__((visibility("default"))) void flash_attention(
+    torch::Tensor& Q, torch::Tensor& K, torch::Tensor& V, torch::Tensor& O,
+    int64_t m, int64_t n, int64_t k, int64_t p);
+}
 
 }  // namespace tilefusion::kernels
