@@ -21,6 +21,7 @@ using FlashAttentionShape = TileShape<kM, kN, kK, kP>;
 template <typename InType, typename AccType, typename OutType,
           typename WholeShape, typename CtaTileShape>
 struct FlashAttentionTraits {
+    static constexpr int kSharedAccess = 64;
     using BaseShape = traits::BaseTileShape<InType>;
 
     using WarpLayout = tl::RowMajor<4, 1>;
@@ -46,7 +47,8 @@ struct FlashAttentionTraits {
     // chunk the K dimension to fit into shared memory
     using GIteratorA = GTileIterator<GlobalA, TileShape<kTM, kTK>>;
 
-    using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, true>;
+    using SharedA =
+        SharedTile<InType, tl::RowMajor<kTM, kTK>, true, kSharedAccess>;
 
     static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kAKs = kTK / BaseShape::kCols;
@@ -59,7 +61,8 @@ struct FlashAttentionTraits {
     // operand B
     using GlobalB = GlobalTile<InType, tl::ColMajor<kK, kN>>;
     using GIteratorB = GTileIterator<GlobalB, TileShape<kTK, kTN>>;
-    using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, true>;
+    using SharedB =
+        SharedTile<InType, tl::ColMajor<kTK, kTN>, true, kSharedAccess>;
 
     static constexpr int kBKs = kTK / BaseShape::kRows;
     static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kCols;
@@ -73,7 +76,8 @@ struct FlashAttentionTraits {
     using GlobalC = GlobalTile<InType, tl::ColMajor<kN, kTP>>;
     // chunk the N dimension to fit into shared memory
     using GIteratorC = GTileIterator<GlobalC, TileShape<kTN, kTP>>;
-    using SharedC = SharedTile<InType, tl::ColMajor<kTN, kTP>, true>;
+    using SharedC =
+        SharedTile<InType, tl::ColMajor<kTN, kTP>, true, kSharedAccess>;
 
     static constexpr int kCNs = kTN / BaseShape::kRows;
     static constexpr int kCPs = kTP / kWarpPerCol / BaseShape::kCols;
@@ -429,31 +433,25 @@ void flash_attention(const torch::Tensor& Q, const torch::Tensor& K,
     using AccType = float;
     using OutType = __half;
 
-    using CtaTileShape = TileShape<64, 64, 128, 128>;
+    using CtaTileShape = TileShape<64, 128, 128, 128>;
 
     auto dQ = reinterpret_cast<const InType*>(Q.data_ptr());
     auto dK = reinterpret_cast<const InType*>(K.data_ptr());
     auto dV = reinterpret_cast<const InType*>(V.data_ptr());
     auto dO = reinterpret_cast<OutType*>(O.data_ptr());
 
-#define DISPATCH_FLASH_ATTENTION_CASE(M, N, K, P)                  \
-    case ((M) << 24 | (N) << 16 | (K) << 8 | (P)): {               \
-        using WholeShape = FlashAttentionShape<M, N, K, P>;        \
-        const int kBatch = 1;                                      \
-        run_flash_attention<InType, AccType, OutType, WholeShape,  \
-                            CtaTileShape, kBatch>(dQ, dK, dV, dO); \
-        break;                                                     \
+    const int kBatch = 1;
+    if (m == 64 && n == 256 && k == 128 && p == 128) {
+        using WholeShape = FlashAttentionShape<64, 256, 128, 128>;
+        run<InType, AccType, OutType, WholeShape, CtaTileShape, kBatch>(dQ, dK,
+                                                                        dV, dO);
+    } else if (m == 64 && n == 128 && k == 128 && p == 128) {
+        using WholeShape = FlashAttentionShape<64, 128, 128, 128>;
+        run<InType, AccType, OutType, WholeShape, CtaTileShape, kBatch>(dQ, dK,
+                                                                        dV, dO);
+    } else {
+        throw std::runtime_error("Unsupported shape");
     }
-
-    switch ((m & 0xFF) << 24 | (n & 0xFF) << 16 | (k & 0xFF) << 8 |
-            (p & 0xFF)) {
-        DISPATCH_FLASH_ATTENTION_CASE(64, 256, 128, 128)
-        DISPATCH_FLASH_ATTENTION_CASE(64, 128, 128, 128)
-        default:
-            throw std::runtime_error("Unsupported shape");
-    }
-
-#undef DISPATCH_FLASH_ATTENTION_CASE
 }
 
 }  // namespace tilefusion::kernels

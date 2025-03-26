@@ -25,18 +25,13 @@ template <typename InType,
           typename BroadcastDiv, typename BlockExp, typename BlockAdd,
           typename VecMax, typename VecAdd, typename VecSub, typename VecMul,
           typename VecExp>
-__global__ void flash_attention(const InType* dQ, const InType* dK,
-                                const InType* dV, InType* dO, int kM, int kN,
-                                int kK, int kP, int kTM, int kTN, int kTK,
-                                int kTP);
+__global__ void ke_flash_attention(const InType* dQ, const InType* dK,
+                                   const InType* dV, InType* dO, int kM, int kN,
+                                   int kK, int kP, int kTM, int kTN, int kTK,
+                                   int kTP);
 
-template <typename InType, typename AccType, typename OutType,
-          typename WholeShape, typename CtaTileShape, const int kBatch>
-void run_flash_attention(const InType* dQ, const InType* dK, const InType* dV,
-                         OutType* dO);
-
-void flash_attention_op(const torch::Tensor& Q, const torch::Tensor& K,
-                        const torch::Tensor& V, torch::Tensor& O, int64_t m,
-                        int64_t n, int64_t k, int64_t p);
+void flash_attention(const torch::Tensor& Q, const torch::Tensor& K,
+                     const torch::Tensor& V, torch::Tensor& O, int64_t m,
+                     int64_t n, int64_t k, int64_t p);
 
 }  // namespace tilefusion::kernels

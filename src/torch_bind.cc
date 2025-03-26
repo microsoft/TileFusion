@@ -49,43 +49,45 @@ class KernelBuilder {
     std::optional<torch::CppFunction> fn_;
 };
 
-// Helper function to create CppFunction from kernel
-template <typename Func>
-torch::CppFunction make_op(Func* kernel_fn) {
-    return torch::CppFunction(kernel_fn);
-}
+// Simplified kernel registry information
+struct KernelRegInfo {
+    const char* name;
+    const char* sig;
+};
 
-// Fixed macro to use correct function names
-#define REG_KERNEL(name, func)                             \
-    std::move(KernelBuilder(#name))                        \
-        .sig(name##_sig)                                   \
-        .fn(torch::CppFunction(tilefusion::kernels::func)) \
-        .build()
+// Helper macro to define kernel registration
+#define REGISTER_KERNEL(str_name, fn_name)                             \
+    else if (strcmp(info.name, str_name) == 0) {                       \
+        kernels.push_back(                                             \
+            std::move(KernelBuilder(info.name))                        \
+                .sig(info.sig)                                         \
+                .fn(torch::CppFunction(&tilefusion::kernels::fn_name)) \
+                .build());                                             \
+    }
 
-// Collection of all kernel definitions
-// Helper macro to define kernel signatures more cleanly
-#define DEF_KERNEL_SIG(name, signature) \
-    static const char* name##_sig = signature;
-
-// Helper macro to add a kernel to the registry
-#define ADD_KERNEL(kernels, name, func) \
-    kernels.push_back(REG_KERNEL(name, func))
-
-std::vector<KernelInfo> get_kernel_registry() {
-    // Define all kernel signatures
-    DEF_KERNEL_SIG(
-        scatter_nd,
-        "scatter_nd(Tensor(a!) data, Tensor updates, Tensor indices) -> ()");
-    DEF_KERNEL_SIG(flash_attention_fwd,
-                   R"DOC(flash_attention_fwd(
+// Define all kernels
+static const KernelRegInfo kernel_registry_info[] = {
+    {"scatter_nd",
+     "scatter_nd(Tensor(a!) data, Tensor updates, Tensor indices) -> ()"},
+    {"flash_attention",
+     R"DOC(flash_attention(
             Tensor(a!) Q,
             Tensor K, Tensor V, Tensor O,
             int m, int n, int k, int p) -> ()
-        )DOC");
+        )DOC"}};
 
+std::vector<KernelInfo> get_kernel_registry() {
     std::vector<KernelInfo> kernels;
-    ADD_KERNEL(kernels, scatter_nd, scatter_op);
-    ADD_KERNEL(kernels, flash_attention_fwd, flash_attention_op);
+    for (const auto& info : kernel_registry_info) {
+        if (false) {
+        }  // start the else-if chain
+        REGISTER_KERNEL("scatter_nd", scatter_nd)
+        REGISTER_KERNEL("flash_attention", flash_attention)
+        else {
+            throw std::runtime_error("Unknown kernel: " +
+                                     std::string(info.name));
+        }
+    }
     return kernels;
 }
 
