@@ -45,9 +45,9 @@ struct FusedGemmTraits : public Base {
     static constexpr int kThreadsPerCol = CeilDiv<kTK, Base::kNumPerAccess>;
     static constexpr int kThreadsPerRow = CeilDiv<kThreads, kThreadsPerCol>;
 
-    static constexpr int kSwizzle = (kTK == 32 ? 2 : 3);
+    // static constexpr int kSwizzle = (kTK == 32 ? 2 : 3);
     using SmemLayoutAtom = decltype(composition(
-        Swizzle<kSwizzle, 3, 3>{},
+        Swizzle<2, 3, 3>{},
         Layout<Shape<_8, Int<kTK>>, Stride<Int<kTK>, _1>>{}));
 
     using SmemLayoutA =
@@ -217,19 +217,19 @@ float cute_fused_gemm(const Element* dA, const Element* dB, const Element* dC,
     float elapsed = 0.;
     if (timeit) {
         for (int i = 0; i < warp_up; ++i) {
-            kernel<<<gridDim, blockDim, shm_size, 0>>>(dA, dB, dC, dD);
+            kernel<<<gridDim, blockDim, shm_size>>>(dA, dB, dC, dD);
         }
         cudaDeviceSynchronize();
 
         CudaTimer timer;
         timer.start();
         for (int i = 0; i < iters; ++i) {
-            kernel<<<gridDim, blockDim, shm_size, 0>>>(dA, dB, dC, dD);
+            kernel<<<gridDim, blockDim, shm_size>>>(dA, dB, dC, dD);
         }
         cudaDeviceSynchronize();
         elapsed = timer.stop() / iters;
     } else {
-        kernel<<<gridDim, blockDim, shm_size, 0>>>(dA, dB, dC, dD);
+        kernel<<<gridDim, blockDim, shm_size>>>(dA, dB, dC, dD);
     }
     return elapsed;
 }
