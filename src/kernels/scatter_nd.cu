@@ -53,7 +53,7 @@ __global__ void ke_scatter_nd(const T* in, T* out, const int64_t* indices,
     }
 }
 
-void scatter_nd(torch::Tensor& data, const torch::Tensor& updates,
+void scatter_nd(const torch::Tensor& data, torch::Tensor& updates,
                 const torch::Tensor& indices) {
     auto data_dims = data.sizes();
     auto update_dims = updates.sizes();
@@ -107,7 +107,7 @@ void scatter_nd(torch::Tensor& data, const torch::Tensor& updates,
 
     TILEFUSION_DISPATCH_ALL_TYPES(data.scalar_type(), [&] {
         ke_scatter_nd<<<grid, block>>>(
-            reinterpret_cast<const scalar_t*>(indices.const_data_ptr()),
+            reinterpret_cast<const scalar_t*>(updates.const_data_ptr()),
             reinterpret_cast<scalar_t*>(data.mutable_data_ptr()),
             reinterpret_cast<const int64_t*>(indices.const_data_ptr()),
             reinterpret_cast<const unsigned int*>(device_strides), n, k,

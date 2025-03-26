@@ -1,46 +1,50 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#include "kernel_defs.hpp"
 #include "kernel_registry.hpp"
-#include "kernels/mod.hpp"
+#include "kernels/flash_attn.hpp"
+#include "kernels/scatter_nd.hpp"
+
+#include <ATen/ATen.h>
+#include <torch/script.h>
 
 namespace tilefusion {
-using namespace tilefusion::kernels;
 
-namespace {
+// Register scatter_nd kernel
+REGISTER_KERNEL(
+    scatter_nd,
+    "scatter_nd(Tensor data, Tensor(a!) updates, Tensor indices) -> ()",
+    tilefusion::kernels::scatter_nd);
 
-static const std::vector<KernelRegEntry> kernel_registry = []() {
-    std::vector<KernelRegEntry> registry;
-    for (const auto* kernel : all_kernels) {
-        registry.push_back(*kernel);
-    }
-    return registry;
-}();
+// Register flash attention kernel
+REGISTER_KERNEL(flash_attention,
+                "flash_attention(Tensor Q, Tensor K, Tensor V, Tensor(a!) O, "
+                "int m, int n, int k, int p) -> ()",
+                tilefusion::kernels::flash_attention);
 
-std::vector<KernelInfo> get_kernel_registry() {
-    std::vector<KernelInfo> kernels;
-    for (const auto& entry : kernel_registry) {
-        kernels.push_back(
-            KernelInfo{entry.name, entry.sig,
-                       torch::CppFunction(
-                           reinterpret_cast<void (*)(void)>(entry.fn_ptr))});
-    }
-    return kernels;
-}
-
-void register_kernels(torch::Library& m, bool is_impl) {
-    for (auto&& k : get_kernel_registry()) {
-        if (is_impl) {
-            m.impl(k.name, std::move(k.fn));
-        } else {
-            m.def(k.sig);
+TORCH_LIBRARY_IMPL(tilefusion, CUDA, m) {
+    const auto& registry = KernelRegistry::instance();
+    for (const auto& [name, info] : registry.getAllKernels()) {
+        if (name == "scatter_nd") {
+            using Func =
+                void (*)(at::Tensor&, const at::Tensor&, const at::Tensor&);
+            auto func = reinterpret_cast<Func>(info.fn_ptr);
+            m.impl(name.c_str(), func);
+        } else if (name == "flash_attention") {
+            using Func =
+                void (*)(at::Tensor&, at::Tensor, at::Tensor, at::Tensor,
+                         int64_t, int64_t, int64_t, int64_t);
+            auto func = reinterpret_cast<Func>(info.fn_ptr);
+            m.impl(name.c_str(), func);
         }
     }
 }
-}  // anonymous namespace
 
-TORCH_LIBRARY_IMPL(tilefusion, CUDA, m) { register_kernels(m, true); }
+TORCH_LIBRARY(tilefusion, m) {
+    const auto& registry = KernelRegistry::instance();
+    for (const auto& [name, info] : registry.getAllKernels()) {
+        m.def(info.schema.c_str());
+    }
+}
 
-TORCH_LIBRARY(tilefusion, m) { register_kernels(m, false); }
 }  // namespace tilefusion

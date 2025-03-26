@@ -6,9 +6,11 @@
 #include "cuda_utils.hpp"
 #include "dispatch_macros.hpp"
 
+#include <ATen/ATen.h>
 #include <torch/script.h>
 
-namespace tilefusion::kernels {
+namespace tilefusion {
+namespace kernels {
 
 // reference:
 // https://github.com/InfiniTensor/RefactorGraph/blob/master/src/04kernel/cuda/src/scatter_nd.cu#L7
@@ -34,7 +36,8 @@ __global__ void ke_scatter_nd(const T* in, T* out, const int64_t* indices,
                               unsigned int const* __restrict__ strides,
                               size_t n, size_t rank, size_t slice_size);
 
-void scatter_nd(torch::Tensor& data, const torch::Tensor& updates,
-                const torch::Tensor& indices);
+void scatter_nd(at::Tensor& data, const at::Tensor& updates,
+                const at::Tensor& indices);
 
-}  // namespace tilefusion::kernels
+}  // namespace kernels
+}  // namespace tilefusion

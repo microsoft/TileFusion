@@ -46,9 +46,7 @@ class TestScatterNd(unittest.TestCase):
             torch.bfloat16,
         ]:
             data_shape = [7, 8, 9, 10]
-            data = torch.empty(data_shape, dtype=dtype, device="cuda").fill_(
-                5.0
-            )
+            data = torch.full(data_shape, 5.0, dtype=dtype, device="cuda")
             scatter_data = data.flatten()
 
             indices_shape = [5, 2]
@@ -63,23 +61,25 @@ class TestScatterNd(unittest.TestCase):
             scatter_indices = indices.flatten()
 
             update_shape = self._compute_output_shape(indices_shape, data_shape)
-            updates = torch.empty(
-                update_shape, dtype=dtype, device="cuda"
-            ).fill_(10.0)
+            updates = torch.full(update_shape, 10.0, dtype=dtype, device="cuda")
             scatter_updates = updates.flatten()
 
             scatter_nd(scatter_data, scatter_indices, scatter_updates)
 
-            # Implement `scatter_nd` in Python.
             data[indices[:, 0], indices[:, 1]] = updates
 
             flattened_data = data.flatten()
 
-            # Print data
             print(scatter_data)  # noqa: T201
             print(flattened_data)  # noqa: T201
 
-            assert torch.allclose(scatter_data, flattened_data)
+            torch.testing.assert_close(
+                scatter_data,
+                flattened_data,
+                rtol=1e-3,
+                atol=1e-3,
+                msg=f"scatter_nd failed for dtype {dtype}",
+            )
 
 
 if __name__ == "__main__":

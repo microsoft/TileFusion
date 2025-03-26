@@ -22,6 +22,7 @@ template <typename InType, typename AccType, typename OutType,
           typename WholeShape, typename CtaTileShape>
 struct FlashAttentionTraits {
     static constexpr int kSharedAccess = 64;
+
     using BaseShape = traits::BaseTileShape<InType>;
 
     using WarpLayout = tl::RowMajor<4, 1>;
@@ -154,10 +155,10 @@ template <typename InType,
           typename BroadcastDiv, typename BlockExp, typename BlockAdd,
           typename VecMax, typename VecAdd, typename VecSub, typename VecMul,
           typename VecExp, typename RegVecPrinter, typename RegAccPrinter>
-__global__ void ke_flash_attention(const InType* dQ, const InType* dK,
-                                   const InType* dV, InType* dO, int kM, int kN,
-                                   int kK, int kP, int kTM, int kTN, int kTK,
-                                   int kTP) {
+__global__ void flash_attention(const InType* dQ, const InType* dK,
+                                const InType* dV, InType* dO, int kM, int kN,
+                                int kK, int kP, int kTM, int kTN, int kTK,
+                                int kTP) {
     // Advance to the global data tile to the current CTA.
     const InType* Q = dQ + blockIdx.z * (kM * kK) + blockIdx.x * (kTM * kK);
     const InType* K = dK + blockIdx.z * (kK * kN);
@@ -320,7 +321,8 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
 
 template <typename InType, typename AccType, typename OutType,
           typename WholeShape, typename CtaTileShape, const int kBatch>
-void run(const InType* dQ, const InType* dK, const InType* dV, OutType* dO) {
+void run_flash_attention(const InType* dQ, const InType* dK, const InType* dV,
+                         OutType* dO) {
     static constexpr int kM = dim_size<0, WholeShape>;
     static constexpr int kN = dim_size<1, WholeShape>;
     static constexpr int kK = dim_size<2, WholeShape>;
@@ -401,19 +403,20 @@ void run(const InType* dQ, const InType* dK, const InType* dV, OutType* dO) {
     int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
                                           : shm_input * sizeof(InType);
 
-    auto kernel = &ke_flash_attention<
-        InType, AccType,
-        OutType,                    //
-        GIteratorA, SharedA, RegA,  //
-        SharedALoader, RegALoader,  //
-        GIteratorB, SharedB, RegB,  //
-        SharedBLoader, RegBLoader,  //
-        GIteratorC, SharedC, RegC,  //
-        SharedCLoader, RegCLoader,  //
-        RegAcc, RegAccCast, typename Config::GlobalD, RegD, RegDCast, DStorer,
-        ConvertAcc, ConvertO, RegVec, CopyVec, RowMax, RowSum, BroadcastSub,
-        BroadcastMul, BroadcastDiv, BlockExp, BlockAdd, VecMax, VecAdd, VecSub,
-        VecMul, VecExp, RegVecPrinter, RegAccPrinter>;
+    auto kernel =
+        &flash_attention<InType, AccType,
+                         OutType,                    //
+                         GIteratorA, SharedA, RegA,  //
+                         SharedALoader, RegALoader,  //
+                         GIteratorB, SharedB, RegB,  //
+                         SharedBLoader, RegBLoader,  //
+                         GIteratorC, SharedC, RegC,  //
+                         SharedCLoader, RegCLoader,  //
+                         RegAcc, RegAccCast, typename Config::GlobalD, RegD,
+                         RegDCast, DStorer, ConvertAcc, ConvertO, RegVec,
+                         CopyVec, RowMax, RowSum, BroadcastSub, BroadcastMul,
+                         BroadcastDiv, BlockExp, BlockAdd, VecMax, VecAdd,
+                         VecSub, VecMul, VecExp, RegVecPrinter, RegAccPrinter>;
 
     if (shm_size > 48 * 1024) {
         cudaFuncSetAttribute(
@@ -426,9 +429,9 @@ void run(const InType* dQ, const InType* dK, const InType* dV, OutType* dO) {
     cudaDeviceSynchronize();
 }
 
-void flash_attention(const torch::Tensor& Q, const torch::Tensor& K,
-                     const torch::Tensor& V, torch::Tensor& O, int64_t m,
-                     int64_t n, int64_t k, int64_t p) {
+void flash_attention_op(const torch::Tensor& Q, const torch::Tensor& K,
+                        const torch::Tensor& V, torch::Tensor& O, int64_t m,
+                        int64_t n, int64_t k, int64_t p) {
     using InType = __half;
     using AccType = float;
     using OutType = __half;
@@ -440,15 +443,16 @@ void flash_attention(const torch::Tensor& Q, const torch::Tensor& K,
     auto dV = reinterpret_cast<const InType*>(V.data_ptr());
     auto dO = reinterpret_cast<OutType*>(O.data_ptr());
 
-    const int kBatch = 1;
     if (m == 64 && n == 256 && k == 128 && p == 128) {
         using WholeShape = FlashAttentionShape<64, 256, 128, 128>;
-        run<InType, AccType, OutType, WholeShape, CtaTileShape, kBatch>(dQ, dK,
-                                                                        dV, dO);
+        const int kBatch = 1;
+        run_flash_attention<InType, AccType, OutType, WholeShape, CtaTileShape,
+                            kBatch>(dQ, dK, dV, dO);
     } else if (m == 64 && n == 128 && k == 128 && p == 128) {
         using WholeShape = FlashAttentionShape<64, 128, 128, 128>;
-        run<InType, AccType, OutType, WholeShape, CtaTileShape, kBatch>(dQ, dK,
-                                                                        dV, dO);
+        const int kBatch = 1;
+        run_flash_attention<InType, AccType, OutType, WholeShape, CtaTileShape,
+                            kBatch>(dQ, dK, dV, dO);
     } else {
         throw std::runtime_error("Unsupported shape");
     }
