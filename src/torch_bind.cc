@@ -17,50 +17,75 @@ struct KernelInfo {
 // Builder class for kernel registration
 class KernelBuilder {
   public:
-    // Initialize without fn_ in constructor
-    KernelBuilder(const char* name) : name_(name) {}
+    // Only initialize name_ and sig_, fn_ will be set later via fn()
+    KernelBuilder(const char* name)
+        : name_(name),
+          sig_(nullptr)
+    // Don't initialize fn_ in constructor
+    {}
 
-    KernelBuilder& sig(const char* s) {
+    KernelBuilder&& sig(const char* s) && {
         sig_ = s;
-        return *this;
+        return std::move(*this);
     }
 
-    // Take CppFunction by value and move it
-    KernelBuilder& fn(torch::CppFunction&& f) {
+    KernelBuilder&& fn(torch::CppFunction f) && {
         fn_ = std::move(f);
-        return *this;
+        return std::move(*this);
     }
 
-    KernelInfo build() && { return {name_, sig_, std::move(fn_)}; }
+    // Make sure fn_ is set before building
+    KernelInfo build() && {
+        assert(fn_.has_value());  // Ensure fn was set
+        return KernelInfo{
+            name_, sig_,
+            std::move(*fn_)  // Dereference the optional before moving
+        };
+    }
 
   private:
     const char* name_;
     const char* sig_;
-    torch::CppFunction fn_{torch::CppFunction(
-        nullptr, nullptr, nullptr)};  // Initialize with dummy values
+    std::optional<torch::CppFunction> fn_;
 };
 
-// Fixed macro to use _op suffix and proper function wrapping
-#define REG_KERNEL(name, signature)                          \
-    KernelBuilder(#name)                                     \
-        .sig(signature)                                      \
-        .fn(torch::CppFunction(name##_op, nullptr, nullptr)) \
+// Helper function to create CppFunction from kernel
+template <typename Func>
+torch::CppFunction make_op(Func* kernel_fn) {
+    return torch::CppFunction(kernel_fn);
+}
+
+// Fixed macro to use correct function names
+#define REG_KERNEL(name, func)                             \
+    std::move(KernelBuilder(#name))                        \
+        .sig(name##_sig)                                   \
+        .fn(torch::CppFunction(tilefusion::kernels::func)) \
         .build()
 
 // Collection of all kernel definitions
+// Helper macro to define kernel signatures more cleanly
+#define DEF_KERNEL_SIG(name, signature) \
+    static const char* name##_sig = signature;
+
+// Helper macro to add a kernel to the registry
+#define ADD_KERNEL(kernels, name, func) \
+    kernels.push_back(REG_KERNEL(name, func))
+
 std::vector<KernelInfo> get_kernel_registry() {
-    static const char* scatter_sig =
-        "scatter_nd(Tensor(a!) data, Tensor updates, Tensor indices) -> ()";
-    static const char* flash_attn_sig =
-        R"DOC(flash_attention_fwd(
+    // Define all kernel signatures
+    DEF_KERNEL_SIG(
+        scatter_nd,
+        "scatter_nd(Tensor(a!) data, Tensor updates, Tensor indices) -> ()");
+    DEF_KERNEL_SIG(flash_attention_fwd,
+                   R"DOC(flash_attention_fwd(
             Tensor(a!) Q,
             Tensor K, Tensor V, Tensor O,
             int m, int n, int k, int p) -> ()
-        )DOC";
+        )DOC");
 
     std::vector<KernelInfo> kernels;
-    kernels.push_back(REG_KERNEL(scatter_nd, scatter_sig));
-    kernels.push_back(REG_KERNEL(flash_attention_fwd, flash_attn_sig));
+    ADD_KERNEL(kernels, scatter_nd, scatter_op);
+    ADD_KERNEL(kernels, flash_attention_fwd, flash_attention_op);
     return kernels;
 }
 
