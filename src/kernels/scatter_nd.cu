@@ -27,9 +27,9 @@ namespace tilefusion::kernels {
  * dimension of `indices` along the memory dimensions of `data`.
  */
 template <typename T>
-__global__ void scatter_nd_kernel(const T* in, T* out, const int64_t* indices,
-                                  unsigned int const* __restrict__ strides,
-                                  size_t n, size_t rank, size_t slice_size) {
+__global__ void ke_scatter_nd(const T* in, T* out, const int64_t* indices,
+                              unsigned int const* __restrict__ strides,
+                              size_t n, size_t rank, size_t slice_size) {
     for (size_t tid = blockIdx.x * blockDim.x + threadIdx.x,
                 step = blockDim.x * gridDim.x;
          tid < n; tid += step) {
@@ -53,7 +53,7 @@ __global__ void scatter_nd_kernel(const T* in, T* out, const int64_t* indices,
     }
 }
 
-void scatter_op(torch::Tensor& data, const torch::Tensor& updates,
+void scatter_nd(torch::Tensor& data, const torch::Tensor& updates,
                 const torch::Tensor& indices) {
     auto data_dims = data.sizes();
     auto update_dims = updates.sizes();
@@ -106,7 +106,7 @@ void scatter_op(torch::Tensor& data, const torch::Tensor& updates,
     int64_t grid = (n + block - 1) / block;
 
     TILEFUSION_DISPATCH_ALL_TYPES(data.scalar_type(), [&] {
-        scatter_nd_kernel<<<grid, block>>>(
+        ke_scatter_nd<<<grid, block>>>(
             reinterpret_cast<const scalar_t*>(indices.const_data_ptr()),
             reinterpret_cast<scalar_t*>(data.mutable_data_ptr()),
             reinterpret_cast<const int64_t*>(indices.const_data_ptr()),
