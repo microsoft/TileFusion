@@ -1,9 +1,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-// #include "cutlass_fused_two_gemms.cuh"
-#include "kernels/mod.hpp"
-#include "tilefusion_fused_two_gemms.cuh"
+#include "cutlass_fused_two_gemms.cuh"
+#include "kernels/fused_two_gemms.hpp"
 #include "util.cuh"
 
 using namespace tilefusion::kernels;

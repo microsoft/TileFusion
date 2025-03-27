@@ -7,8 +7,6 @@
 #include "dispatch_macros.hpp"
 #include "kernel_registry.hpp"
 
-#include <torch/script.h>
-
 namespace tilefusion::kernels {
 
 // reference:
