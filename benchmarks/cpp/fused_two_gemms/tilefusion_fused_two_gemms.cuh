@@ -187,6 +187,7 @@ __global__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
             load_ra(sA, rA);
             load_rb(sB, rB);
             __syncthreads();
+            gemm(rA, rB, acc);
         }
         load_rc(sC, rC);
         __syncthreads();

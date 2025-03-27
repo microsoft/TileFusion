@@ -217,19 +217,19 @@ float cute_fused_gemm(const Element* dA, const Element* dB, const Element* dC,
     float elapsed = 0.;
     if (timeit) {
         for (int i = 0; i < warp_up; ++i) {
-            kernel<<<gridDim, blockDim, shm_size, 0>>>(dA, dB, dC, dD);
+            kernel<<<gridDim, blockDim, shm_size>>>(dA, dB, dC, dD);
         }
         cudaDeviceSynchronize();
 
         CudaTimer timer;
         timer.start();
         for (int i = 0; i < iters; ++i) {
-            kernel<<<gridDim, blockDim, shm_size, 0>>>(dA, dB, dC, dD);
+            kernel<<<gridDim, blockDim, shm_size>>>(dA, dB, dC, dD);
         }
         cudaDeviceSynchronize();
         elapsed = timer.stop() / iters;
     } else {
-        kernel<<<gridDim, blockDim, shm_size, 0>>>(dA, dB, dC, dD);
+        kernel<<<gridDim, blockDim, shm_size>>>(dA, dB, dC, dD);
     }
     return elapsed;
 }

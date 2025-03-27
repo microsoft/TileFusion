@@ -43,28 +43,31 @@ void run(float epsilon = 1e-3) {
         h_c[i] = static_cast<cutlass::half_t>(rand_float());
     }
 
-    thrust::host_vector<cutlass::half_t> h_d(kM * kP * kBatch);
+    thrust::host_vector<InType> h_d(kM * kP * kBatch);
     thrust::fill(h_d.begin(), h_d.end(), 0.);
+
+    thrust::host_vector<cutlass::half_t> h_d2(kM * kP * kBatch);
+    thrust::fill(h_d2.begin(), h_d2.end(), 0.);
+
+    thrust::host_vector<__half> h_d3(kM * kP * kBatch);
+    thrust::fill(h_d3.begin(), h_d3.end(), 0.);
 
     thrust::device_vector<cutlass::half_t> d_a = h_a;
     thrust::device_vector<cutlass::half_t> d_b = h_b;
     thrust::device_vector<cutlass::half_t> d_c = h_c;
-    thrust::device_vector<cutlass::half_t> d_d = h_d;
-
-    // const InType* A = thrust::raw_pointer_cast(d_a.data());
-    // const InType* B = thrust::raw_pointer_cast(d_b.data());
-    // const InType* C = thrust::raw_pointer_cast(d_c.data());
-    // InType* D = thrust::raw_pointer_cast(d_d.data());
+    thrust::device_vector<InType> d_d = h_d;
+    thrust::device_vector<cutlass::half_t> d_d2 = h_d2;
+    thrust::device_vector<__half> d_d3 = h_d3;
 
     const cutlass::half_t* CA = thrust::raw_pointer_cast(d_a.data());
     const cutlass::half_t* CB = thrust::raw_pointer_cast(d_b.data());
     const cutlass::half_t* CC = thrust::raw_pointer_cast(d_c.data());
-    cutlass::half_t* CD = thrust::raw_pointer_cast(d_d.data());
+    cutlass::half_t* CD = thrust::raw_pointer_cast(d_d2.data());
 
     const InType* A = reinterpret_cast<const InType*>(CA);
     const InType* B = reinterpret_cast<const InType*>(CB);
     const InType* C = reinterpret_cast<const InType*>(CC);
-    InType* D = reinterpret_cast<InType*>(CD);
+    InType* D = thrust::raw_pointer_cast(d_d.data());
 
     using Config = FusedTwoGemmsTraits<InType, AccType, WholeShape,
                                        CtaTileShape, WarpLayout, kSharedAccess>;
@@ -139,43 +142,57 @@ void run(float epsilon = 1e-3) {
 
     h_d = d_d;
 
+    cutlass_fused_gemm(CA, CB, CC, CD, false, 0, 0);
+    h_d2 = d_d2;
+
     thrust::host_vector<InType> h_acc(kM * kN * kBatch);
     thrust::fill(h_acc.begin(), h_acc.end(), 0.);
     thrust::device_vector<InType> d_acc = h_acc;
 
-    thrust::host_vector<InType> h_d2(kM * kP * kBatch);
-    thrust::fill(h_d2.begin(), h_d2.end(), 0.);
-    thrust::device_vector<InType> d_d2 = h_d2;
-
     cublas_two_gemms(kM, kN, kK, kP, kBatch, A, B, C,
-                     thrust::raw_pointer_cast(d_d2.data()),
+                     thrust::raw_pointer_cast(d_d3.data()),
                      thrust::raw_pointer_cast(d_acc.data()), false);
     cudaDeviceSynchronize();
     h_acc = d_acc;
-    h_d2 = d_d2;
+    h_d3 = d_d3;
 
 #ifdef DEBUG
     InType* data = thrust::raw_pointer_cast(h_d.data());
-    __half* ground_truth = thrust::raw_pointer_cast(h_d2.data());
+    cutlass::half_t* cutlass_data = thrust::raw_pointer_cast(h_d2.data());
+    __half* cutlass_data_half = reinterpret_cast<__half*>(cutlass_data);
+    __half* ground_truth = thrust::raw_pointer_cast(h_d3.data());
 
+    const int numel = 256;
     printf("ours:\n");
-    for (int i = 0; i < h_d.size(); ++i) {
+    for (int i = 0; i < numel; ++i) {
         printf("%.3f, ", __half2float(data[i]));
         if (i && (i + 1) % 16 == 0) printf("\n");
     }
+    printf("cutlass:\n");
+    for (int i = 0; i < numel; ++i) {
+        printf("%.3f, ", __half2float(cutlass_data_half[i]));
+        if (i && (i + 1) % 16 == 0) printf("\n");
+    }
     printf("\nground_truth:\n");
-    for (int i = 0; i < h_d.size(); ++i) {
+    for (int i = 0; i < numel; ++i) {
         printf("%.3f, ", __half2float(ground_truth[i]));
         if (i && (i + 1) % 16 == 0) printf("\n");
     }
 
-    if (check_results(data, ground_truth, kM * kP, epsilon)) {
+    bool passed1 = check_results(data, ground_truth, kM * kP, epsilon);
+    bool passed2 =
+        check_results(cutlass_data_half, ground_truth, kM * kP, epsilon);
+    std::cout << "passed1: " << passed1 << ", passed2: " << passed2
+              << std::endl;
+
+    if (passed1 && passed2) {
         std::cout << "[" << kM << ", " << kN << ", " << kK << ", " << kP
                   << "], batch = " << kBatch << ", passed." << std::endl;
     } else {
         std::cout << "[" << kM << ", " << kN << ", " << kK << ", " << kP
                   << "], batch = " << kBatch << ", failed." << std::endl;
     }
+
 #endif
 
     CudaTimer timer;
@@ -200,14 +217,15 @@ void run(float epsilon = 1e-3) {
         cutlass_fused_gemm(CA, CB, CC, CD, true, warm_up, iters);
 
     float cublas_time = cublas_two_gemms(
-        kM, kN, kK, kP, kBatch, A, B, C, thrust::raw_pointer_cast(d_d2.data()),
+        kM, kN, kK, kP, kBatch, A, B, C, thrust::raw_pointer_cast(d_d3.data()),
         thrust::raw_pointer_cast(d_acc.data()), true);
 
     std::cout << "[" << kM << ", " << kN << ", " << kK << ", " << kP << "]\t["
               << kTM << ", " << kTN << ", " << kTK << ", " << kTP << "]\t"
               << cublas_time << "\t" << cutlass_time << "("
-              << cutlass_time / cublas_time << ")" << "\t" << tilefusion_time
-              << "(" << tilefusion_time / cublas_time << ")" << std::endl;
+              << cutlass_time / cublas_time << ")"
+              << "\t" << tilefusion_time << "(" << tilefusion_time / cublas_time
+              << ")" << std::endl;
 }
 
 int main() {
@@ -224,13 +242,13 @@ int main() {
 
     using WarpLayout2 = tl::RowMajor<4, 1>;
     static constexpr int kSharedAccess1 = 128;
-    run<B2BGemmShape<2048 /*M*/, 2048 /*N*/, 128 /*K*/, 128 /*P*/>,
-        B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, 64>(5e-3);
+    // run<B2BGemmShape<2048 /*M*/, 2048 /*N*/, 128 /*K*/, 128 /*P*/>,
+    //     B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
+    //     WarpLayout2, 1, 64>(5e-3);
 
-    run<B2BGemmShape<1024 /*M*/, 1024 /*N*/, 128 /*K*/, 128 /*P*/>,
-        B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, 64>(5e-3);
+    // run<B2BGemmShape<1024 /*M*/, 1024 /*N*/, 128 /*K*/, 128 /*P*/>,
+    //     B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
+    //     WarpLayout2, 1, 64>(5e-3);
 
     run<B2BGemmShape<512 /*M*/, 512 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
