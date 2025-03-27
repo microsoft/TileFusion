@@ -36,7 +36,6 @@ void cublas_two_gemms_impl(cublasHandle_t handle, int kM, int kN, int kK,
         // [n, m] = [n, k] @ [k, m]
         cublasHgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N /* transb*/, kN, kM, kK,
                     &alf, B, kK, A, kK, &bet, acc, kN);
-        cudaDeviceSynchronize();
 
         // D and acc are laid out in row-major fashion, while C is in column
         // major fashion. Operands of cuBLAS is by default in column
