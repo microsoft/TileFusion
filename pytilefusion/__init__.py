@@ -24,7 +24,6 @@ def _load_library(filename: str) -> Any:
     Raises:
         RuntimeError: If the library cannot be loaded.
     """
-    # Look for the library in the same directory as this file
     lib_path = Path(__file__).parent / filename
     print(lib_path)  # noqa: T201
 

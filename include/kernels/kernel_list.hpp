@@ -6,33 +6,16 @@
 #include "kernel_registry.hpp"
 #include "kernels/mod.hpp"
 
-namespace tilefusion {
-namespace kernels {
+namespace tilefusion ::kernels {
 
-// Macro for kernel registration
-#define REGISTER_TILEFUSION_KERNEL(name, schema, func)                        \
-    namespace {                                                               \
-    [[maybe_unused]] static const auto name##_registered = []() {             \
-        tilefusion::KernelRegistry::instance().register_kernel(#name, schema, \
-                                                               func);         \
-        return true;                                                          \
-    }();                                                                      \
-    }
+REGISTER_KERNEL(
+    scatter_nd,
+    "scatter_nd(Tensor data, Tensor(a!) updates, Tensor indices) -> ()",
+    &scatter_nd);
 
-// All kernel registrations
-#define REGISTER_ALL_KERNELS()                                               \
-    REGISTER_TILEFUSION_KERNEL(                                              \
-        scatter_nd,                                                          \
-        "scatter_nd(Tensor data, Tensor(a!) updates, Tensor indices) -> ()", \
-        tilefusion::kernels::scatter_nd);                                    \
-                                                                             \
-    REGISTER_TILEFUSION_KERNEL(                                              \
-        flash_attention,                                                     \
-        "flash_attention(Tensor Q, Tensor K, Tensor V, Tensor(a!) O, "       \
-        "int m, int n, int k, int p) -> ()",                                 \
-        tilefusion::kernels::flash_attention)
+REGISTER_KERNEL(flash_attention,
+                "flash_attention(Tensor Q, Tensor K, Tensor V, Tensor(a!) O, "
+                "int m, int n, int k, int p) -> ()",
+                &flash_attention);
 
-// Add new kernels by extending REGISTER_ALL_KERNELS macro
-
-}  // namespace kernels
-}  // namespace tilefusion
+}  // namespace tilefusion::kernels

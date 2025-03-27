@@ -5,12 +5,11 @@
 
 #include "cuda_utils.hpp"
 #include "dispatch_macros.hpp"
+#include "kernel_registry.hpp"
 
-#include <ATen/ATen.h>
 #include <torch/script.h>
 
-namespace tilefusion {
-namespace kernels {
+namespace tilefusion::kernels {
 
 // reference:
 // https://github.com/InfiniTensor/RefactorGraph/blob/master/src/04kernel/cuda/src/scatter_nd.cu#L7
@@ -36,18 +35,8 @@ __global__ void ke_scatter_nd(const T* in, T* out, const int64_t* indices,
                               unsigned int const* __restrict__ strides,
                               size_t n, size_t rank, size_t slice_size);
 
-#if defined(_MSC_VER)
-    #define TILEFUSION_EXPORT __declspec(dllexport)
-#else
-    #define TILEFUSION_EXPORT __attribute__((visibility("default")))
-#endif
+TILEFUSION_EXPORT void scatter_nd(const torch::Tensor& data,
+                                  torch::Tensor& updates,
+                                  const torch::Tensor& indices);
 
-// Export the function with C linkage
-extern "C" {
-TILEFUSION_EXPORT
-void scatter_nd(at::Tensor& data, const at::Tensor& updates,
-                const at::Tensor& indices);
-}
-
-}  // namespace kernels
-}  // namespace tilefusion
+}  // namespace tilefusion::kernels
