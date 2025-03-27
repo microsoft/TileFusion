@@ -21,4 +21,5 @@ include_directories("${THIRD_PARTY_DIR}/cutlass/include")
 include_directories(${TORCH_INCLUDE_DIRS})
 
 add_executable(bench_fused_two_gemms bench.cu)
-target_link_libraries(bench_fused_two_gemms ${CUDA_CUBLAS_LIBRARIES} ${TORCH_LIBRARIES})
+target_link_libraries(bench_fused_two_gemms ${CUDA_CUBLAS_LIBRARIES}
+                      ${TORCH_LIBRARIES})

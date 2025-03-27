@@ -231,18 +231,7 @@ void run(float epsilon = 1e-3) {
 }
 
 int main() {
-    // std::cout << "[kM, kN, kK, kP]\t[kTM, kTN, kTK, kTP]\t[cublas "
-    //              "time]\t[tilefusion time(Radio)]"
-    //           << std::endl;
-
-    // run<B2BGemmShape<256 /*M*/, 128 /*N*/, 64 /*K*/, 64 /*P*/>,
-    //     B2BGemmShape<64 /*kTM*/, 64 /*kTN*/, 64 /*kTK*/, 64 /*kTP*/>,
-    //     WarpLayout1, 1, kSharedAccess0>(5e-3);
-
-    using WarpLayout1 = tl::RowMajor<2, 1>;
-    static constexpr int kSharedAccess0 = 64;
     using WarpLayout2 = tl::RowMajor<4, 1>;
-
     static constexpr int kSharedAccess1 = 128;
 
     run<B2BGemmShape<4096 /*M*/, 1024 /*N*/, 128 /*K*/, 128 /*P*/>,
