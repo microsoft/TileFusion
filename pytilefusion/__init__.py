@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------
 
 import ctypes
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -23,15 +24,16 @@ def _load_library(filename: str) -> Any:
     Raises:
         RuntimeError: If the library cannot be loaded.
     """
+    lib_path = Path(__file__).parent / filename
+    print(lib_path)  # noqa: T201
+
     try:
-        return ctypes.CDLL(filename)
-    except OSError as e:
-        print(f"Failed to load library: {filename}")  # noqa: T201
-        print(f"Error: {e}")  # noqa: T201
-        raise RuntimeError(f"Failed to load library: {filename}") from e
+        return ctypes.CDLL(str(lib_path))
+    except Exception as e:
+        raise RuntimeError(f"Failed to load library from {lib_path}") from e
 
 
-_load_library("libtilefusion.so")
+_lib = _load_library("libtilefusion.so")
 
 
 def scatter_nd(
@@ -73,7 +75,7 @@ def flash_attention_fwd(
         query_dim: Size of second dimension of query/key.
         value_dim: Size of second dimension of value/output.
     """
-    torch.ops.tilefusion.flash_attention_fwd(
+    torch.ops.tilefusion.flash_attention(
         query, key, value, output, query_size, key_size, query_dim, value_dim
     )
 

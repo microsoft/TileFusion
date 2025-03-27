@@ -24,7 +24,7 @@ cd TileFusion && git submodule update --init --recursive
    make
    ```
 
-1. Run the C++ unit tests:
+2. Run the C++ unit tests:
 
    - **Run a single C++ unit test**:
      ```bash
@@ -43,13 +43,13 @@ cd TileFusion && git submodule update --init --recursive
    python3 setup.py build bdist_wheel
    ```
 
-1. Clean the build:
+2. Clean the build:
 
    ```bash
    python3 setup.py clean
    ```
 
-1. Install the Python wrapper in editable mode (recommended for development):
+3. Install the Python wrapper in editable mode (recommended for development):
 
    ```bash
    python3 setup.py develop
