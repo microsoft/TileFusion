@@ -5,5 +5,5 @@ url = https://github.com/NVIDIA/cutlass.git
 path = 3rd-party/googletest
 url = https://github.com/google/googletest.git
 [submodule "docs"]
-	path = docs
-	url = https://github.com/TiledTensor/tilefusion-docs.git
+path = docs
+url = https://github.com/TiledTensor/tilefusion-docs.git
