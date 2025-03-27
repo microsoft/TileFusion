@@ -1,12 +1,3 @@
----
-layout: page
-title: Examples
-nav_order: 4
-has_children: true
----
-
-This page showcases various examples of using TileFusion.
-
 ## Basic GEMM Example
 
 TileFusion implements `GlobalTile`, `SharedTile` and `RegTile` to customize the shape and layout of tiles located in the GPU's three memory hierarchies. Here's an example of a simple GEMM kernel written in TileFusion (the complete example can be found in [this directory](examples/cpp/01_gemm/01_gemm_global_reg/gemm.hpp)):
