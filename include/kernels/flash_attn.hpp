@@ -5,8 +5,6 @@
 
 #include "cuda_utils.hpp"
 
-#include <torch/script.h>
-
 namespace tilefusion::kernels {
 
 template <typename InType,

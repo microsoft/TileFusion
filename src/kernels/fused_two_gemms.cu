@@ -1,6 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-#pragma once
 
 #include "cell/compute/mod.hpp"
 #include "cell/mod.hpp"
@@ -11,6 +10,8 @@ using namespace cell;
 using namespace cell::copy;
 using namespace compute;
 namespace tl = tile_layout;
+
+namespace tilefusion::kernels {
 
 template <typename InType, typename AccType, typename WholeShape,
           typename CtaTileShape, typename WarpLayout, const int kSharedAccess>
@@ -204,3 +205,4 @@ __global__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
     __syncthreads();
     store_sD(sD, gD);
 }
+}  // namespace tilefusion::kernels

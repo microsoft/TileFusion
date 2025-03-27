@@ -45,9 +45,9 @@ struct FusedGemmTraits : public Base {
     static constexpr int kThreadsPerCol = CeilDiv<kTK, Base::kNumPerAccess>;
     static constexpr int kThreadsPerRow = CeilDiv<kThreads, kThreadsPerCol>;
 
-    static constexpr int kSwizzle = (kTK == 32 ? 2 : 3);
+    // static constexpr int kSwizzle = (kTK == 32 ? 2 : 3);
     using SmemLayoutAtom = decltype(composition(
-        Swizzle<kSwizzle, 3, 3>{},
+        Swizzle<2, 3, 3>{},
         Layout<Shape<_8, Int<kTK>>, Stride<Int<kTK>, _1>>{}));
 
     using SmemLayoutA =
