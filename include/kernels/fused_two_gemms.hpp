@@ -4,6 +4,7 @@
 
 #include "cell/compute/mod.hpp"
 #include "cell/mod.hpp"
+#include "kernel_registry.hpp"
 #include "types/mod.hpp"
 
 using namespace tilefusion;
@@ -13,6 +14,7 @@ using namespace compute;
 namespace tl = tile_layout;
 
 namespace tilefusion::kernels {
+
 template <typename InType, typename AccType, typename WholeShape,
           typename CtaTileShape, typename WarpLayout, const int kSharedAccess>
 struct FusedTwoGemmsTraits {
@@ -205,4 +207,10 @@ __global__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
     __syncthreads();
     store_sD(sD, gD);
 }
+
+TILEFUSION_EXPORT void fused_two_gemms(const torch::Tensor& A,
+                                       const torch::Tensor& B,
+                                       const torch::Tensor& C, torch::Tensor& D,
+                                       int64_t m, int64_t n, int64_t k,
+                                       int64_t p);
 }  // namespace tilefusion::kernels
