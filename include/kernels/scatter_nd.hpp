@@ -5,6 +5,7 @@
 
 #include "cuda_utils.hpp"
 #include "dispatch_macros.hpp"
+#include "kernel_registry.hpp"
 
 #include <torch/script.h>
 
@@ -30,11 +31,12 @@ namespace tilefusion::kernels {
  * dimension of `indices` along the memory dimensions of `data`.
  */
 template <typename T>
-__global__ void scatter_nd_kernel(const T* in, T* out, const int64_t* indices,
-                                  unsigned int const* __restrict__ strides,
-                                  size_t n, size_t rank, size_t slice_size);
+__global__ void ke_scatter_nd(const T* in, T* out, const int64_t* indices,
+                              unsigned int const* __restrict__ strides,
+                              size_t n, size_t rank, size_t slice_size);
 
-void scatter_op(torch::Tensor& data, const torch::Tensor& updates,
-                const torch::Tensor& indices);
+TILEFUSION_EXPORT void scatter_nd(const torch::Tensor& data,
+                                  torch::Tensor& updates,
+                                  const torch::Tensor& indices);
 
 }  // namespace tilefusion::kernels

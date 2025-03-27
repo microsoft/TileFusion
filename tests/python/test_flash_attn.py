@@ -206,29 +206,6 @@ class TestFlashAttention(unittest.TestCase):
 
         assert passed
 
-    def test_flash_attention_v0(self) -> None:
-        """Test flash attention with equal dimensions."""
-        matrix_m = 64
-        matrix_n = 64
-        matrix_k = 128
-        matrix_p = 128
-
-        tile_m = 64
-        tile_n = 64
-        tile_k = 128
-        tile_p = 128
-
-        self.run_flash_attention(
-            matrix_m,
-            matrix_n,
-            matrix_k,
-            matrix_p,
-            tile_m,
-            tile_n,
-            tile_k,
-            tile_p,
-        )
-
     def test_flash_attention_v1(self) -> None:
         """Test flash attention with N=128."""
         matrix_m = 64

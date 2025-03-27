@@ -203,10 +203,8 @@ void run(bool check = true) {
 
 int main() {
     static constexpr int kSharedAccess = 64;
-    run<FlashAttentionShape<64 /*M*/, 128 /*N*/, 128 /*K*/, 128 /*P*/>,
-        FlashAttentionShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128
-                            /*kTP*/>,
-        1, kSharedAccess>();
+    run<FlashAttentionShape<64, 128, 128, 128>,
+        FlashAttentionShape<64, 128, 128, 128>, 1, kSharedAccess>();
 
     // run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
     //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
