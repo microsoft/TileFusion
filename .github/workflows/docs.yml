@@ -1,0 +1,39 @@
+name: Deploy Docs
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'docs/**' # only trigger when docs change
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      - name: Install Jekyll
+        run: |
+          cd docs
+          bundle install
+
+      - name: Build Site
+        run: |
+          cd docs
+          bundle exec jekyll build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/_site
+          force_orphan: true

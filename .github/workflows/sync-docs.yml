@@ -1,0 +1,33 @@
+name: Sync Docs
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 */3 * *'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Update Submodule
+        run: |
+          if ! git submodule update --remote --merge; then
+            echo "Failed to update submodule"
+            exit 1
+          fi
+
+          # Configure git for GitHub Actions
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # Stage, commit and push changes
+          git add docs
+          git commit -m "chore: sync docs submodule" || echo "No changes to commit"
+          git push
+
+    permissions:
+      contents: write
