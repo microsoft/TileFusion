@@ -4,7 +4,7 @@
 # --------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
-project(gemm_bench LANGUAGES C CXX CUDA)
+project(fused_two_gemms_bench LANGUAGES C CXX CUDA)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
                       "${PROJECT_SOURCE_DIR}/../../../cmake")
