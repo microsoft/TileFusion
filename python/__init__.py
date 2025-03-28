@@ -1,4 +1,4 @@
-"""PyTileFusion: A Python wrapper for tilefusion C++ library."""
+"""The Python wrapper for tilefusion C++ library."""
 
 # -------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

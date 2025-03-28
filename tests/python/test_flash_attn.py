@@ -8,8 +8,7 @@
 import unittest
 
 import torch
-
-from pytilefusion import TiledFlashAttention
+from tilefusion import TiledFlashAttention
 
 
 class FlashAttention:
