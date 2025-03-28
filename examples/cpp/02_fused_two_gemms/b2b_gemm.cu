@@ -1,11 +1,14 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#include "b2b_gemm.hpp"
+#include "kernels/fused_two_gemms.hpp"
 #include "util.hpp"
 
+using namespace tilefusion::kernels;
+namespace tl = tilefusion::tile_layout;
+
 template <typename WholeShape, typename CtaTileShape, typename WarpLayout,
-          const int kBatch>
+          const int kBatch, const int kSharedAccess>
 void run(float epsilon = 1e-3) {
     using InType = __half;
     using AccType = float;
@@ -39,26 +42,27 @@ void run(float epsilon = 1e-3) {
         h_c[i] = static_cast<InType>(rand_float());
     }
 
-    thrust::host_vector<AccType> h_d(kM * kP * kBatch);
+    thrust::host_vector<InType> h_d(kM * kP * kBatch);
     thrust::fill(h_d.begin(), h_d.end(), 0.);
 
     thrust::device_vector<InType> d_a = h_a;
     thrust::device_vector<InType> d_b = h_b;
     thrust::device_vector<InType> d_c = h_c;
-    thrust::device_vector<AccType> d_d = h_d;
+    thrust::device_vector<InType> d_d = h_d;
 
     const InType* A = thrust::raw_pointer_cast(d_a.data());
     const InType* B = thrust::raw_pointer_cast(d_b.data());
     const InType* C = thrust::raw_pointer_cast(d_c.data());
-    AccType* D = thrust::raw_pointer_cast(d_d.data());
+    InType* D = thrust::raw_pointer_cast(d_d.data());
 
-    using Config =
-        B2BGemmTraits<InType, AccType, WholeShape, CtaTileShape, WarpLayout>;
+    using Config = FusedTwoGemmsTraits<InType, AccType, WholeShape,
+                                       CtaTileShape, WarpLayout, kSharedAccess>;
 
     using RegA = typename Config::RegA;
     using RegB = typename Config::RegB;
     using RegC = typename Config::RegC;
     using RegD = typename Config::RegD;
+    using RegDHalf = typename Config::RegDHalf;
     using RegAcc = typename Config::RegAcc;
     using RegAccCast = typename Config::RegAccCast;
 
@@ -77,9 +81,12 @@ void run(float epsilon = 1e-3) {
     using SharedCLoader = typename Config::SharedCLoader;
     using RegCLoader = typename Config::RegCLoader;
 
-    using DStorer = typename Config::DStorer;
+    using SharedD = typename Config::SharedD;
+    using StoreRegD = typename Config::StoreRegD;
+    using StoreSharedD = typename Config::StoreSharedD;
 
     using ConvertAcc = typename Config::ConvertHalf;
+    using ConvertD = typename Config::ConvertD;
 
     int block_x = CeilDiv<kM, kTM>;
     int block_y = CeilDiv<kP, kTP>;
@@ -93,15 +100,17 @@ void run(float epsilon = 1e-3) {
     int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
                                           : shm_input * sizeof(InType);
 
-    auto kernel = &KeBack2BackGemm<InType, AccType,            //
-                                   GIteratorA, SharedA, RegA,  //
-                                   SharedALoader, RegALoader,  //
-                                   GIteratorB, SharedB, RegB,  //
-                                   SharedBLoader, RegBLoader,  //
-                                   GIteratorC, SharedC, RegC,  //
-                                   SharedCLoader, RegCLoader,  //
-                                   RegAcc, RegAccCast, typename Config::GlobalD,
-                                   RegD, DStorer, ConvertAcc>;
+    auto kernel =
+        &ke_fused_two_gemms<InType, AccType,            //
+                            GIteratorA, SharedA, RegA,  //
+                            SharedALoader, RegALoader,  //
+                            GIteratorB, SharedB, RegB,  //
+                            SharedBLoader, RegBLoader,  //
+                            GIteratorC, SharedC, RegC,  //
+                            SharedCLoader, RegCLoader,  //
+                            RegAcc, RegAccCast, typename Config::GlobalD,
+                            SharedD, RegD, RegDHalf, StoreRegD, StoreSharedD,
+                            ConvertAcc, ConvertD>;
 
     if (shm_size > 48 * 1024) {
         cudaFuncSetAttribute(
@@ -129,13 +138,13 @@ void run(float epsilon = 1e-3) {
     h_acc = d_acc;
     h_d2 = d_d2;
 
-    float* data = thrust::raw_pointer_cast(h_d.data());
+    InType* data = thrust::raw_pointer_cast(h_d.data());
     __half* ground_truth = thrust::raw_pointer_cast(h_d2.data());
 
 #ifdef DEBUG
     printf("ours:\n");
     for (int i = 0; i < h_d.size(); ++i) {
-        printf("%.3f, ", data[i]);
+        printf("%.3f, ", __half2float(data[i]));
         if (i && (i + 1) % 16 == 0) printf("\n");
     }
     printf("\nground_truth:\n");
@@ -155,12 +164,13 @@ void run(float epsilon = 1e-3) {
 }
 
 int main() {
-    using WarpLayout1 = tl::RowMajor<2, 1>;
+    // 在主函数内定义这些变量，而不是全局范围
+    using WarpLayout = tl::RowMajor<2, 1>;
+    static constexpr int kSharedAccess = 64;
 
     run<B2BGemmShape<256 /*M*/, 128 /*N*/, 64 /*K*/, 64 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 64 /*kTN*/, 64 /*kTK*/, 64 /*kTP*/>,
-        WarpLayout1, 1>(5e-3);
-
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     return 0;
 }

@@ -91,8 +91,8 @@ class GTileIterator {
         using NewTile = GlobalTile<DType, TileLayout>;
 
         int offset = Tile::kType == tl::Layout::kRowMajor
-                         ? x * (kStride0 * Tile::kCols) + y * kStride1
-                         : x * kStride0 + y * (Tile::kRows * kStride1);
+                         ? x * (kStride0 * Tile::kRowStride) + y * kStride1
+                         : x * kStride0 + y * (Tile::kColStride * kStride1);
         NewTile tile(data_ + offset);
 
         return tile;

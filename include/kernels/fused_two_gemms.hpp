@@ -4,6 +4,7 @@
 
 #include "cell/compute/mod.hpp"
 #include "cell/mod.hpp"
+#include "kernel_registry.hpp"
 #include "types/mod.hpp"
 
 using namespace tilefusion;
@@ -12,9 +13,11 @@ using namespace cell::copy;
 using namespace compute;
 namespace tl = tile_layout;
 
+namespace tilefusion::kernels {
+
 template <typename InType, typename AccType, typename WholeShape,
-          typename CtaTileShape, typename WarpLayout>
-struct B2BGemmTraits {
+          typename CtaTileShape, typename WarpLayout, const int kSharedAccess>
+struct FusedTwoGemmsTraits {
     using BaseShape = traits::BaseTileShape<InType>;
 
     static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
@@ -40,7 +43,8 @@ struct B2BGemmTraits {
 
     static const bool kUseSwizzling = true;
 
-    using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kUseSwizzling>;
+    using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kUseSwizzling,
+                               kSharedAccess>;
 
     static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kAKs = kTK / BaseShape::kCols;
@@ -53,7 +57,8 @@ struct B2BGemmTraits {
     // operand B
     using GlobalB = GlobalTile<InType, tl::ColMajor<kK, kN>>;
     using GIteratorB = GTileIterator<GlobalB, TileShape<kTK, kTN>>;
-    using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, kUseSwizzling>;
+    using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, kUseSwizzling,
+                               kSharedAccess>;
 
     static constexpr int kBKs = kTK / BaseShape::kRows;
     static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kCols;
@@ -67,7 +72,8 @@ struct B2BGemmTraits {
     using GlobalC = GlobalTile<InType, tl::ColMajor<kN, kTP>>;
     // chunk the N dimension to fit into shared memory
     using GIteratorC = GTileIterator<GlobalC, TileShape<kTN, kTP>>;
-    using SharedC = SharedTile<InType, tl::ColMajor<kTN, kTP>, kUseSwizzling>;
+    using SharedC = SharedTile<InType, tl::ColMajor<kTN, kTP>, kUseSwizzling,
+                               kSharedAccess>;
 
     static constexpr int kCNs = kTN / BaseShape::kRows;
     static constexpr int kCPs = kTP / kWarpPerCol / BaseShape::kCols;
@@ -78,12 +84,16 @@ struct B2BGemmTraits {
         SharedToRegLoader<RegC, WarpLayout, WarpReuse::kColReuseCont>;
 
     // output D
-    using GlobalD = GlobalTile<AccType, tl::RowMajor<kTM, kTP>>;
+    using GlobalD = GlobalTile<InType, tl::RowMajor<kTM, kTP>>;
+    using SharedD = SharedTile<InType, tl::RowMajor<kTM, kTP>, kUseSwizzling,
+                               kSharedAccess>;
 
     static constexpr int kDMs = kTM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kDPs = kTP / kWarpPerCol / BaseShape::kCols;
     using RegD = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kDMs, kDPs>>;
-    using DStorer = copy::RegToGlobalStorer<GlobalD, RegD, WarpLayout>;
+    using RegDHalf =
+        RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kDMs, kDPs>>;
+    // using DStorer = copy::RegToGlobalStorer<GlobalD, RegD, WarpLayout>;
 
     static constexpr int kAccMs = kTM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kAccNs = kTN / kWarpPerCol / BaseShape::kCols;
@@ -96,6 +106,10 @@ struct B2BGemmTraits {
 
     // Convert the accumulator to half
     using ConvertHalf = compute::RegTileConvert<RegAcc, RegAccCast>;
+    using ConvertD = compute::RegTileConvert<RegD, RegDHalf>;
+
+    using StoreRegD = RegToSharedStorer<RegDHalf, WarpLayout>;
+    using StoreSharedD = SharedToGlobalStorer<SharedD, WarpLayout>;
 };
 
 template <typename InType, typename AccType,                     //
@@ -105,20 +119,22 @@ template <typename InType, typename AccType,                     //
           typename SharedBLoader, typename RegBLoader,           //
           typename GIteratorC, typename SharedC, typename RegC,  //
           typename SharedCLoader, typename RegCLoader,           //
-          typename RegAcc, typename RegAccCast, typename GlobalD, typename RegD,
-          typename DStorer, typename ConvertAcc>
-__global__ void KeBack2BackGemm(const InType* dA, const InType* dB,
-                                const InType* dC, AccType* dD, int kM, int kN,
-                                int kK, int kP, int kTM, int kTN, int kTK,
-                                int kTP) {
+          typename RegAcc, typename RegAccCast, typename GlobalD,
+          typename SharedD, typename RegD, typename RegDHalf,
+          typename StoreRegD, typename StoreSharedD, typename ConvertAcc,
+          typename ConvertD>
+__global__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
+                                   const InType* dC, InType* dD, int kM, int kN,
+                                   int kK, int kP, int kTM, int kTN, int kTK,
+                                   int kTP) {
     // Advance to the global data tile to the current CTA.
     const InType* A = dA + blockIdx.z * (kM * kK) + blockIdx.x * (kTM * kK);
     const InType* B = dB + blockIdx.z * (kK * kN);
     const InType* gC_ptr =
         dC + blockIdx.z * (kN * kP) + blockIdx.y * (kTP * kN);
 
-    AccType* gD_ptr = dD + blockIdx.z * (kM * kP) + blockIdx.x * (kTM * kP) +
-                      (blockIdx.y * kTP);
+    InType* gD_ptr = dD + blockIdx.z * (kM * kP) + blockIdx.x * (kTM * kP) +
+                     (blockIdx.y * kTP);
 
     extern __shared__ __align__(sizeof(double)) unsigned char shared_buf[];
     auto* shm = reinterpret_cast<InType*>(shared_buf);
@@ -126,6 +142,7 @@ __global__ void KeBack2BackGemm(const InType* dA, const InType* dB,
     InType* sA_ptr = shm;
     InType* sB_ptr = shm + SharedA::kNumel;
     InType* sC_ptr = shm + SharedA::kNumel + SharedB::kNumel;
+    InType* sD_ptr = shm;
 
     GIteratorA gAs(A);
     SharedA sA(sA_ptr);
@@ -148,11 +165,18 @@ __global__ void KeBack2BackGemm(const InType* dA, const InType* dB,
     RegCLoader load_rc;
     RegC rC;
 
+    GlobalD gD(gD_ptr);
+    SharedD sD(sD_ptr);
     RegD rD;
+    RegDHalf rD_half;
+    StoreRegD store_rD;
+    StoreSharedD store_sD;
+
     RegAcc acc;
     RegAccCast acc_half;
 
     ConvertAcc cast_acc;  // Convert acc to half precision
+    ConvertD convert_d;   // Convert D to half precision
 
     for (int n = 0; n < GIteratorC::sc0; ++n) {
         load_sc(gCs(n), sC);
@@ -166,7 +190,6 @@ __global__ void KeBack2BackGemm(const InType* dA, const InType* dB,
             load_ra(sA, rA);
             load_rb(sB, rB);
             __syncthreads();
-
             gemm(rA, rB, acc);
         }
         load_rc(sC, rC);
@@ -178,8 +201,16 @@ __global__ void KeBack2BackGemm(const InType* dA, const InType* dB,
         acc.clear();
     }
     __syncthreads();
+    convert_d(rD, rD_half);
 
-    GlobalD gD(gD_ptr);
-    DStorer storer_d;  // Store D tile from register to global.
-    storer_d(rD, gD);
+    store_rD(rD_half, sD);
+    __syncthreads();
+    store_sD(sD, gD);
 }
+
+TILEFUSION_EXPORT void fused_two_gemms(const torch::Tensor& A,
+                                       const torch::Tensor& B,
+                                       const torch::Tensor& C, torch::Tensor& D,
+                                       int64_t m, int64_t n, int64_t k,
+                                       int64_t p);
+}  // namespace tilefusion::kernels

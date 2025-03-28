@@ -1,3 +1,5 @@
+"""Test module for flash attention implementation."""
+
 # -------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
@@ -11,50 +13,84 @@ from pytilefusion import TiledFlashAttention
 
 
 class FlashAttention:
+    """Reference implementation of flash attention."""
 
-    def __init__(self, query, key, value, M, N, K, P, kTM, kTN, kTK, kTP):
-        self.M = M
-        self.N = N
-        self.K = K
-        self.P = P
+    def __init__(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        matrix_m: int,
+        matrix_n: int,
+        matrix_k: int,
+        matrix_p: int,
+        tile_m: int,
+        tile_n: int,
+        tile_k: int,
+        tile_p: int,
+    ) -> None:
+        """Initialize the flash attention.
 
-        self.kTM = kTM
-        self.kTN = kTN
-        self.kTK = kTK
-        self.kTP = kTP
+        Args:
+            query: Query tensor.
+            key: Key tensor.
+            value: Value tensor.
+            matrix_m: Size of first dimension of query.
+            matrix_n: Size of first dimension of key/value.
+            matrix_k: Size of second dimension of query/key.
+            matrix_p: Size of second dimension of value/output.
+            tile_m: Tile size for M dimension.
+            tile_n: Tile size for N dimension.
+            tile_k: Tile size for K dimension.
+            tile_p: Tile size for P dimension.
+        """
+        self.matrix_m = matrix_m
+        self.matrix_n = matrix_n
+        self.matrix_k = matrix_k
+        self.matrix_p = matrix_p
+
+        self.tile_m = tile_m
+        self.tile_n = tile_n
+        self.tile_k = tile_k
+        self.tile_p = tile_p
 
         self.query = query
         self.key = key
         self.value = value
-        self.output = torch.empty(M, P, device='cpu')
+        self.output = torch.empty(matrix_m, matrix_p, device="cpu")
 
-    def forward(self):
-        iter_n = self.N // self.kTN
+    def forward(self) -> torch.Tensor:
+        """Perform the forward pass of flash attention.
 
-        prev_maxes = torch.zeros(self.M, 1, device='cpu')
-        prev_sums = torch.zeros(self.M, 1, device='cpu')
+        Returns:
+            torch.Tensor: The attention output.
+        """
+        iter_n = self.matrix_n // self.tile_n
 
-        output = self.output.view(self.M, self.P)
+        prev_maxes = torch.zeros(self.matrix_m, 1, device="cpu")
+        prev_sums = torch.zeros(self.matrix_m, 1, device="cpu")
 
-        dK = self.key.view(self.K, self.N)
-        dV = self.value.view(self.N, self.P)
+        output = self.output.view(self.matrix_m, self.matrix_p)
+
+        dK = self.key.view(self.matrix_k, self.matrix_n)
+        dV = self.value.view(self.matrix_n, self.matrix_p)
 
         ks = torch.chunk(dK, iter_n, dim=-1)
         vs = torch.chunk(dV, iter_n, dim=-2)
 
-        for n in range(iter_n):
-            q = self.query.view(self.M, self.K)  # m * k
+        for chunk_idx in range(iter_n):
+            query_view = self.query.view(self.matrix_m, self.matrix_k)  # m * k
 
-            k = ks[n]
-            v = vs[n]
+            key_chunk = ks[chunk_idx]
+            value_chunk = vs[chunk_idx]
 
-            attn_weights = q @ k  # m * ktn
+            attn_weights = query_view @ key_chunk  # m * ktn
 
             # reduce maxes
             cur_maxes, _ = torch.max(attn_weights, dim=-1, keepdim=True)
             exp_weights = torch.exp(attn_weights - cur_maxes)
             # unnormalized attention score @ values
-            exp_values = exp_weights @ v
+            exp_values = exp_weights @ value_chunk
             # move the normalization step to the very end
             # of the attention computation.
             cur_sums = torch.sum(exp_weights, dim=-1, keepdim=True)  # l(x_cur)
@@ -82,89 +118,139 @@ class FlashAttention:
 
 
 class TestFlashAttention(unittest.TestCase):
+    """Test cases for flash attention implementation."""
 
-    def setUp(self):
+    def setUp(self) -> None:
+        """Set up the test environment."""
         torch.manual_seed(1234)
 
-    def run_flash_attention(self, m, n, k, p, kTM, kTN, kTK, kTP):
+    def run_flash_attention(
+        self,
+        matrix_m: int,
+        matrix_n: int,
+        matrix_k: int,
+        matrix_p: int,
+        tile_m: int,
+        tile_n: int,
+        tile_k: int,
+        tile_p: int,
+    ) -> None:
+        """Run flash attention test with given dimensions.
 
-        Q = torch.randn(m, k, device='cpu')
-        K = torch.randn(k, n, device='cpu')
-        V = torch.randn(n, p, device='cpu')
+        Args:
+            matrix_m: Size of first dimension of query.
+            matrix_n: Size of first dimension of key/value.
+            matrix_k: Size of second dimension of query/key.
+            matrix_p: Size of second dimension of value/output.
+            tile_m: Tile size for M dimension.
+            tile_n: Tile size for N dimension.
+            tile_k: Tile size for K dimension.
+            tile_p: Tile size for P dimension.
+        """
+        query = torch.randn(matrix_m, matrix_k, device="cpu")
+        key = torch.randn(matrix_k, matrix_n, device="cpu")
+        value = torch.randn(matrix_n, matrix_p, device="cpu")
 
         flash_attn = FlashAttention(
-            Q.half().flatten(),
-            K.half().flatten(),
-            V.half().flatten(), m, n, k, p, kTM, kTN, kTK, kTP
+            query.half().flatten(),
+            key.half().flatten(),
+            value.half().flatten(),
+            matrix_m,
+            matrix_n,
+            matrix_k,
+            matrix_p,
+            tile_m,
+            tile_n,
+            tile_k,
+            tile_p,
         )
 
-        ref_o = flash_attn.forward().half()
+        ref_output = flash_attn.forward().half()
 
-        CUDA_Q = Q.cuda()
-        CUDA_K = K.cuda()
-        CUDA_V = V.cuda()
+        cuda_query = query.cuda()
+        cuda_key = key.cuda()
+        cuda_value = value.cuda()
 
-        tiled_flash_attention = TiledFlashAttention(CUDA_Q, CUDA_K, CUDA_V)
-        out = tiled_flash_attention.forward()
+        tiled_flash_attention = TiledFlashAttention(
+            cuda_query, cuda_key, cuda_value
+        )
+        output = tiled_flash_attention.forward()
 
-        print('CPU Reference output: ', ref_o)
-        print('tilefusion output: ', out)
+        print("CPU Reference output: ", ref_output)  # noqa: T201
+        print("tilefusion output: ", output)  # noqa: T201
 
-        hO = out.cpu()
+        host_output = output.cpu()
 
         passed = True
 
         # Compare elements one by one and print the different numbers.
-        for i in range(m):
-            for j in range(p):
-                if abs(hO[i][j] - ref_o[i][j]) > 8e-2:
-                    print('(', i, ', ', j, ')')
-                    print('tilefusion O: ', hO[i][j])
-                    print('CPU Reference O: ', ref_o[i][j])
+        for row_idx in range(matrix_m):
+            for col_idx in range(matrix_p):
+                if (
+                    abs(
+                        host_output[row_idx][col_idx]
+                        - ref_output[row_idx][col_idx]
+                    )
+                    > 8e-2
+                ):
+                    print("(", row_idx, ", ", col_idx, ")")  # noqa: T201
+                    print(  # noqa: T201
+                        "tilefusion O: ", host_output[row_idx][col_idx]
+                    )
+                    print(  # noqa: T201
+                        "CPU Reference O: ", ref_output[row_idx][col_idx]
+                    )
 
                     passed = False
                     break
 
         assert passed
 
-    def test_flash_attention_v0(self):
-        M = 64
-        N = 64
-        K = 128
-        P = 128
+    def test_flash_attention_v1(self) -> None:
+        """Test flash attention with N=128."""
+        matrix_m = 64
+        matrix_n = 128
+        matrix_k = 128
+        matrix_p = 128
 
-        kTM = 64
-        kTN = 64
-        kTK = 128
-        kTP = 128
+        tile_m = 64
+        tile_n = 64
+        tile_k = 128
+        tile_p = 128
 
-        self.run_flash_attention(M, N, K, P, kTM, kTN, kTK, kTP)
+        self.run_flash_attention(
+            matrix_m,
+            matrix_n,
+            matrix_k,
+            matrix_p,
+            tile_m,
+            tile_n,
+            tile_k,
+            tile_p,
+        )
 
-    def test_flash_attention_v1(self):
-        M = 64
-        N = 128
-        K = 128
-        P = 128
+    def test_flash_attention_v2(self) -> None:
+        """Test flash attention with N=256."""
+        matrix_m = 64
+        matrix_n = 256
+        matrix_k = 128
+        matrix_p = 128
 
-        kTM = 64
-        kTN = 64
-        kTK = 128
-        kTP = 128
+        tile_m = 64
+        tile_n = 64
+        tile_k = 128
+        tile_p = 128
 
-        self.run_flash_attention(M, N, K, P, kTM, kTN, kTK, kTP)
-
-    def test_flash_attention_v2(self):
-        M = 64
-        N = 256
-        K = 128
-        P = 128
-
-        kTM = 64
-        kTN = 64
-        kTK = 128
-        kTP = 128
-
-        self.run_flash_attention(M, N, K, P, kTM, kTN, kTK, kTP)
+        self.run_flash_attention(
+            matrix_m,
+            matrix_n,
+            matrix_k,
+            matrix_p,
+            tile_m,
+            tile_n,
+            tile_k,
+            tile_p,
+        )
 
 
 if __name__ == "__main__":

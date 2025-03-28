@@ -66,10 +66,11 @@ void cublas_two_gemms(int kM, int kN, int kK, int kP, int kBatch,
     cublasDestroy(handle);
 }
 
-bool check_results(const float* values1, const __half* values2, int numel,
+bool check_results(const __half* values1, const __half* values2, int numel,
                    float epsilon) {
     bool passed = true;
 
+    float v1 = 0.;
     float v2 = 0.;
 
     double total_diff = 0.;
@@ -77,15 +78,16 @@ bool check_results(const float* values1, const __half* values2, int numel,
     double diff = 0.;
 
     for (int i = 0; i < numel; ++i) {
+        v1 = __half2float(values1[i]);
         v2 = __half2float(values2[i]);
-        diff = abs(values1[i] - v2);
+        diff = abs(v1 - v2);
         max_abs_diff = max_abs_diff < diff ? diff : max_abs_diff;
         total_diff += diff;
 
 #ifdef DEBUG
         if (diff > epsilon) {
-            printf("%d-th value has large differences: %.3f vs. %.3f\n", i,
-                   values1[i], v2);
+            printf("%d-th value has large differences: %.3f vs. %.3f\n", i, v1,
+                   v2);
         }
 #endif
     }
