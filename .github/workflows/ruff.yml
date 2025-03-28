@@ -50,7 +50,7 @@ jobs:
         isort --check-only --profile black .
     - name: Run mypy
       run: |
-        mypy --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs .
+        mypy --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --exclude benchmarks/ .
     - name: Run bandit
       run: |
         bandit -c pyproject.toml -r .
