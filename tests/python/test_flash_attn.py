@@ -8,7 +8,8 @@
 import unittest
 
 import torch
-from tilefusion import TiledFlashAttention
+
+from tilefusion.ops import TiledFlashAttention
 
 
 class FlashAttention:

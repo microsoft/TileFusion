@@ -9,7 +9,8 @@ import random
 import unittest
 
 import torch
-from tilefusion import scatter_nd
+
+from tilefusion.ops import scatter_nd
 
 
 class TestScatterNd(unittest.TestCase):
