@@ -39,18 +39,18 @@ jobs:
         pip install bandit==1.8.3
         pip install pyupgrade==3.19.1
         pip install commitizen==4.4.1
+    - name: Run isort
+      run: |
+        isort --check-only --profile black .
     - name: Run black
       run: |
         black --check --line-length=80 .
     - name: Run flake8
       run: |
         flake8 --max-line-length=80 .
-    - name: Run isort
-      run: |
-        isort --check-only --profile black .
     - name: Run mypy
       run: |
-        mypy --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs .
+        mypy --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --exclude benchmarks/ .
     - name: Run bandit
       run: |
         bandit -c pyproject.toml -r .

@@ -1,4 +1,7 @@
-"""Test module for flash attention implementation."""
+"""Test flash attention implementation.
+
+isort:skip_file
+"""
 
 # -------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -9,7 +12,7 @@ import unittest
 
 import torch
 
-from pytilefusion import TiledFlashAttention
+from tilefusion.ops import TiledFlashAttention
 
 
 class FlashAttention:

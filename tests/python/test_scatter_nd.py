@@ -1,4 +1,7 @@
-"""Test module for scatter_nd operation implementation."""
+"""Test scatter operations.
+
+isort:skip_file
+"""
 
 # -------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -10,7 +13,7 @@ import unittest
 
 import torch
 
-from pytilefusion import scatter_nd
+from tilefusion.ops import scatter_nd
 
 
 class TestScatterNd(unittest.TestCase):

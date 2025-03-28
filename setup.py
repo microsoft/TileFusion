@@ -1,17 +1,20 @@
-"""Setup configuration for PyTileFusion package."""
+"""Setup configuration for TileFusion python package."""
 
 # -------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
+import glob
 import os
+import re
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Optional
 
 from packaging.version import Version, parse
-from setuptools import Command, Extension, find_packages, setup
+from setuptools import Command, Extension, setup
 from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
 from torch.utils.cpp_extension import CUDA_HOME
@@ -145,13 +148,15 @@ class CMakeBuildExt(build_ext):
             extdir = os.path.abspath(
                 os.path.dirname(self.get_ext_fullpath(ext.name))
             )
-            extdir = os.path.join(extdir, "pytilefusion")
+            extdir = os.path.join(extdir, "tilefusion")
 
             cmake_args = [
                 f"-DCMAKE_BUILD_TYPE={cfg}",
                 f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}={extdir}",
-                "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_"
-                f"{cfg.upper()}={self.build_temp}",
+                (
+                    "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY"
+                    f"_{cfg.upper()}={self.build_temp}"
+                ),
                 f"-DUSER_CUDA_ARCH_LIST={arch_list}" if arch_list else "",
                 f"-DNVCC_THREADS={nvcc_threads()}",
             ]
@@ -194,27 +199,48 @@ class CMakeBuildExt(build_ext):
 class Develop(develop):
     """Post-installation for development mode."""
 
-    def post_build_copy(self) -> None:
-        """Copy built files to source directory."""
-        build_py = self.get_finalized_command("build_py")
-        source_root = Path(os.path.abspath(build_py.build_lib)).parents[1]
-
-        # NOTE: Do not change the name of the target library. If you do,
-        # you must also update the target name in the CMakeLists.txt file.
-        target = "libtilefusion.so"
-
-        source_path = os.path.join(build_py.build_lib, "pytilefusion", target)
-        target_path = os.path.join(source_root, "pytilefusion", target)
-
-        if os.path.exists(source_path):
-            self.copy_file(source_path, target_path, level=self.verbose)
-        else:
-            raise FileNotFoundError(f"Cannot find built library: {source_path}")
-
     def run(self) -> None:  # type: ignore[override]
         """Run the develop command."""
         develop.run(self)
-        self.post_build_copy()
+
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        python_dir = os.path.join(project_root, "python")
+        tilefusion_link = os.path.join(project_root, "tilefusion")
+
+        if os.path.exists(tilefusion_link):
+            if os.path.islink(tilefusion_link):
+                os.remove(tilefusion_link)
+            else:
+                shutil.rmtree(tilefusion_link)
+
+        if os.path.exists(python_dir):
+            try:
+                os.symlink("python", tilefusion_link)
+                print("Symlink created successfully")  # noqa: T201
+
+                build_py = self.get_finalized_command("build_py")
+                build_lib = build_py.build_lib
+                built_lib = os.path.join(
+                    build_lib, "tilefusion", "libtilefusion.so"
+                )
+                target_lib = os.path.join(python_dir, "libtilefusion.so")
+
+                if os.path.exists(built_lib):
+                    print(  # noqa: T201
+                        f"Copying dynamic library from {built_lib} "
+                        f"to {target_lib}"
+                    )
+                    shutil.copy2(built_lib, target_lib)
+                else:
+                    print(  # noqa: T201
+                        f"Warning: Built library not found at {built_lib}"
+                    )
+            except Exception as e:
+                print(f"Error during setup: {e}")  # noqa: T201
+        else:
+            print(  # noqa: T201
+                f"Warning: python directory not found at {python_dir}"
+            )
 
 
 class Clean(Command):
@@ -230,9 +256,29 @@ class Clean(Command):
 
     def run(self) -> None:
         """Run the clean command."""
-        import glob
-        import re
-        import shutil
+        # Clean the symlink which is created in the develop mode if it exists
+        tilefusion_link = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "tilefusion"
+        )
+        if os.path.exists(tilefusion_link):
+            print(f"cleaning symlink {tilefusion_link}")  # noqa: T201
+            if os.path.islink(tilefusion_link):
+                os.remove(tilefusion_link)
+            else:
+                shutil.rmtree(tilefusion_link)
+
+        # Clean the dynamic library in python directory
+        # copyed in the develop mode if it exists
+        python_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "python"
+        )
+        if os.path.exists(python_dir):
+            for so_file in glob.glob(os.path.join(python_dir, "*.so")):
+                print(f"cleaning dynamic library {so_file}")  # noqa: T201
+                try:
+                    os.remove(so_file)
+                except OSError as e:
+                    print(f"Error removing {so_file}: {e}")  # noqa: T201
 
         with open(".gitignore") as f:
             ignores = f.read()
@@ -243,23 +289,21 @@ class Clean(Command):
                     if match.group(1):
                         # Marker is found and stop reading .gitignore.
                         break
-                    # Ignore lines which begin with '#'.
                 else:
                     # Don't remove absolute paths from the system
                     wildcard = wildcard.lstrip("./")
 
                     for filename in glob.glob(wildcard):
-                        print("cleaning {filename}")  # noqa: T201
+                        print(f"cleaning {filename}")  # noqa: T201
                         try:
                             os.remove(filename)
                         except OSError:
                             shutil.rmtree(filename, ignore_errors=True)
 
 
-description = "PyTileFusion: A Python wrapper for tilefusion C++ library."
+description = "Python wrapper for tilefusion C++ library."
 
-# Read version from file instead of using exec
-with open(os.path.join("pytilefusion", "__version__.py")) as f:
+with open(os.path.join("python", "__version__.py")) as f:
     version_file_content = f.read()
     version_line = next(
         line
@@ -275,7 +319,8 @@ setup(
     author="Ying Cao, Chengxiang Qi",
     author_email="ying.cao@microsoft.com",
     url="https://github.com/microsoft/TileFusion",
-    packages=find_packages(),
+    packages=["tilefusion"],
+    package_dir={"tilefusion": "python"},
     install_requires=get_requirements(),
     python_requires=">=3.9",
     cmdclass={
@@ -284,4 +329,5 @@ setup(
         "clean": Clean,
     },
     ext_modules=[CMakeExtension()],
+    zip_safe=False,
 )
