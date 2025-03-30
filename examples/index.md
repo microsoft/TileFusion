@@ -1,4 +1,6 @@
-## Basic GEMM Example
+## 101: The Basic GEMM Example
+
+This section introduces the basic General Matrix Multiply (GEMM) example. It demonstrates the fundamental usage of TileFusion's C++ headers to implement custom GEMM kernels.
 
 TileFusion implements `GlobalTile`, `SharedTile` and `RegTile` to customize the shape and layout of tiles located in the GPU's three memory hierarchies. Here's an example of a simple GEMM kernel written in TileFusion (the complete example can be found in [this directory](examples/cpp/01_gemm/01_gemm_global_reg/gemm.hpp)):
 

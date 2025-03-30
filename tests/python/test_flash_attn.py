@@ -8,8 +8,9 @@ isort:skip_file
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
-import unittest
+from typing import Any
 
+import pytest
 import torch
 
 from tilefusion.ops import TiledFlashAttention
@@ -120,141 +121,134 @@ class FlashAttention:
         return self.output
 
 
-class TestFlashAttention(unittest.TestCase):
-    """Test cases for flash attention implementation."""
-
-    def setUp(self) -> None:
-        """Set up the test environment."""
-        torch.manual_seed(1234)
-
-    def run_flash_attention(
-        self,
-        matrix_m: int,
-        matrix_n: int,
-        matrix_k: int,
-        matrix_p: int,
-        tile_m: int,
-        tile_n: int,
-        tile_k: int,
-        tile_p: int,
-    ) -> None:
-        """Run flash attention test with given dimensions.
-
-        Args:
-            matrix_m: Size of first dimension of query.
-            matrix_n: Size of first dimension of key/value.
-            matrix_k: Size of second dimension of query/key.
-            matrix_p: Size of second dimension of value/output.
-            tile_m: Tile size for M dimension.
-            tile_n: Tile size for N dimension.
-            tile_k: Tile size for K dimension.
-            tile_p: Tile size for P dimension.
-        """
-        query = torch.randn(matrix_m, matrix_k, device="cpu")
-        key = torch.randn(matrix_k, matrix_n, device="cpu")
-        value = torch.randn(matrix_n, matrix_p, device="cpu")
-
-        flash_attn = FlashAttention(
-            query.half().flatten(),
-            key.half().flatten(),
-            value.half().flatten(),
-            matrix_m,
-            matrix_n,
-            matrix_k,
-            matrix_p,
-            tile_m,
-            tile_n,
-            tile_k,
-            tile_p,
-        )
-
-        ref_output = flash_attn.forward().half()
-
-        cuda_query = query.cuda()
-        cuda_key = key.cuda()
-        cuda_value = value.cuda()
-
-        tiled_flash_attention = TiledFlashAttention(
-            cuda_query, cuda_key, cuda_value
-        )
-        output = tiled_flash_attention.forward()
-
-        print("CPU Reference output: ", ref_output)  # noqa: T201
-        print("tilefusion output: ", output)  # noqa: T201
-
-        host_output = output.cpu()
-
-        passed = True
-
-        # Compare elements one by one and print the different numbers.
-        for row_idx in range(matrix_m):
-            for col_idx in range(matrix_p):
-                if (
-                    abs(
-                        host_output[row_idx][col_idx]
-                        - ref_output[row_idx][col_idx]
-                    )
-                    > 8e-2
-                ):
-                    print("(", row_idx, ", ", col_idx, ")")  # noqa: T201
-                    print(  # noqa: T201
-                        "tilefusion O: ", host_output[row_idx][col_idx]
-                    )
-                    print(  # noqa: T201
-                        "CPU Reference O: ", ref_output[row_idx][col_idx]
-                    )
-
-                    passed = False
-                    break
-
-        assert passed
-
-    def test_flash_attention_v1(self) -> None:
-        """Test flash attention with N=128."""
-        matrix_m = 64
-        matrix_n = 128
-        matrix_k = 128
-        matrix_p = 128
-
-        tile_m = 64
-        tile_n = 64
-        tile_k = 128
-        tile_p = 128
-
-        self.run_flash_attention(
-            matrix_m,
-            matrix_n,
-            matrix_k,
-            matrix_p,
-            tile_m,
-            tile_n,
-            tile_k,
-            tile_p,
-        )
-
-    def test_flash_attention_v2(self) -> None:
-        """Test flash attention with N=256."""
-        matrix_m = 64
-        matrix_n = 256
-        matrix_k = 128
-        matrix_p = 128
-
-        tile_m = 64
-        tile_n = 64
-        tile_k = 128
-        tile_p = 128
-
-        self.run_flash_attention(
-            matrix_m,
-            matrix_n,
-            matrix_k,
-            matrix_p,
-            tile_m,
-            tile_n,
-            tile_k,
-            tile_p,
-        )
+@pytest.fixture(autouse=True)  # type: ignore[misc]
+def setup() -> None:
+    """Set up the test environment."""
+    torch.manual_seed(1234)
 
 
-if __name__ == "__main__":
-    unittest.main()
+def run_flash_attention(
+    matrix_m: int,
+    matrix_n: int,
+    matrix_k: int,
+    matrix_p: int,
+    tile_m: int,
+    tile_n: int,
+    tile_k: int,
+    tile_p: int,
+) -> None:
+    """Run flash attention test with given dimensions.
+
+    Args:
+        matrix_m: Size of first dimension of query.
+        matrix_n: Size of first dimension of key/value.
+        matrix_k: Size of second dimension of query/key.
+        matrix_p: Size of second dimension of value/output.
+        tile_m: Tile size for M dimension.
+        tile_n: Tile size for N dimension.
+        tile_k: Tile size for K dimension.
+        tile_p: Tile size for P dimension.
+    """
+    query = torch.randn(matrix_m, matrix_k, device="cpu")
+    key = torch.randn(matrix_k, matrix_n, device="cpu")
+    value = torch.randn(matrix_n, matrix_p, device="cpu")
+
+    flash_attn = FlashAttention(
+        query.half().flatten(),
+        key.half().flatten(),
+        value.half().flatten(),
+        matrix_m,
+        matrix_n,
+        matrix_k,
+        matrix_p,
+        tile_m,
+        tile_n,
+        tile_k,
+        tile_p,
+    )
+
+    ref_output = flash_attn.forward().half()
+
+    cuda_query = query.cuda()
+    cuda_key = key.cuda()
+    cuda_value = value.cuda()
+
+    tiled_flash_attention = TiledFlashAttention(
+        cuda_query, cuda_key, cuda_value
+    )
+    output = tiled_flash_attention.forward()
+
+    print("CPU Reference output: ", ref_output)  # noqa: T201
+    print("tilefusion output: ", output)  # noqa: T201
+
+    host_output = output.cpu()
+
+    passed = True
+
+    # Compare elements one by one and print the different numbers.
+    for row_idx in range(matrix_m):
+        for col_idx in range(matrix_p):
+            if (
+                abs(
+                    host_output[row_idx][col_idx] - ref_output[row_idx][col_idx]
+                )
+                > 8e-2
+            ):
+                print("(", row_idx, ", ", col_idx, ")")  # noqa: T201
+                print(  # noqa: T201
+                    "tilefusion O: ", host_output[row_idx][col_idx]
+                )
+                print(  # noqa: T201
+                    "CPU Reference O: ", ref_output[row_idx][col_idx]
+                )
+
+                passed = False
+                break
+
+    assert passed
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "name": "test_case1",
+            "matrix_m": 64,
+            "matrix_n": 128,
+            "matrix_k": 128,
+            "matrix_p": 128,
+            "tile_m": 64,
+            "tile_n": 64,
+            "tile_k": 128,
+            "tile_p": 128,
+        },
+        {
+            "name": "test_case2",
+            "matrix_m": 64,
+            "matrix_n": 256,
+            "matrix_k": 128,
+            "matrix_p": 128,
+            "tile_m": 64,
+            "tile_n": 64,
+            "tile_k": 128,
+            "tile_p": 128,
+        },
+    ],
+    ids=lambda x: x["name"],
+)  # type: ignore[misc]
+def test_flash_attention(test_case: dict[str, Any]) -> None:
+    """Test flash attention with different matrix dimensions.
+
+    Args:
+        test_case: Dictionary containing test parameters
+    """
+    run_flash_attention(
+        matrix_m=test_case["matrix_m"],
+        matrix_n=test_case["matrix_n"],
+        matrix_k=test_case["matrix_k"],
+        matrix_p=test_case["matrix_p"],
+        tile_m=test_case["tile_m"],
+        tile_n=test_case["tile_n"],
+        tile_k=test_case["tile_k"],
+        tile_p=test_case["tile_p"],
+    )

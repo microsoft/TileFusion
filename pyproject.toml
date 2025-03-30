@@ -1,6 +1,6 @@
 [project]
 name = "tilefusion"
-version = "0.0.0"
+version = "0.0.1"
 authors = [
     {name="Ying Cao", email="lcy.seso@gmail.com"},
     {name="ChengXiang Qi", email="KuangjuX@outlook.com"},
@@ -24,6 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "pytest>=7.0.0",
     "black==25.1.0",
     "flake8==7.1.2",
     "flake8-bugbear",
@@ -55,17 +56,18 @@ requires = [
     "packaging",
     "setuptools>=64.0.0",
     "wheel",
+    "pytest-runner",
 ]
 build-backend = "setuptools.build_meta"
 
 [tool.black]
 line-length = 80
-target-version = ['py39']
-include = '\.pyi?$'
+target-version = ["py39"]
 
 [tool.isort]
 profile = "black"
 line_length = 80
+multi_line_output = 3
 
 [tool.flake8]
 max-line-length = 80
@@ -162,3 +164,4 @@ version_files = [
 
 [tool.pyupgrade]
 py39-plus = true
+args = ["--keep-percent-format", "--py39-plus"]

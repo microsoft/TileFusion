@@ -104,7 +104,7 @@ repos:
     rev: v3.19.1
     hooks:
     -   id: pyupgrade
-        args: [--py39-plus]
+        args: [--keep-percent-format, --py39-plus]
 
 -   repo: https://github.com/commitizen-tools/commitizen
     rev: v4.4.1

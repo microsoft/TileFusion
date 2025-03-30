@@ -88,9 +88,9 @@ cd TileFusion && git submodule update --init --recursive
 
 TileFusion requires a C++20 host compiler, CUDA 12.0 or later, and GCC version 10.0 or higher to support C++20 features.
 
-### Build from Source
+TileFusion can be used as a lightweight C++ library with header-only usage, or it can be built as a Python library. You can choose to build either one.
 
-#### Building the C++ Library Using Makefile
+### Building the C++ Library Using Makefile
 
 1. To build the project using the provided `Makefile`, simply run:
 
@@ -98,44 +98,61 @@ TileFusion requires a C++20 host compiler, CUDA 12.0 or later, and GCC version 1
    make
    ```
 
-2. Run the C++ unit tests:
+2. Run a single C++ unit test:
 
-   - **Run a single C++ unit test**:
-     ```bash
-     make unit_test_cpp CPP_UT=test_gemm
-     ```
-   - **Run all C++ unit tests**:
-     ```bash
-     make unit_test_cpps
-     ```
+   ```bash
+   make unit_test_cpp CPP_UT=test_gemm
+   ```
 
-#### Building the Python Wrapper
+### Building the Python Package
 
 1. Build the wheel:
 
    ```bash
-   python3 setup.py build bdist_wheel
+   python setup.py build bdist_wheel
    ```
 
 2. Clean the build:
 
    ```bash
-   python3 setup.py clean
+   python setup.py clean
    ```
 
-3. Install the Python wrapper in editable mode (recommended for development):
+3. Install the Python package in editable mode (recommended for development):
 
    ```bash
-   python3 setup.py develop
+   python setup.py develop
    ```
 
    This allows you to edit the source code directly without needing to reinstall it repeatedly.
+
+4. Run the Python unit tests:
+
+   Before running the Python unit tests, you need to build and install the Python package (see the [Building the Python Package](#building-the-python-package) section).
+
+   - **Run a single Python unit test**:
+
+     ```bash
+     pytest tests/python/test_scatter_nd.py
+     ```
+
+   - **Run all Python unit tests**:
+
+     ```bash
+     python setup.py pytests
+     ```
+
+5. Run all C++ unit tests:
+
+   ```bash
+   python setup.py ctests
+   ```
 
 ## Contributing
 
 This project welcomes contributions and suggestions. Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
+the rights to use your contribution. For details, visit <https://cla.opensource.microsoft.com>.
 
 When you submit a pull request, a CLA bot will automatically determine whether you need to provide
 a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions

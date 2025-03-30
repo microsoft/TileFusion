@@ -13,24 +13,14 @@ import subprocess
 from pathlib import Path
 from typing import Any, Optional
 
+import pytest
 from packaging.version import Version, parse
-from setuptools import Command, Extension, setup
+from setuptools import Command, Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
 from torch.utils.cpp_extension import CUDA_HOME
 
 cur_path = Path(__file__).parent
-
-
-def get_requirements() -> list[str]:
-    """Get Python package dependencies from requirements.txt.
-
-    Returns:
-        list[str]: List of package requirements.
-    """
-    with open(cur_path / "requirements.txt") as f:
-        requirements = f.read().strip().split("\n")
-    return [req for req in requirements if "https" not in req]
 
 
 def get_cuda_bare_metal_version(cuda_dir: str) -> tuple[str, Version]:
@@ -301,6 +291,73 @@ class Clean(Command):
                             shutil.rmtree(filename, ignore_errors=True)
 
 
+class PythonTest(Command):
+    """Custom test command to run python unit tests."""
+
+    user_options = [
+        ("pytest-args=", "a", "Arguments to pass to pytest"),
+    ]
+
+    def initialize_options(self) -> None:
+        """Initialize the test command options."""
+        self.pytest_args = ""
+
+    def finalize_options(self) -> None:
+        """Finalize the test command options."""
+        pass
+
+    def run(self) -> None:
+        """Run all python unit tests using pytest."""
+        errno = pytest.main(["tests/python"] + self.pytest_args.split())
+        if errno != 0:
+            raise SystemExit(errno)
+
+
+class CppTest(Command):
+    """Custom test command to run C++ unit tests with ctest."""
+
+    user_options = [
+        ("ctest-args=", "a", "Arguments to pass to ctest"),
+    ]
+
+    def initialize_options(self) -> None:
+        """Initialize the test command options."""
+        self.ctest_args = ""
+
+    def finalize_options(self) -> None:
+        """Finalize the test command options."""
+        pass
+
+    def run(self) -> None:
+        """Run the C++ tests using ctest."""
+        build_dir = "build"
+        if not os.path.exists(build_dir):
+            print(  # noqa: T201
+                "Build directory not found. Building project first..."
+            )
+            self.run_command("build")
+
+        try:
+            cmake_path = subprocess.check_output(
+                ["which", "cmake"], text=True
+            ).strip()
+            cmake_dir = os.path.dirname(cmake_path)
+            ctest_path = os.path.join(cmake_dir, "ctest")
+        except subprocess.CalledProcessError:
+            raise RuntimeError("Could not find cmake executable") from None
+
+        try:
+            # Run ctest in the build directory
+            errno = subprocess.call(
+                [ctest_path, "--output-on-failure"] + self.ctest_args.split(),
+                cwd=build_dir,
+            )
+            if errno != 0:
+                raise SystemExit(errno)
+        except OSError as e:
+            raise RuntimeError(f"Failed to run ctest: {e}") from e
+
+
 description = "Python wrapper for tilefusion C++ library."
 
 with open(os.path.join("python", "__version__.py")) as f:
@@ -319,14 +376,15 @@ setup(
     author="Ying Cao, Chengxiang Qi",
     author_email="ying.cao@microsoft.com",
     url="https://github.com/microsoft/TileFusion",
-    packages=["tilefusion"],
+    packages=find_packages(),
     package_dir={"tilefusion": "python"},
-    install_requires=get_requirements(),
-    python_requires=">=3.9",
+    python_requires=">=3.8",
     cmdclass={
         "build_ext": CMakeBuildExt,
         "develop": Develop,
         "clean": Clean,
+        "pytests": PythonTest,
+        "ctests": CppTest,
     },
     ext_modules=[CMakeExtension()],
     zip_safe=False,
