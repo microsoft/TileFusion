@@ -1,4 +1,7 @@
-"""Test scatter operations."""
+"""Test scatter operations.
+
+isort:skip_file
+"""
 
 # -------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
