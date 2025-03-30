@@ -101,12 +101,31 @@ TileFusion requires a C++20 host compiler, CUDA 12.0 or later, and GCC version 1
 2. Run the C++ unit tests:
 
    - **Run a single C++ unit test**:
+
      ```bash
      make unit_test_cpp CPP_UT=test_gemm
      ```
+
    - **Run all C++ unit tests**:
+
      ```bash
      make unit_test_cpps
+     ```
+
+3. Run the Python unit tests:
+
+   Before running the Python unit tests, you need to build the python wrapper (see [Building the Python Wrapper](#building-the-python-wrapper) section).
+
+   - **Run a single Python unit test**:
+
+     ```bash
+     pytest tests/python/test_scatter_nd.py
+     ```
+
+   - **Run all Python unit tests**:
+
+     ```bash
+     python setup.py pytest
      ```
 
 #### Building the Python Wrapper
@@ -135,7 +154,7 @@ TileFusion requires a C++20 host compiler, CUDA 12.0 or later, and GCC version 1
 
 This project welcomes contributions and suggestions. Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
+the rights to use your contribution. For details, visit <https://cla.opensource.microsoft.com>.
 
 When you submit a pull request, a CLA bot will automatically determine whether you need to provide
 a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
