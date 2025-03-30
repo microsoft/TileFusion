@@ -292,7 +292,7 @@ class Clean(Command):
 
 
 class PythonTest(Command):
-    """Custom test command to run pytest."""
+    """Custom test command to run python unit tests."""
 
     user_options = [
         ("pytest-args=", "a", "Arguments to pass to pytest"),
@@ -307,10 +307,55 @@ class PythonTest(Command):
         pass
 
     def run(self) -> None:
-        """Run the tests using pytest."""
+        """Run all python unit tests using pytest."""
         errno = pytest.main(["tests/python"] + self.pytest_args.split())
         if errno != 0:
             raise SystemExit(errno)
+
+
+class CppTest(Command):
+    """Custom test command to run C++ unit tests with ctest."""
+
+    user_options = [
+        ("ctest-args=", "a", "Arguments to pass to ctest"),
+    ]
+
+    def initialize_options(self) -> None:
+        """Initialize the test command options."""
+        self.ctest_args = ""
+
+    def finalize_options(self) -> None:
+        """Finalize the test command options."""
+        pass
+
+    def run(self) -> None:
+        """Run the C++ tests using ctest."""
+        build_dir = "build"
+        if not os.path.exists(build_dir):
+            print(  # noqa: T201
+                "Build directory not found. Building project first..."
+            )
+            self.run_command("build")
+
+        try:
+            cmake_path = subprocess.check_output(
+                ["which", "cmake"], text=True
+            ).strip()
+            cmake_dir = os.path.dirname(cmake_path)
+            ctest_path = os.path.join(cmake_dir, "ctest")
+        except subprocess.CalledProcessError:
+            raise RuntimeError("Could not find cmake executable") from None
+
+        try:
+            # Run ctest in the build directory
+            errno = subprocess.call(
+                [ctest_path, "--output-on-failure"] + self.ctest_args.split(),
+                cwd=build_dir,
+            )
+            if errno != 0:
+                raise SystemExit(errno)
+        except OSError as e:
+            raise RuntimeError(f"Failed to run ctest: {e}") from e
 
 
 description = "Python wrapper for tilefusion C++ library."
@@ -338,7 +383,8 @@ setup(
         "build_ext": CMakeBuildExt,
         "develop": Develop,
         "clean": Clean,
-        "pytest": PythonTest,
+        "pytests": PythonTest,
+        "ctests": CppTest,
     },
     ext_modules=[CMakeExtension()],
     zip_safe=False,
