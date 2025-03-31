@@ -121,7 +121,7 @@ class FlashAttention:
         return self.output
 
 
-@pytest.fixture(autouse=True)  # type: ignore[misc]
+@pytest.fixture(autouse=True)
 def setup() -> None:
     """Set up the test environment."""
     torch.manual_seed(1234)
@@ -235,7 +235,7 @@ def run_flash_attention(
         },
     ],
     ids=lambda x: x["name"],
-)  # type: ignore[misc]
+)
 def test_flash_attention(test_case: dict[str, Any]) -> None:
     """Test flash attention with different matrix dimensions.
 

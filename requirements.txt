@@ -1,5 +1,1 @@
-cmake
-packaging
-setuptools>=64.0.0
 torch>=2.4.0
-wheel

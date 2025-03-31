@@ -11,11 +11,11 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from packaging.version import Version, parse
-from setuptools import Command, Extension, find_packages, setup
+from setuptools import Command, Extension, setup
 from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
 from torch.utils.cpp_extension import CUDA_HOME
@@ -41,19 +41,21 @@ def get_cuda_bare_metal_version(cuda_dir: str) -> tuple[str, Version]:
     return raw_output, bare_metal_version
 
 
-def nvcc_threads() -> Optional[int]:
+def nvcc_threads() -> int:
     """Get the number of threads for nvcc compilation.
 
     Returns:
-        Optional[int]: Number of threads to use, or None if not applicable.
+        int: Number of threads to use.
     """
+    if CUDA_HOME is None:
+        return os.cpu_count() or 1
     _, bare_metal_version = get_cuda_bare_metal_version(CUDA_HOME)
     if bare_metal_version >= Version("11.2"):
         nvcc_threads = os.getenv("NVCC_THREADS")
         if nvcc_threads is not None:
             return int(nvcc_threads)
-        return os.cpu_count()
-    return os.cpu_count()
+        return os.cpu_count() or 1
+    return os.cpu_count() or 1
 
 
 class CMakeExtension(Extension):
@@ -258,7 +260,7 @@ class Clean(Command):
                 shutil.rmtree(tilefusion_link)
 
         # Clean the dynamic library in python directory
-        # copyed in the develop mode if it exists
+        # copied in the develop mode if it exists
         python_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "python"
         )
@@ -376,9 +378,9 @@ setup(
     author="Ying Cao, Chengxiang Qi",
     author_email="ying.cao@microsoft.com",
     url="https://github.com/microsoft/TileFusion",
-    packages=find_packages(),
+    packages=["tilefusion"],
     package_dir={"tilefusion": "python"},
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     cmdclass={
         "build_ext": CMakeBuildExt,
         "develop": Develop,
@@ -388,4 +390,8 @@ setup(
     },
     ext_modules=[CMakeExtension()],
     zip_safe=False,
+    package_data={
+        "tilefusion": ["**/*.py"],
+    },
+    include_package_data=True,
 )
