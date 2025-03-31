@@ -35,7 +35,7 @@ def compute_output_shape(
     return out_shape
 
 
-@pytest.fixture(autouse=True)  # type: ignore[misc]
+@pytest.fixture(autouse=True)
 def setup() -> None:
     """Set up the test environment."""
     torch.manual_seed(1234)
@@ -49,7 +49,7 @@ def setup() -> None:
         torch.bfloat16,
     ],
     ids=lambda x: str(x).split(".")[-1],
-)  # type: ignore[misc]
+)
 def test_scatter_nd(dtype: torch.dtype) -> None:
     """Test scatter_nd operation with different data types.
 

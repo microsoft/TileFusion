@@ -11,7 +11,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from packaging.version import Version, parse
@@ -41,19 +41,21 @@ def get_cuda_bare_metal_version(cuda_dir: str) -> tuple[str, Version]:
     return raw_output, bare_metal_version
 
 
-def nvcc_threads() -> Optional[int]:
+def nvcc_threads() -> int:
     """Get the number of threads for nvcc compilation.
 
     Returns:
-        Optional[int]: Number of threads to use, or None if not applicable.
+        int: Number of threads to use.
     """
+    if CUDA_HOME is None:
+        return os.cpu_count() or 1
     _, bare_metal_version = get_cuda_bare_metal_version(CUDA_HOME)
     if bare_metal_version >= Version("11.2"):
         nvcc_threads = os.getenv("NVCC_THREADS")
         if nvcc_threads is not None:
             return int(nvcc_threads)
-        return os.cpu_count()
-    return os.cpu_count()
+        return os.cpu_count() or 1
+    return os.cpu_count() or 1
 
 
 class CMakeExtension(Extension):
