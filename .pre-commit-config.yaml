@@ -113,3 +113,10 @@ repos:
         stages: [commit-msg]
     -   id: commitizen-branch
         stages: [pre-push]
+
+-   repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+    -   id: codespell
+        args: ["--toml=pyproject.toml"]
+        additional_dependencies: [tomli]

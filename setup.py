@@ -15,7 +15,7 @@ from typing import Any, Optional
 
 import pytest
 from packaging.version import Version, parse
-from setuptools import Command, Extension, find_packages, setup
+from setuptools import Command, Extension, setup
 from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
 from torch.utils.cpp_extension import CUDA_HOME
@@ -258,7 +258,7 @@ class Clean(Command):
                 shutil.rmtree(tilefusion_link)
 
         # Clean the dynamic library in python directory
-        # copyed in the develop mode if it exists
+        # copied in the develop mode if it exists
         python_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "python"
         )
@@ -376,9 +376,9 @@ setup(
     author="Ying Cao, Chengxiang Qi",
     author_email="ying.cao@microsoft.com",
     url="https://github.com/microsoft/TileFusion",
-    packages=find_packages(),
+    packages=["tilefusion"],
     package_dir={"tilefusion": "python"},
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     cmdclass={
         "build_ext": CMakeBuildExt,
         "develop": Develop,

@@ -1,3 +1,3 @@
-"""Version information for TileFusion."""
+"""Version information."""
 
 __version__ = "0.0.1"
