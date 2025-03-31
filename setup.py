@@ -388,4 +388,8 @@ setup(
     },
     ext_modules=[CMakeExtension()],
     zip_safe=False,
+    package_data={
+        "tilefusion": ["**/*.py"],
+    },
+    include_package_data=True,
 )
