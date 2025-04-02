@@ -3,11 +3,9 @@
 
 #pragma once
 
-#include "cuda_utils.hpp"
-
 __half max(__half a, __half b) { return a > b ? a : b; }
 
-__half exp(__half x) { return __float2half(exp(__half2float(x))); }
+__half exph(__half x) { return __float2half(expf(__half2float(x))); }
 
 void host_flash_attn(int kM, int kN, int kK, int kP, int kBatch,
                      const __half* Q, const __half* K, const __half* V,
@@ -46,7 +44,7 @@ void host_flash_attn(int kM, int kN, int kK, int kP, int kBatch,
         // Broadcast sub row max to attention scores
         for (int i = 0; i < kM; ++i) {
             for (int j = 0; j < kN; ++j) {
-                acc[i * kN + j] = exp(acc[i * kN + j] - cur_row_max[i]);
+                acc[i * kN + j] = exph(acc[i * kN + j] - cur_row_max[i]);
             }
         }
 
@@ -66,10 +64,10 @@ void host_flash_attn(int kM, int kN, int kK, int kP, int kBatch,
 
         for (int i = 0; i < kM; ++i) {
             // Compute remormalization factor for the previous block.
-            prev_norm_vec[i] = exp(prev_row_max[i] - new_row_max[i]);
+            prev_norm_vec[i] = exph(prev_row_max[i] - new_row_max[i]);
 
             // Compute remormalization factor for the current block.
-            new_norm_vec[i] = exp(cur_row_max[i] - new_row_max[i]);
+            new_norm_vec[i] = exph(cur_row_max[i] - new_row_max[i]);
         }
 
         // Update normalization factor l(x).

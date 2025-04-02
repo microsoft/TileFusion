@@ -29,6 +29,7 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
                                    int kK, int kP, int kTM, int kTN, int kTK,
                                    int kTP);
 
+// declare the host function for flash attention
 TILEFUSION_EXPORT void flash_attention(const torch::Tensor& Q,
                                        const torch::Tensor& K,
                                        const torch::Tensor& V, torch::Tensor& O,

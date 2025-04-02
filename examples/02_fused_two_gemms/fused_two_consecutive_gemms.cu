@@ -164,7 +164,6 @@ void run(float epsilon = 1e-3) {
 }
 
 int main() {
-    // 在主函数内定义这些变量，而不是全局范围
     using WarpLayout = tl::RowMajor<2, 1>;
     static constexpr int kSharedAccess = 64;
 

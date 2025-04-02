@@ -1,15 +1,14 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#include "cell/compute/mod.hpp"
 #include "cell/mod.hpp"
 #include "kernels/flash_attn.hpp"
 #include "types/mod.hpp"
 
 using namespace tilefusion;
-using namespace tilefusion::cell;
-using namespace tilefusion::cell::copy;
-using namespace tilefusion::cell::compute;
+using namespace cell;
+using namespace cell::copy;
+using namespace cell::compute;
 namespace tl = tile_layout;
 
 namespace tilefusion::kernels {
@@ -251,7 +250,7 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
             load_rk(sK, rK);
             __syncthreads();
 
-            compute::gemm(rQ, rK, attn_block_f32);
+            gemm(rQ, rK, attn_block_f32);
         }
         load_rv(sV, rV);
         __syncthreads();
@@ -287,7 +286,7 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
         vec_add(prev_norm_mul_sum, cur_norm_mul_sum, new_sum_vec);
 
         // Compute unnormized attention block.
-        compute::gemm(attn_block, rV, exp_values_f32);
+        gemm(attn_block, rV, exp_values_f32);
 
         cast_o(exp_values_f32, exp_values);
 

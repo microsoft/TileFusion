@@ -4,6 +4,8 @@
 #pragma once
 
 #include <cuda_bf16.h>
+#include <cuda_fp16.h>
+
 typedef __nv_bfloat16 __bfloat16;
 
 #include <type_traits>

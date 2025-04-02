@@ -33,6 +33,7 @@ __global__ void ke_scatter_nd(const T* in, T* out, const int64_t* indices,
                               unsigned int const* __restrict__ strides,
                               size_t n, size_t rank, size_t slice_size);
 
+// declare the host function for scatter_nd
 TILEFUSION_EXPORT void scatter_nd(const torch::Tensor& data,
                                   torch::Tensor& updates,
                                   const torch::Tensor& indices);
