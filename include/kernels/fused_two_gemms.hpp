@@ -2,21 +2,21 @@
 // Licensed under the MIT License.
 #pragma once
 
-#include "cell/compute/mod.hpp"
 #include "cell/mod.hpp"
-#include "kernel_registry.hpp"
 #include "types/mod.hpp"
 
 using namespace tilefusion;
 using namespace cell;
 using namespace cell::copy;
 using namespace compute;
+
 namespace tl = tile_layout;
 
 namespace tilefusion::kernels {
 
-template <typename InType, typename AccType, typename WholeShape,
-          typename CtaTileShape, typename WarpLayout, const int kSharedAccess>
+template <typename InType, typename AccType,  //
+          typename WholeShape, typename CtaTileShape, typename WarpLayout,
+          const int kSharedAccess>
 struct FusedTwoGemmsTraits {
     using BaseShape = traits::BaseTileShape<InType>;
 
@@ -93,7 +93,6 @@ struct FusedTwoGemmsTraits {
     using RegD = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kDMs, kDPs>>;
     using RegDHalf =
         RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kDMs, kDPs>>;
-    // using DStorer = copy::RegToGlobalStorer<GlobalD, RegD, WarpLayout>;
 
     static constexpr int kAccMs = kTM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kAccNs = kTN / kWarpPerCol / BaseShape::kCols;
@@ -208,9 +207,4 @@ __global__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
     store_sD(sD, gD);
 }
 
-TILEFUSION_EXPORT void fused_two_gemms(const torch::Tensor& A,
-                                       const torch::Tensor& B,
-                                       const torch::Tensor& C, torch::Tensor& D,
-                                       int64_t m, int64_t n, int64_t k,
-                                       int64_t p);
 }  // namespace tilefusion::kernels

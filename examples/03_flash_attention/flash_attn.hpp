@@ -2,14 +2,15 @@
 // Licensed under the MIT License.
 
 #pragma once
-
-#include "cell/compute/mod.hpp"
 #include "cell/mod.hpp"
+#include "cuda_utils.hpp"
 #include "types/mod.hpp"
 
 using namespace tilefusion;
-using namespace tilefusion::cell;
-using namespace tilefusion::cell::copy;
+using namespace cell;
+using namespace cell::copy;
+using namespace cell::compute;
+
 namespace tl = tile_layout;
 
 template <const int kM, const int kN, const int kK, const int kP>
@@ -103,31 +104,30 @@ struct FlashAttentionTraits {
         RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kAccMs, kAccNs>>;
 
     // Convert the accumulator to half
-    using ConvertHalf = compute::RegTileConvert<RegAcc, RegAccCast>;
-    using ConvertO = compute::RegTileConvert<RegD, RegDCast>;
+    using ConvertHalf = RegTileConvert<RegAcc, RegAccCast>;
+    using ConvertO = RegTileConvert<RegD, RegDCast>;
 
     using RegVec = RegTile<InType, tl::RowMajor<kAccMs, 2>>;
 
-    using CopyVec = copy::BaseTileCopy<RegVec>;
-    using RowMax = compute::MaxReduce<RegAccCast, tl::Layout::kRowMajor>;
+    using CopyVec = BaseTileCopy<RegVec>;
+    using RowMax = MaxReduce<RegAccCast, tl::Layout::kRowMajor>;
 
-    using RowSum = compute::SumReduce<RegAccCast, tl::Layout::kRowMajor>;
+    using RowSum = SumReduce<RegAccCast, tl::Layout::kRowMajor>;
 
     using BroadcastSub =
-        compute::BroadcastSub<RegVec, RegAccCast, tl::Layout::kRowMajor>;
-    using BroadcastMul =
-        compute::BroadcastMul<RegVec, RegDCast, tl::Layout::kRowMajor>;
+        BroadcastSub<RegVec, RegAccCast, tl::Layout::kRowMajor>;
+    using BroadcastMul = BroadcastMul<RegVec, RegDCast, tl::Layout::kRowMajor>;
     using BroadcastDiv =
         compute::BroadcastDiv<RegVec, RegDCast, tl::Layout::kRowMajor>;
 
-    using BlockExp = compute::RegTileExp<RegAccCast>;
-    using BlockAdd = compute::RegTileAdd<RegDCast>;
+    using BlockExp = RegTileExp<RegAccCast>;
+    using BlockAdd = RegTileAdd<RegDCast>;
 
-    using VecMax = compute::BaseTileMax<RegVec>;
-    using VecAdd = compute::BaseTileAdd<RegVec>;
-    using VecSub = compute::BaseTileSub<RegVec>;
-    using VecMul = compute::BaseTileMul<RegVec>;
-    using VecExp = compute::BaseTileExp<RegVec>;
+    using VecMax = BaseTileMax<RegVec>;
+    using VecAdd = BaseTileAdd<RegVec>;
+    using VecSub = BaseTileSub<RegVec>;
+    using VecMul = BaseTileMul<RegVec>;
+    using VecExp = BaseTileExp<RegVec>;
 };
 
 template <typename InType,
@@ -243,7 +243,7 @@ __global__ void KeFlashAttention(const InType* dQ, const InType* dK,
             load_rk(sK, rK);
             __syncthreads();
 
-            compute::gemm(rQ, rK, attn_block_f32);
+            gemm(rQ, rK, attn_block_f32);
         }
         load_rv(sV, rV);
         __syncthreads();
@@ -279,7 +279,7 @@ __global__ void KeFlashAttention(const InType* dQ, const InType* dK,
         vec_add(prev_norm_mul_sum, cur_norm_mul_sum, new_sum_vec);
 
         // Compute unnormized attention block.
-        compute::gemm(attn_block, rV, exp_values_f32);
+        gemm(attn_block, rV, exp_values_f32);
 
         cast_o(exp_values_f32, exp_values);
 

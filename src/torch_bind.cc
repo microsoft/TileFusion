@@ -10,7 +10,6 @@ TORCH_LIBRARY(tilefusion, m) {
 }
 
 TORCH_LIBRARY_IMPL(tilefusion, CUDA, m) {
-    // Register CUDA implementations
     KernelRegistry::instance().register_implementations(m);
 }
 
