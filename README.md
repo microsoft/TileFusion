@@ -1,108 +1,156 @@
 <div align="center">
   <img src="assets/TileFusion-logo.png" width="120"/>
+  <h1>TileFusion: A High-Level, Modular Tile Processing Library</h1>
+  <p>
+    <a href="https://tiledtensor.github.io/tilefusion-docs/docs/installation.html"><b>Installation</b></a> |
+    <a href="https://tiledtensor.github.io/tilefusion-docs/docs/examples/"> <b>Getting Started</b></a> |
+    <a href="https://github.com/microsoft/TileFusion/tree/master/examples"><b>Examples</b></a> |
+    <a href="https://tiledtensor.github.io/tilefusion-docs/"><b>Documentation</b></a>
+  </p>
 </div>
 
-# TileFusion: Simplifying Kernel Fusion with Tile Processing
+## Overview
 
-**TileFusion** is a highly efficient C++ macro kernel template library designed to elevate the level of abstraction in CUDA C for processing tiles. It is designed to be:
+**TileFusion**, derived from the research presented in this [paper](https://dl.acm.org/doi/pdf/10.1145/3694715.3695961), is an efficient C++ macro kernel library designed to elevate the level of abstraction in CUDA C for tile processing. The library offers:
 
-- **Higher-Level Programming**: TileFusion offers a set of device kernels for transferring tiles between the CUDA device's three memory hierarchies and for computing tiles.
-- **Modularity**: TileFusion enables users to construct their applications by processing larger tiles in time and space using the provided BaseTiles.
-- **Efficiency**: TileFusion offers highly efficient implementations of these device kernels.
+- **Higher-Level Programming Constructs**: TileFusion supports tiles across the three-level GPU memory hierarchy, providing device kernels for transferring tiles between CUDA memory hierarchies and for tile computation.
+- **Modularity**: TileFusion enables applications to process larger tiles built out of BaseTiles in both time and space, abstracting away low-level hardware details.
+- **Efficiency**: The library's BaseTiles are designed to match TensorCore instruction shapes and encapsulate hardware-specific performance parameters, ensuring optimal utilization of TensorCore capabilities.
 
-TileFusion adopts a hardware bottom-up approach by building kernels around the core concept of the **BaseTile**. The shapes of these BaseTiles align with TensorCore's instruction shape and encapsulate hardware-dependent performance parameters to optimally utilize TensorCore's capabilities. Serving as building blocks, these BaseTiles are then combined to construct larger tiles in both temporal and spatial dimensions, enabling users to process larger tiles composed of BaseTiles for their applications.
+A core design goal of **TileFusion** is to allow users to understand and utilize provided primitives using logical concepts, without delving into low-level hardware complexities. The library rigorously separates data flow across the memory hierarchy from the configuration of individual macro kernels. This design choice enables performance enhancements through tuning, which operates in three possible ways:
 
-## Basic GEMM Example
+- **Structural Tuning**: Designs various data flows while keeping kernel configurations unchanged.
+- **Parameterized Tuning**: Adjusts kernel configurations while maintaining the same data flow.
+- **Combined Tuning**: Integrates both structural and parameterized tuning approaches simultaneously.
 
-TileFusion implements `GlobalTile`, `SharedTile` and `RegTile` to customize the shape and layout of tiles located in the GPU's three memory hierarchies. Here's an example of a simple GEMM kernel written in TileFusion (the complete example can be found in [this directory](examples/cpp/01_gemm/01_gemm_global_reg/gemm.hpp)):
+In summary, **TileFusion** encourages algorithm developers to focus on designing the data flow of their algorithms using efficient tile primitives. It can be utilized as:
 
-(*To simplify the demonstration, this example only involves two memory levels: global memory and registers. TileFusion also applies a similar concept to shared memory*.)
+1. A lightweight C++ library with header-only usage, offering superior readability, modifiability, and debuggability.
+2. A Python library with pre-existing kernels bound to PyTorch.
 
-```cpp
-template <typename InType, typename AccType, typename IteratorA, typename RegA,
-          typename LoaderA, typename IteratorB, typename RegB, typename LoaderB,
-          typename GlobalC, typename RegC, typename CStorer>
-__global__ void simple_gemm(const InType* dA, const InType* dB, AccType* dC) {
-    IteratorA gAs(dA);
-    RegA rA;
-    LoaderA loader_a;
+## The Basic GEMM Example
 
-    IteratorB gBs(dB);
-    RegB rB;
-    LoaderB loader_b;
+TileFusion approaches the efficient implementation of a kernel by:
 
-    RegC acc;
+1. Managing dataflow over memory hierarchies.
+2. Configuring tile primitives, such as tile shapes, layouts, and other parameters.
 
-    for (int k = 0; k < IteratorA::sc1; ++k) {
-        loader_a(gAs(k), rA);
-        loader_b(gBs(k), rB);
-        __syncthreads();
+This is an example of a simple GEMM (General Matrix Multiplication) kernel written using TileFusion. For the complete example, please refer to [this directory](examples/cpp/01_gemm/01_gemm_global_reg/gemm.hpp).
 
-        gemm(rA, rB, acc);
-    }
-    __syncthreads();
+### Configuration of the Tile Primitives
 
-    GlobalC gC(dC);
-    CStorer storer_c;
-    storer_c(acc, gC);
-}
-```
+The core programming constructs in TileFusion are `Tile`, `TileLayout`, `TileIterator`, `Loader`, and `Storer`.
 
-- The `TileIterator` is used to divide the `GlobalTile` into smaller sub-tiles and iterate over them. Various warp reuse methods are provided to support efficient repeated loading of data by warps within a thread block. TileFusion provides efficient loading and storing methods that transfer data between memory hierarchies by utilizing specialized hardware-accelerated instructions. Tiles of data are then cooperatively loaded into the `RegTile`, which is stored in each thread's local register file.
+1. **Declare the `Tile`**: [GlobalTile](https://github.com/microsoft/TileFusion/blob/master/include/types/global.hpp) and [RegTile](https://github.com/microsoft/TileFusion/blob/master/include/types/register.hpp) are utilized to customize the shape and layout of 1D (vector) or 2D (matrix) arrays within the GPU's three memory hierarchies, known as a *Tile*.
 
-- Once the data is loaded into a thread's local register file, `gemm` performs matrix multiplication using TensorCore's warp-level matrix multiply-and-accumulate (wmma) instruction on the `BaseTile`s. The specialized data distribution required by TensorCore is automatically maintained by TileFusion's `RegTile` layout.
+2. **Declare the `TileIterator`**: Partition the `GlobalTile` into smaller, manageable sub-tiles for efficient processing.
 
-- After the `gemm` operation is completed, data in the `RegTile` is cooperatively stored back from registers to global memory using the `RegToGlobalStorer`.
+3. **Declare Loader and Storer**: Loaders and Storers use cooperative threads to transfer a tile from the source to the target location. They operate at the CTA level and accept the following inputs:
 
-Here is how to declare the `Tile` at each level of memory, use `TileIterator` to chunk large tiles into sub-tiles, and declare loaders and storers to transfer tiles between memory hierarchies.
+   - **Warp Layout**
+   - **Target Tile**
+   - **Source Tile**
+
+   Based on these parameters, they automatically infer a copy plan that partitions the data transfer work among the threads.
 
 ```cpp
-using WarpLayout = RowMajor<2, 2>;
-
-// operand A
-using GlobalA = GlobalTile<InType, RowMajor<128, 256>>;
-using IteratorA = TileIterator<GlobalA, TileShape<128, 32>>;
-using RegA = RegTile<BaseTileRowMajor<__half>, RowMajor<8, 8>>;
-using ALoader = GlobalToRegLoader<RegA, WarpLayout, kRowReuseCont>;
-
-// operand B
-using GlobalB = GlobalTile<InType, ColMajor<256, 64>>;
-using IteratorB = TileIterator<GlobalB, TileShape<32, 64>>;
-using RegB = RegTile<BaseTileColMajor<__half>, ColMajor<8, 4>>;
-using BLoader = GlobalToRegLoader<RegB, WarpLayout, kColReuseCont>;
-
-// output C
-using GlobalC = GlobalTile<AccType, RowMajor<128, 64>>;
-using RegC = RegTile<BaseTileRowMajor<float>, RowMajor<8, 8>>;
-using CStorer = RegToGlobalStorer<GlobalC, RegC, WarpLayout>;
+1  using WarpLayout = RowMajor<2, 2>;
+2
+3  // operand A
+4  using GlobalA = GlobalTile<InType, RowMajor<128, 256>>;
+5  using IteratorA = TileIterator<GlobalA, TileShape<128, 32>>;
+6  using RegA = RegTile<BaseTileRowMajor<__half>, RowMajor<8, 8>>;
+7  using ALoader = GlobalToRegLoader<RegA, WarpLayout, kRowReuseCont>;
+8
+9  // operand B
+10 using GlobalB = GlobalTile<InType, ColMajor<256, 64>>;
+11 using IteratorB = TileIterator<GlobalB, TileShape<32, 64>>;
+12 using RegB = RegTile<BaseTileColMajor<__half>, ColMajor<8, 4>>;
+13 using BLoader = GlobalToRegLoader<RegB, WarpLayout, kColReuseCont>;
+14
+15 // output C
+16 using GlobalC = GlobalTile<AccType, RowMajor<128, 64>>;
+17 using RegC = RegTile<BaseTileRowMajor<float>, RowMajor<8, 8>>;
+18 using CStorer = RegToGlobalStorer<GlobalC, RegC, WarpLayout>;
 ```
 
-### Download
+> **Note**: To simplify the demonstration, this example involves only two memory levels: global memory and registers. TileFusion also applies similar concepts to [SharedTile](https://github.com/microsoft/TileFusion/blob/master/include/types/shared.hpp).
+
+### Dataflow Over Memory Hierarchies
+
+The the kernel is defined as implementing the following dataflow over memory hierarchies:
+
+```cpp
+1  template <typename InType, typename AccType,
+2            typename IteratorA, typename RegA, typename LoaderA,
+3            typename IteratorB, typename RegB, typename LoaderB,
+4            typename GlobalC, typename RegC, typename CStorer>
+5  __global__ void simple_gemm(const InType* dA, const InType* dB, AccType* dC) {
+6      IteratorA gAs(dA);
+7      RegA rA;
+8      LoaderA loader_a;
+9
+10     IteratorB gBs(dB);
+11     RegB rB;
+12     LoaderB loader_b;
+13
+14     RegC acc;
+15
+16     for (int k = 0; k < IteratorA::sc1; ++k) {
+17         loader_a(gAs(k), rA);
+18         loader_b(gBs(k), rB);
+19         __syncthreads();
+20
+21         gemm(rA, rB, acc);
+22     }
+23     __syncthreads();
+24
+25     GlobalC gC(dC);
+26     CStorer storer_c;
+27     storer_c(acc, gC);
+28 }
+```
+
+The `TileIterator` (`IteratorA`, `IteratorB` in lines 6 and 10) serves as a syntactic interface for defining tile partitions. It is used to divide the `GlobalTile` into smaller sub-tiles and iterate over them.
+
+`Loader` and `Storer` (declared in lines 8, 12, and 26) are efficient methods for loading and storing data, transferring data between memory hierarchies using specialized hardware-accelerated instructions (lines 17, 18, and 27). Tiles of data are cooperatively loaded into the `RegTile`, which is stored in each thread's local register file.
+
+Once the data is loaded into a thread's local register file, `gemm` (in line 21) performs matrix multiplication using TensorCore's warp-level matrix multiply-and-accumulate (WMMA) instruction on the `BaseTile`s. The specialized data distribution required by TensorCore is automatically maintained by TileFusion's `RegTile` layout.
+
+After the `gemm` operation is completed, the data in the `RegTile` is cooperatively stored back from registers to global memory using the `RegToGlobalStorer`.
+
+## Installation
+
+TileFusion can be used as a lightweight C++ library with header-only usage, or it can be built as a Python library. You can choose to build either one.
+
+### Prerequisites
+
+TileFusion requires:
+
+- C++20 host compiler
+- CUDA 12.0 or later
+- GCC version 10.0 or higher to support C++20 features
+
+Download the repository:
 
 ```bash
 git clone git@github.com:microsoft/TileFusion.git
 cd TileFusion && git submodule update --init --recursive
 ```
 
-### Installation
+### Building the C++ Library
 
-TileFusion requires a C++20 host compiler, CUDA 12.0 or later, and GCC version 10.0 or higher to support C++20 features.
+To build the project using the provided `Makefile`, simply run:
 
-TileFusion can be used as a lightweight C++ library with header-only usage, or it can be built as a Python library. You can choose to build either one.
+```bash
+make
+```
 
-### Building the C++ Library Using Makefile
+To run a single C++ unit test:
 
-1. To build the project using the provided `Makefile`, simply run:
-
-   ```bash
-   make
-   ```
-
-2. Run a single C++ unit test:
-
-   ```bash
-   make unit_test_cpp CPP_UT=test_gemm
-   ```
+```bash
+make unit_test_cpp CPP_UT=test_gemm
+```
 
 ### Building the Python Package
 
@@ -126,27 +174,27 @@ TileFusion can be used as a lightweight C++ library with header-only usage, or i
 
    This allows you to edit the source code directly without needing to reinstall it repeatedly.
 
-4. Run the Python unit tests:
+### Running Unit Tests
 
-   Before running the Python unit tests, you need to build and install the Python package (see the [Building the Python Package](#building-the-python-package) section).
+Before running the Python unit tests, you need to build and install the Python package (see the [Building the Python Package](#building-the-python-package) section).
 
-   - **Run a single Python unit test**:
+- **Run a single Python unit test**:
 
-     ```bash
-     pytest tests/python/test_scatter_nd.py
-     ```
+  ```bash
+  pytest tests/python/test_scatter_nd.py
+  ```
 
-   - **Run all Python unit tests**:
+- **Run all Python unit tests**:
 
-     ```bash
-     python setup.py pytests
-     ```
+  ```bash
+  python setup.py pytests
+  ```
 
-5. Run all C++ unit tests:
+- **Run all C++ unit tests**:
 
-   ```bash
-   python setup.py ctests
-   ```
+  ```bash
+  python setup.py ctests
+  ```
 
 ## Contributing
 
