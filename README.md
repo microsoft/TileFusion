@@ -1,10 +1,10 @@
 <div align="center">
   <img src="assets/TileFusion-logo.png" width="120"/>
-  <h1>TileFusion: A High-Level, Modular Tile Processing Library</h1>
+  <h1>TileFusion: A High-Level, Modular<br>Tile Processing Library</h1>
   <p>
     <a href="https://tiledtensor.github.io/tilefusion-docs/docs/installation.html"><b>Installation</b></a> |
-    <a href="https://tiledtensor.github.io/tilefusion-docs/docs/examples/"> <b>Getting Started</b></a> |
-    <a href="https://github.com/microsoft/TileFusion/tree/master/examples"><b>Examples</b></a> |
+    <a href="https://tiledtensor.github.io/tilefusion-docs/docs/design/core_concepts"> <b>Getting Started</b></a> |
+    <a href="https://tiledtensor.github.io/tilefusion-docs/docs/examples/101_gemm"><b>Examples</b></a> |
     <a href="https://tiledtensor.github.io/tilefusion-docs/"><b>Documentation</b></a>
   </p>
 </div>
