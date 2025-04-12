@@ -27,13 +27,14 @@ template <typename InType,
 __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
                                    const InType* dV, InType* dO, int kM, int kN,
                                    int kK, int kP, int kTM, int kTN, int kTK,
-                                   int kTP);
+                                   int kTP, float softmax_scale, bool causal);
 
 // declare the host function for flash attention
 TILEFUSION_EXPORT void flash_attention(const torch::Tensor& Q,
                                        const torch::Tensor& K,
                                        const torch::Tensor& V, torch::Tensor& O,
                                        int64_t m, int64_t n, int64_t k,
-                                       int64_t p);
+                                       int64_t p, double softmax_scale,
+                                       bool causal);
 
 }  // namespace tilefusion::kernels
