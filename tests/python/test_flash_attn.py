@@ -49,7 +49,8 @@ class FlashAttention:
             tile_n: Tile size for N dimension.
             tile_k: Tile size for K dimension.
             tile_p: Tile size for P dimension.
-            softmax_scale: Softmax scale. The scaling of QK^T before applying softmax.
+            softmax_scale: Softmax scale.
+                The scaling of QK^T before applying softmax.
                 Default is 1.0 / sqrt(matrix_k).
             causal: bool. Whether to apply causal mask.
         """
@@ -167,7 +168,8 @@ def run_flash_attention(
         tile_n: Tile size for N dimension.
         tile_k: Tile size for K dimension.
         tile_p: Tile size for P dimension.
-        softmax_scale: Softmax scale. The scaling of QK^T before applying softmax.
+        softmax_scale: Softmax scale.
+            The scaling of QK^T before applying softmax.
             Default is 1.0 / sqrt(matrix_k).
         causal: bool. Whether to apply causal mask.
     """
@@ -198,7 +200,11 @@ def run_flash_attention(
     cuda_value = value.cuda()
 
     tiled_flash_attention = TiledFlashAttention(
-        cuda_query, cuda_key, cuda_value, softmax_scale, causal
+        query=cuda_query,
+        key=cuda_key,
+        value=cuda_value,
+        softmax_scale=softmax_scale,
+        causal=causal,
     )
     output = tiled_flash_attention.forward()
 

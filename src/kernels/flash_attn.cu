@@ -158,7 +158,7 @@ template <typename InType,
 __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
                                    const InType* dV, InType* dO, int kM, int kN,
                                    int kK, int kP, int kTM, int kTN, int kTK,
-                                   int kTP, float softmax_scale, bool mask) {
+                                   int kTP, float softmax_scale, bool causal) {
     // Advance to the global data tile to the current CTA.
     const InType* Q = dQ + blockIdx.z * (kM * kK) + blockIdx.x * (kTM * kK);
     const InType* K = dK + blockIdx.z * (kK * kN);
@@ -204,9 +204,6 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
     RegAcc attn_block_f32;
     RegAccCast attn_block;
 
-    RegVecPrinter print_vec;
-    RegAccPrinter print_acc;
-
     RegVec prev_norm_vec;
     RegVec cur_norm_vec;
 
@@ -242,8 +239,8 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
     VecMul vec_mul;
     VecExp vec_exp;
 
-    ApplyScoreScale apply_score_scale;
     ApplyMask apply_mask;
+    ApplyScoreScale apply_score_scale;
 
     for (int n = 0; n < GIteratorV::sc0; ++n) {
         load_sv(gVs(n), sV);
@@ -263,11 +260,17 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
         load_rv(sV, rV);
         __syncthreads();
 
-        if (mask) {
-            apply_mask(attn_block_f32, blockIdx.x * kTM, n * kTN);
-        }
-
         apply_score_scale(attn_block_f32, softmax_scale, attn_block_f32);
+
+        if (causal) {
+            int row_offset = blockIdx.x * kTM;
+            int col_offset = n * kTN;
+            apply_mask(attn_block_f32, row_offset, col_offset);
+            // __syncthreads();
+            // if (threadIdx.x == 0 && col_offset > row_offset) {
+            //     attn_block_f32.dump_value();
+            // }
+        }
 
         cast_acc(attn_block_f32, attn_block);
 

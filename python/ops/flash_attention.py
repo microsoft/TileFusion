@@ -29,7 +29,8 @@ class TiledFlashAttention:
             query: Query tensor.
             key: Key tensor.
             value: Value tensor.
-            softmax_scale: Softmax scale. The scaling of QK^T before applying softmax.
+            softmax_scale: Softmax scale.
+            The scaling of QK^T before applying softmax.
                 Default is 1.0 / sqrt(matrix_k).
             causal: bool. Whether to apply causal mask.
         """
