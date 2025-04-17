@@ -261,7 +261,6 @@ def run_flash_attention(
             "softmax_scale": 1.0 / 128.0,
             "causal": False,
         },
-
         {
             "name": "test_case3",
             "matrix_m": 128,
@@ -274,7 +273,7 @@ def run_flash_attention(
             "tile_p": 128,
             "softmax_scale": 1.0 / 128.0,
             "causal": True,
-        }
+        },
     ],
     ids=lambda x: x["name"],
 )
