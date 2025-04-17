@@ -65,7 +65,6 @@ struct ApplyMask<RegTile, WarpLayout, BaseShape, MaskMode::kCausal> {
 
         for (int m = 0; m < kRegTileRows; ++m) {
             for (int n = 0; n < kRegTileCols; ++n) {
-                auto sub_tile = tile(m, n);
                 for (int i = 0; i < kSubtileRows; ++i) {
                     for (int j = 0; j < kSubtileCols; ++j) {
                         const int col_idx =
@@ -75,7 +74,12 @@ struct ApplyMask<RegTile, WarpLayout, BaseShape, MaskMode::kCausal> {
                                             m * kWarpRows * kBaseShapeRows +
                                             i * kBaseShapeRows / 2;
                         if (col_idx >= row_idx) {
-                            sub_tile(i, j) = -INFINITY;
+                            tile(m, n)(i, j) = -INFINITY;
+                            if (thread0()) {
+                                printf("tile:\n");
+                                // sub_tile.dump_value();
+                                tile.dump_value();
+                            }
                         }
                     }
                 }

@@ -207,8 +207,10 @@ void run(float softmax_scale, bool causal = false, bool check = true) {
 int main() {
     static constexpr int kSharedAccess = 64;
     run<FlashAttentionShape<128, 128, 128, 128>,
-        FlashAttentionShape<64, 128, 128, 128>, 1, kSharedAccess>(1.0 / 128,
-                                                                  true);
+        FlashAttentionShape<64, 128, 128, 128>, 1, kSharedAccess>(0.5, true);
+
+    run<FlashAttentionShape<256, 256, 128, 128>,
+        FlashAttentionShape<64, 128, 128, 128>, 1, kSharedAccess>(0.5, true);
 
     return 0;
 }

@@ -467,6 +467,11 @@ void flash_attention(const torch::Tensor& Q, const torch::Tensor& K,
         const int kBatch = 1;
         run<InType, AccType, OutType, WholeShape, CtaTileShape, kBatch>(
             dQ, dK, dV, dO, softmax_scale, causal);
+    } else if (m == 128 && n == 128 && k == 128 && p == 128) {
+        using WholeShape = FlashAttentionShape<128, 128, 128, 128>;
+        const int kBatch = 1;
+        run<InType, AccType, OutType, WholeShape, CtaTileShape, kBatch>(
+            dQ, dK, dV, dO, softmax_scale, causal);
     } else {
         throw std::runtime_error("Unsupported shape");
     }
