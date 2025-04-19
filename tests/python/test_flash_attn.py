@@ -100,11 +100,14 @@ class FlashAttention:
             attn_weights = query_view @ key_chunk  # m * ktn
 
             if self.causal:
-                torch.masked_fill(
-                    attn_weights,
-                    torch.tril(torch.ones_like(attn_weights)),
-                    float("-inf"),
-                )
+                # 创建布尔掩码
+                mask = torch.tril(
+                    torch.ones_like(attn_weights), diagonal=0
+                ).bool()
+                # print("mask: ", mask)
+                attn_weights = torch.where(mask, attn_weights, float("-inf"))
+                # print("attn_weights: ", attn_weights)
+                # print("attn_weights.shape: ", attn_weights.shape)
 
             attn_weights = attn_weights * self.softmax_scale
 
@@ -300,4 +303,54 @@ def test_flash_attention(test_case: dict[str, Any]) -> None:
         tile_p=test_case["tile_p"],
         softmax_scale=test_case["softmax_scale"],
         causal=test_case["causal"],
+    )
+
+
+if __name__ == "__main__":
+    # test_flash_attention(
+    #     {
+    #         "name": "test_case1",
+    #         "matrix_m": 128,
+    #         "matrix_n": 128,
+    #         "matrix_k": 128,
+    #         "matrix_p": 128,
+    #         "tile_m": 64,
+    #         "tile_n": 128,
+    #         "tile_k": 128,
+    #         "tile_p": 128,
+    #         "softmax_scale": 1.0,
+    #         "causal": False,
+    #     }
+    # )
+
+    # test_flash_attention(
+    #     {
+    #         "name": "test_case2",
+    #         "matrix_m": 128,
+    #         "matrix_n": 128,
+    #         "matrix_k": 128,
+    #         "matrix_p": 128,
+    #         "tile_m": 64,
+    #         "tile_n": 128,
+    #         "tile_k": 128,
+    #         "tile_p": 128,
+    #         "softmax_scale": 1.0 / 128,
+    #         "causal": False,
+    #     }
+    # )
+
+    test_flash_attention(
+        {
+            "name": "test_case3",
+            "matrix_m": 128,
+            "matrix_n": 128,
+            "matrix_k": 128,
+            "matrix_p": 128,
+            "tile_m": 64,
+            "tile_n": 128,
+            "tile_k": 128,
+            "tile_p": 128,
+            "softmax_scale": 1.0,
+            "causal": True,
+        }
     )

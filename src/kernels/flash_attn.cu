@@ -260,17 +260,18 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
         load_rv(sV, rV);
         __syncthreads();
 
-        apply_score_scale(attn_block_f32, softmax_scale, attn_block_f32);
-
         if (causal) {
             int row_offset = blockIdx.x * kTM;
             int col_offset = n * kTN;
-            apply_mask(attn_block_f32, row_offset, col_offset);
-            // __syncthreads();
-            // if (threadIdx.x == 0 && col_offset > row_offset) {
-            //     attn_block_f32.dump_value();
-            // }
+            apply_mask(attn_block_f32, row_offset, col_offset, -INFINITY);
         }
+
+        if (thread0()) {
+            printf("attn_block_f32: \n");
+            attn_block_f32.dump_value();
+        }
+
+        apply_score_scale(attn_block_f32, softmax_scale, attn_block_f32);
 
         cast_acc(attn_block_f32, attn_block);
 
@@ -334,7 +335,7 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
 template <typename InType, typename AccType, typename OutType,
           typename WholeShape, typename CtaTileShape, const int kBatch>
 void run(const InType* dQ, const InType* dK, const InType* dV, OutType* dO,
-         float softmax_scale, bool mask) {
+         float softmax_scale, bool causal) {
     static constexpr int kM = dim_size<0, WholeShape>;
     static constexpr int kN = dim_size<1, WholeShape>;
     static constexpr int kK = dim_size<2, WholeShape>;
@@ -440,7 +441,7 @@ void run(const InType* dQ, const InType* dK, const InType* dV, OutType* dO,
     }
 
     kernel<<<grid, block, shm_size, 0>>>(dQ, dK, dV, dO, kM, kN, kK, kP, kTM,
-                                         kTN, kTK, kTP, softmax_scale, mask);
+                                         kTN, kTK, kTP, softmax_scale, causal);
 
     cudaDeviceSynchronize();
 }
