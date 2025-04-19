@@ -6,7 +6,7 @@
 
 template <typename WholeShape, typename CtaTileShape, const int kBatch,
           const int kSharedAccess>
-void run(bool check = true) {
+void run(float softmax_scale, bool causal = false, bool check = true) {
     using InType = __half;
     using AccType = float;
     using OutType = __half;
@@ -137,6 +137,9 @@ void run(bool check = true) {
     using VecMul = typename Config::VecMul;
     using VecExp = typename Config::VecExp;
 
+    using ApplyMask = typename Config::ApplyMask;
+    using ApplyScoreScale = typename Config::ApplyScoreScale;
+
     int block_x = CeilDiv<kM, kTM>;
     int block_y = CeilDiv<kP, kTP>;
     int block_z = kBatch;
@@ -162,7 +165,7 @@ void run(bool check = true) {
                           RegDCast, DStorer, ConvertAcc, ConvertO, RegVec,
                           CopyVec, RowMax, RowSum, BroadcastSub, BroadcastMul,
                           BroadcastDiv, BlockExp, BlockAdd, VecMax, VecAdd,
-                          VecSub, VecMul, VecExp>;
+                          VecSub, VecMul, VecExp, ApplyMask, ApplyScoreScale>;
 
     if (shm_size > 48 * 1024) {
         cudaFuncSetAttribute(
@@ -170,26 +173,26 @@ void run(bool check = true) {
     }
 
     kernel<<<grid, block, shm_size, 0>>>(A, B, C, D, kM, kN, kK, kP, kTM, kTN,
-                                         kTK, kTP);
+                                         kTK, kTP, softmax_scale, causal);
 
     cudaDeviceSynchronize();
 
     // Call host-side reference implementation.
-    host_flash_attn(kM, kN, kK, kP, kBatch,
-                    thrust::raw_pointer_cast(h_a.data()),
-                    thrust::raw_pointer_cast(h_b.data()),
-                    thrust::raw_pointer_cast(h_c.data()),
-                    thrust::raw_pointer_cast(h_o.data()),
-                    thrust::raw_pointer_cast(acc.data()),
-                    thrust::raw_pointer_cast(exp_values.data()),
-                    thrust::raw_pointer_cast(cur_row_max.data()),
-                    thrust::raw_pointer_cast(prev_row_max.data()),
-                    thrust::raw_pointer_cast(new_row_max.data()),
-                    thrust::raw_pointer_cast(prev_norm_vec.data()),
-                    thrust::raw_pointer_cast(new_norm_vec.data()),
-                    thrust::raw_pointer_cast(prev_sum_vec.data()),
-                    thrust::raw_pointer_cast(cur_sum_vec.data()),
-                    thrust::raw_pointer_cast(new_sum_vec.data()));
+    host_flash_attn(
+        kM, kN, kK, kP, kBatch, thrust::raw_pointer_cast(h_a.data()),
+        thrust::raw_pointer_cast(h_b.data()),
+        thrust::raw_pointer_cast(h_c.data()),
+        thrust::raw_pointer_cast(h_o.data()),
+        thrust::raw_pointer_cast(acc.data()),
+        thrust::raw_pointer_cast(exp_values.data()),
+        thrust::raw_pointer_cast(cur_row_max.data()),
+        thrust::raw_pointer_cast(prev_row_max.data()),
+        thrust::raw_pointer_cast(new_row_max.data()),
+        thrust::raw_pointer_cast(prev_norm_vec.data()),
+        thrust::raw_pointer_cast(new_norm_vec.data()),
+        thrust::raw_pointer_cast(prev_sum_vec.data()),
+        thrust::raw_pointer_cast(cur_sum_vec.data()),
+        thrust::raw_pointer_cast(new_sum_vec.data()), softmax_scale, causal);
 
     h_d = d_d;
 
@@ -203,26 +206,11 @@ void run(bool check = true) {
 
 int main() {
     static constexpr int kSharedAccess = 64;
-    run<FlashAttentionShape<64, 128, 128, 128>,
-        FlashAttentionShape<64, 128, 128, 128>, 1, kSharedAccess>();
+    run<FlashAttentionShape<128, 128, 128, 128>,
+        FlashAttentionShape<64, 128, 128, 128>, 1, kSharedAccess>(0.5, true);
 
-    // run<FlashAttentionShape<64 /*M*/, 64 /*N*/, 128 /*K*/, 128 /*P*/>,
-    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-    //                         /*kTP*/>,
-    //     2>();
-
-    // run<FlashAttentionShape<64 /*M*/, 128 /*N*/, 128 /*K*/, 128 /*P*/>,
-    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-    //                         /*kTP*/>,
-    //     1>();
-
-    // run<FlashAttentionShape<64 /*M*/, 256 /*N*/, 128 /*K*/, 128 /*P*/>,
-    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-    //     /*kTP*/>, 1>();
-
-    // run<FlashAttentionShape<64 /*M*/, 512 /*N*/, 128 /*K*/, 128 /*P*/>,
-    //     FlashAttentionShape<64 /*kTM*/, 64 /*kTN*/, 128 /*kTK*/, 128
-    //     /*kTP*/>, 1>();
+    run<FlashAttentionShape<256, 256, 128, 128>,
+        FlashAttentionShape<64, 128, 128, 128>, 1, kSharedAccess>(0.5, true);
 
     return 0;
 }
