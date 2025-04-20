@@ -100,7 +100,7 @@ class FlashAttention:
             attn_weights = query_view @ key_chunk  # m * ktn
 
             if self.causal:
-                # 创建布尔掩码
+                # Create a causal mask for the attention weights.
                 mask = torch.tril(
                     torch.ones_like(attn_weights), diagonal=0
                 ).bool()
