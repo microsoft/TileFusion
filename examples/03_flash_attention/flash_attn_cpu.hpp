@@ -44,7 +44,7 @@ void host_flash_attn(int kM, int kN, int kK, int kP, int kBatch,
             for (int i = 0; i < kM; ++i) {
                 for (int j = 0; j < kN; ++j) {
                     if (j > i) {
-                        acc[i * kN + j] = -INFINITY;
+                        acc[i * kN + j] = __float2half(-INFINITY);
                     }
                 }
             }
