@@ -259,13 +259,7 @@ __global__ void KeFlashAttention(const InType* dQ, const InType* dK,
         apply_score_scale(attn_block_f32, softmax_scale, attn_block_f32);
 
         if (causal) {
-            int row_offset = blockIdx.x * kTM;
-            int col_offset = n * kTN;
-            apply_mask(attn_block_f32, row_offset, col_offset);
-            // __syncthreads();
-            // if (threadIdx.x == 0 && col_offset > row_offset) {
-            //     attn_block_f32.dump_value();
-            // }
+            apply_mask(attn_block_f32, blockIdx.x * kTM, n * kTN, -INFINITY);
         }
 
         cast_acc(attn_block_f32, attn_block);

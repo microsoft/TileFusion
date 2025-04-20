@@ -92,12 +92,12 @@ struct ApplyMask<RegTile, WarpLayout, BaseShape, MaskMode::kCausal> {
     DEVICE int lane_id() { return threadIdx.x % WARP_SIZE; }
 
     DEVICE int get_warp_row_offset() {
-        int warp_row_id = get_warp_row_id();
-        int warp_row_stride = get_warp_row_stride();
-        return warp_row_id * warp_row_stride;
+        return get_warp_row_id() * get_warp_row_stride();
     }
 
-    DEVICE int get_warp_col_offset() { return 0; }
+    DEVICE int get_warp_col_offset() {
+        return get_warp_col_id() * get_warp_col_stride();
+    }
 
     DEVICE int get_thread_row_offset() { return lane_id() / kThreadGroupSize; }
 
@@ -107,6 +107,10 @@ struct ApplyMask<RegTile, WarpLayout, BaseShape, MaskMode::kCausal> {
 
     DEVICE int get_warp_row_stride() {
         return RegTile::kRows * BaseShape::kRows;
+    }
+
+    DEVICE int get_warp_col_stride() {
+        return RegTile::kCols * BaseShape::kCols;
     }
 
     DEVICE int get_warp_row_id() {

@@ -261,9 +261,7 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
         __syncthreads();
 
         if (causal) {
-            int row_offset = blockIdx.x * kTM;
-            int col_offset = n * kTN;
-            apply_mask(attn_block_f32, row_offset, col_offset, -INFINITY);
+            apply_mask(attn_block_f32, blockIdx.x * kTM, n * kTN, -INFINITY);
         }
 
         apply_score_scale(attn_block_f32, softmax_scale, attn_block_f32);
