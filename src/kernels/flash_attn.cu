@@ -132,6 +132,10 @@ struct FlashAttentionTraits {
     using VecSub = BaseTileSub<RegVec>;
     using VecMul = BaseTileMul<RegVec>;
     using VecExp = BaseTileExp<RegVec>;
+
+    using ApplyMask =
+        ApplyMask<RegAcc, WarpLayout, BaseShape, MaskMode::kCausal>;
+    using ApplyScoreScale = BroadcastScalarMul<RegAcc>;
 };
 
 template <typename InType,
@@ -149,11 +153,12 @@ template <typename InType,
           typename RowSum, typename BroadcastSub, typename BroadcastMul,
           typename BroadcastDiv, typename BlockExp, typename BlockAdd,
           typename VecMax, typename VecAdd, typename VecSub, typename VecMul,
-          typename VecExp, typename RegVecPrinter, typename RegAccPrinter>
+          typename VecExp, typename RegVecPrinter, typename RegAccPrinter,
+          typename ApplyScoreScale, typename ApplyMask>
 __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
                                    const InType* dV, InType* dO, int kM, int kN,
                                    int kK, int kP, int kTM, int kTN, int kTK,
-                                   int kTP) {
+                                   int kTP, float softmax_scale, bool causal) {
     // Advance to the global data tile to the current CTA.
     const InType* Q = dQ + blockIdx.z * (kM * kK) + blockIdx.x * (kTM * kK);
     const InType* K = dK + blockIdx.z * (kK * kN);
@@ -199,9 +204,6 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
     RegAcc attn_block_f32;
     RegAccCast attn_block;
 
-    RegVecPrinter print_vec;
-    RegAccPrinter print_acc;
-
     RegVec prev_norm_vec;
     RegVec cur_norm_vec;
 
@@ -237,6 +239,9 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
     VecMul vec_mul;
     VecExp vec_exp;
 
+    ApplyMask apply_mask;
+    ApplyScoreScale apply_score_scale;
+
     for (int n = 0; n < GIteratorV::sc0; ++n) {
         load_sv(gVs(n), sV);
 
@@ -254,6 +259,14 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
         }
         load_rv(sV, rV);
         __syncthreads();
+
+        if (causal) {
+            int row_offset = blockIdx.x * kTM;
+            int col_offset = n * kTN;
+            apply_mask(attn_block_f32, row_offset, col_offset, -INFINITY);
+        }
+
+        apply_score_scale(attn_block_f32, softmax_scale, attn_block_f32);
 
         cast_acc(attn_block_f32, attn_block);
 
@@ -307,8 +320,8 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
         attn_block_f32.clear();
         exp_values_f32.clear();
     }
-    __syncthreads();
 
+    __syncthreads();
     GlobalO gO(gO_ptr);
     OStorer storer_o;  // Store O tile from register to global.
     storer_o(rO, gO);
@@ -316,7 +329,8 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
 
 template <typename InType, typename AccType, typename OutType,
           typename WholeShape, typename CtaTileShape, const int kBatch>
-void run(const InType* dQ, const InType* dK, const InType* dV, OutType* dO) {
+void run(const InType* dQ, const InType* dK, const InType* dV, OutType* dO,
+         float softmax_scale, bool causal) {
     static constexpr int kM = dim_size<0, WholeShape>;
     static constexpr int kN = dim_size<1, WholeShape>;
     static constexpr int kK = dim_size<2, WholeShape>;
@@ -385,6 +399,9 @@ void run(const InType* dQ, const InType* dK, const InType* dV, OutType* dO) {
     using VecMul = typename Config::VecMul;
     using VecExp = typename Config::VecExp;
 
+    using ApplyScoreScale = typename Config::ApplyScoreScale;
+    using ApplyMask = typename Config::ApplyMask;
+
     int block_x = CeilDiv<kM, kTM>;
     int block_y = CeilDiv<kP, kTP>;
     int block_z = kBatch;
@@ -397,19 +414,21 @@ void run(const InType* dQ, const InType* dK, const InType* dV, OutType* dO) {
     int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
                                           : shm_input * sizeof(InType);
 
-    auto kernel = &ke_flash_attention<
-        InType, AccType,
-        OutType,                    //
-        GIteratorA, SharedA, RegA,  //
-        SharedALoader, RegALoader,  //
-        GIteratorB, SharedB, RegB,  //
-        SharedBLoader, RegBLoader,  //
-        GIteratorC, SharedC, RegC,  //
-        SharedCLoader, RegCLoader,  //
-        RegAcc, RegAccCast, typename Config::GlobalD, RegD, RegDCast, DStorer,
-        ConvertAcc, ConvertO, RegVec, CopyVec, RowMax, RowSum, BroadcastSub,
-        BroadcastMul, BroadcastDiv, BlockExp, BlockAdd, VecMax, VecAdd, VecSub,
-        VecMul, VecExp, RegVecPrinter, RegAccPrinter>;
+    auto kernel =
+        &ke_flash_attention<InType, AccType,
+                            OutType,                    //
+                            GIteratorA, SharedA, RegA,  //
+                            SharedALoader, RegALoader,  //
+                            GIteratorB, SharedB, RegB,  //
+                            SharedBLoader, RegBLoader,  //
+                            GIteratorC, SharedC, RegC,  //
+                            SharedCLoader, RegCLoader,  //
+                            RegAcc, RegAccCast, typename Config::GlobalD, RegD,
+                            RegDCast, DStorer, ConvertAcc, ConvertO, RegVec,
+                            CopyVec, RowMax, RowSum, BroadcastSub, BroadcastMul,
+                            BroadcastDiv, BlockExp, BlockAdd, VecMax, VecAdd,
+                            VecSub, VecMul, VecExp, RegVecPrinter,
+                            RegAccPrinter, ApplyScoreScale, ApplyMask>;
 
     if (shm_size > 48 * 1024) {
         cudaFuncSetAttribute(
@@ -417,14 +436,15 @@ void run(const InType* dQ, const InType* dK, const InType* dV, OutType* dO) {
     }
 
     kernel<<<grid, block, shm_size, 0>>>(dQ, dK, dV, dO, kM, kN, kK, kP, kTM,
-                                         kTN, kTK, kTP);
+                                         kTN, kTK, kTP, softmax_scale, causal);
 
     cudaDeviceSynchronize();
 }
 
 void flash_attention(const torch::Tensor& Q, const torch::Tensor& K,
                      const torch::Tensor& V, torch::Tensor& O, int64_t m,
-                     int64_t n, int64_t k, int64_t p) {
+                     int64_t n, int64_t k, int64_t p, double softmax_scale,
+                     bool causal) {
     using InType = __half;
     using AccType = float;
     using OutType = __half;
@@ -439,13 +459,18 @@ void flash_attention(const torch::Tensor& Q, const torch::Tensor& K,
     if (m == 64 && n == 256 && k == 128 && p == 128) {
         using WholeShape = FlashAttentionShape<64, 256, 128, 128>;
         const int kBatch = 1;
-        run<InType, AccType, OutType, WholeShape, CtaTileShape, kBatch>(dQ, dK,
-                                                                        dV, dO);
+        run<InType, AccType, OutType, WholeShape, CtaTileShape, kBatch>(
+            dQ, dK, dV, dO, softmax_scale, causal);
     } else if (m == 64 && n == 128 && k == 128 && p == 128) {
         using WholeShape = FlashAttentionShape<64, 128, 128, 128>;
         const int kBatch = 1;
-        run<InType, AccType, OutType, WholeShape, CtaTileShape, kBatch>(dQ, dK,
-                                                                        dV, dO);
+        run<InType, AccType, OutType, WholeShape, CtaTileShape, kBatch>(
+            dQ, dK, dV, dO, softmax_scale, causal);
+    } else if (m == 128 && n == 128 && k == 128 && p == 128) {
+        using WholeShape = FlashAttentionShape<128, 128, 128, 128>;
+        const int kBatch = 1;
+        run<InType, AccType, OutType, WholeShape, CtaTileShape, kBatch>(
+            dQ, dK, dV, dO, softmax_scale, causal);
     } else {
         throw std::runtime_error("Unsupported shape");
     }

@@ -146,6 +146,23 @@ struct BroadcastFuse<SrcTile, DstTile, Functor, tl::Layout::kColMajor> {
     }
 };
 
+template <typename RegTile, typename Functor>
+struct BroadcastScalar {
+    static constexpr int kRows = RegTile::kRows;
+    static constexpr int kCols = RegTile::kCols;
+
+    template <typename Element>
+    DEVICE void operator()(const RegTile& src, Element scalar, RegTile& dst) {
+        Functor f;
+        for (int i = 0; i < kRows; ++i) {
+            for (int j = 0; j < kCols; ++j) {
+                // src(i, j), scalar, dst(i, j) have the same data type.
+                f(src(i, j), scalar, dst(i, j));
+            }
+        }
+    }
+};
+
 template <typename SrcTile, typename DstTile, const tl::Layout kLayout>
 using BroadcastAdd =
     BroadcastFuse<SrcTile, DstTile, Add<typename SrcTile::DType>, kLayout>;
@@ -161,5 +178,13 @@ using BroadcastMul =
 template <typename SrcTile, typename DstTile, const tl::Layout kLayout>
 using BroadcastDiv =
     BroadcastFuse<SrcTile, DstTile, Div<typename SrcTile::DType>, kLayout>;
+
+template <typename RegTile>
+using BaseBroadcastScalarMul =
+    BroadcastScalar<RegTile, Mul<typename RegTile::DType>>;
+
+template <typename RegTile>
+using BroadcastScalarMul =
+    BroadcastScalar<RegTile, BaseBroadcastScalarMul<typename RegTile::DType>>;
 
 }  // namespace tilefusion::cell::compute

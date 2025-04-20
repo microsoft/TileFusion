@@ -128,6 +128,11 @@ struct FlashAttentionTraits {
     using VecSub = BaseTileSub<RegVec>;
     using VecMul = BaseTileMul<RegVec>;
     using VecExp = BaseTileExp<RegVec>;
+
+    using ApplyMask =
+        ApplyMask<RegAcc, WarpLayout, BaseShape, MaskMode::kCausal>;
+
+    using ApplyScoreScale = BroadcastScalarMul<RegAcc>;
 };
 
 template <typename InType,
@@ -145,11 +150,11 @@ template <typename InType,
           typename RowSum, typename BroadcastSub, typename BroadcastMul,
           typename BroadcastDiv, typename BlockExp, typename BlockAdd,
           typename VecMax, typename VecAdd, typename VecSub, typename VecMul,
-          typename VecExp>
+          typename VecExp, typename ApplyMask, typename ApplyScoreScale>
 __global__ void KeFlashAttention(const InType* dQ, const InType* dK,
                                  const InType* dV, InType* dO, int kM, int kN,
                                  int kK, int kP, int kTM, int kTN, int kTK,
-                                 int kTP) {
+                                 int kTP, float softmax_scale, bool causal) {
     // Advance to the global data tile to the current CTA.
     const InType* Q = dQ + blockIdx.z * (kM * kK) + blockIdx.x * (kTM * kK);
     const InType* K = dK + blockIdx.z * (kK * kN);
@@ -230,6 +235,9 @@ __global__ void KeFlashAttention(const InType* dQ, const InType* dK,
     VecMul vec_mul;
     VecExp vec_exp;
 
+    ApplyMask apply_mask;
+    ApplyScoreScale apply_score_scale;
+
     for (int n = 0; n < GIteratorV::sc0; ++n) {
         load_sv(gVs(n), sV);
 
@@ -247,6 +255,18 @@ __global__ void KeFlashAttention(const InType* dQ, const InType* dK,
         }
         load_rv(sV, rV);
         __syncthreads();
+
+        apply_score_scale(attn_block_f32, softmax_scale, attn_block_f32);
+
+        if (causal) {
+            int row_offset = blockIdx.x * kTM;
+            int col_offset = n * kTN;
+            apply_mask(attn_block_f32, row_offset, col_offset);
+            // __syncthreads();
+            // if (threadIdx.x == 0 && col_offset > row_offset) {
+            //     attn_block_f32.dump_value();
+            // }
+        }
 
         cast_acc(attn_block_f32, attn_block);
 

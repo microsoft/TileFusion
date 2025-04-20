@@ -32,6 +32,8 @@ class FlashAttention:
         tile_n: int,
         tile_k: int,
         tile_p: int,
+        softmax_scale: float,
+        causal: bool,
     ) -> None:
         """Initialize the flash attention.
 
@@ -47,6 +49,10 @@ class FlashAttention:
             tile_n: Tile size for N dimension.
             tile_k: Tile size for K dimension.
             tile_p: Tile size for P dimension.
+            softmax_scale: Softmax scale.
+                The scaling of QK^T before applying softmax.
+                Default is 1.0 / sqrt(matrix_k).
+            causal: bool. Whether to apply causal mask.
         """
         self.matrix_m = matrix_m
         self.matrix_n = matrix_n
@@ -57,6 +63,9 @@ class FlashAttention:
         self.tile_n = tile_n
         self.tile_k = tile_k
         self.tile_p = tile_p
+
+        self.softmax_scale = softmax_scale
+        self.causal = causal
 
         self.query = query
         self.key = key
@@ -89,6 +98,15 @@ class FlashAttention:
             value_chunk = vs[chunk_idx]
 
             attn_weights = query_view @ key_chunk  # m * ktn
+
+            if self.causal:
+                # 创建布尔掩码
+                mask = torch.tril(
+                    torch.ones_like(attn_weights), diagonal=0
+                ).bool()
+                attn_weights = torch.where(mask, attn_weights, float("-inf"))
+
+            attn_weights = attn_weights * self.softmax_scale
 
             # reduce maxes
             cur_maxes, _ = torch.max(attn_weights, dim=-1, keepdim=True)
@@ -136,6 +154,8 @@ def run_flash_attention(
     tile_n: int,
     tile_k: int,
     tile_p: int,
+    softmax_scale: float,
+    causal: bool,
 ) -> None:
     """Run flash attention test with given dimensions.
 
@@ -148,6 +168,10 @@ def run_flash_attention(
         tile_n: Tile size for N dimension.
         tile_k: Tile size for K dimension.
         tile_p: Tile size for P dimension.
+        softmax_scale: Softmax scale.
+            The scaling of QK^T before applying softmax.
+            Default is 1.0 / sqrt(matrix_k).
+        causal: bool. Whether to apply causal mask.
     """
     query = torch.randn(matrix_m, matrix_k, device="cpu")
     key = torch.randn(matrix_k, matrix_n, device="cpu")
@@ -165,6 +189,8 @@ def run_flash_attention(
         tile_n,
         tile_k,
         tile_p,
+        softmax_scale,
+        causal,
     )
 
     ref_output = flash_attn.forward().half()
@@ -174,7 +200,11 @@ def run_flash_attention(
     cuda_value = value.cuda()
 
     tiled_flash_attention = TiledFlashAttention(
-        cuda_query, cuda_key, cuda_value
+        query=cuda_query,
+        key=cuda_key,
+        value=cuda_value,
+        softmax_scale=softmax_scale,
+        causal=causal,
     )
     output = tiled_flash_attention.forward()
 
@@ -218,9 +248,11 @@ def run_flash_attention(
             "matrix_k": 128,
             "matrix_p": 128,
             "tile_m": 64,
-            "tile_n": 64,
+            "tile_n": 128,
             "tile_k": 128,
             "tile_p": 128,
+            "softmax_scale": 1.0 / 128.0,
+            "causal": False,
         },
         {
             "name": "test_case2",
@@ -229,9 +261,24 @@ def run_flash_attention(
             "matrix_k": 128,
             "matrix_p": 128,
             "tile_m": 64,
-            "tile_n": 64,
+            "tile_n": 128,
             "tile_k": 128,
             "tile_p": 128,
+            "softmax_scale": 1.0 / 128.0,
+            "causal": False,
+        },
+        {
+            "name": "test_case3",
+            "matrix_m": 128,
+            "matrix_n": 128,
+            "matrix_k": 128,
+            "matrix_p": 128,
+            "tile_m": 64,
+            "tile_n": 128,
+            "tile_k": 128,
+            "tile_p": 128,
+            "softmax_scale": 1.0 / 128.0,
+            "causal": True,
         },
     ],
     ids=lambda x: x["name"],
@@ -251,4 +298,56 @@ def test_flash_attention(test_case: dict[str, Any]) -> None:
         tile_n=test_case["tile_n"],
         tile_k=test_case["tile_k"],
         tile_p=test_case["tile_p"],
+        softmax_scale=test_case["softmax_scale"],
+        causal=test_case["causal"],
+    )
+
+
+if __name__ == "__main__":
+    # test_flash_attention(
+    #     {
+    #         "name": "test_case1",
+    #         "matrix_m": 128,
+    #         "matrix_n": 128,
+    #         "matrix_k": 128,
+    #         "matrix_p": 128,
+    #         "tile_m": 64,
+    #         "tile_n": 128,
+    #         "tile_k": 128,
+    #         "tile_p": 128,
+    #         "softmax_scale": 1.0,
+    #         "causal": False,
+    #     }
+    # )
+
+    # test_flash_attention(
+    #     {
+    #         "name": "test_case2",
+    #         "matrix_m": 128,
+    #         "matrix_n": 128,
+    #         "matrix_k": 128,
+    #         "matrix_p": 128,
+    #         "tile_m": 64,
+    #         "tile_n": 128,
+    #         "tile_k": 128,
+    #         "tile_p": 128,
+    #         "softmax_scale": 1.0 / 128,
+    #         "causal": False,
+    #     }
+    # )
+
+    test_flash_attention(
+        {
+            "name": "test_case3",
+            "matrix_m": 128,
+            "matrix_n": 128,
+            "matrix_k": 128,
+            "matrix_p": 128,
+            "tile_m": 64,
+            "tile_n": 128,
+            "tile_k": 128,
+            "tile_p": 128,
+            "softmax_scale": 1.0,
+            "causal": True,
+        }
     )

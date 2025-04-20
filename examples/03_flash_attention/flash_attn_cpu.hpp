@@ -13,7 +13,7 @@ void host_flash_attn(int kM, int kN, int kK, int kP, int kBatch,
                      __half* cur_row_max, __half* prev_row_max,
                      __half* new_row_max, __half* prev_norm_vec,
                      __half* new_norm_vec, __half* prev_sums, __half* cur_sums,
-                     __half* new_sums) {
+                     __half* new_sums, float softmax_scale, bool causal) {
 #pragma omp parallel for
     for (int b = 0; b < kBatch; ++b) {
         const __half* q_ = Q + b * kM * kK;
@@ -29,6 +29,24 @@ void host_flash_attn(int kM, int kN, int kK, int kP, int kBatch,
                     s += q_[i * kK + k] * k_[k + kK * j];
                 }
                 acc[i * kN + j] = s;
+            }
+        }
+
+        // Apply softmax scale
+        for (int i = 0; i < kM; ++i) {
+            for (int j = 0; j < kN; ++j) {
+                acc[i * kN + j] = acc[i * kN + j] * __float2half(softmax_scale);
+            }
+        }
+
+        if (causal) {
+            // Apply causal mask
+            for (int i = 0; i < kM; ++i) {
+                for (int j = 0; j < kN; ++j) {
+                    if (j > i) {
+                        acc[i * kN + j] = -INFINITY;
+                    }
+                }
             }
         }
 
