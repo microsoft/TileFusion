@@ -6,9 +6,11 @@
 # --------------------------------------------------------------------------
 
 from .flash_attention import TiledFlashAttention
+from .jit_add import jit_add
 from .scatter_nd import scatter_nd
 
 __all__ = [
     "TiledFlashAttention",
     "scatter_nd",
+    "jit_add",
 ]

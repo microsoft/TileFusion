@@ -10,9 +10,11 @@ from pathlib import Path
 from typing import Any
 
 from . import ops
+from .ops import jit_add
 
 __all__ = [
     "ops",
+    "jit_add",
 ]
 
 

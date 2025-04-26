@@ -5,10 +5,15 @@
 
 set(TARGET "tilefusion")
 
-file(GLOB_RECURSE SOURCES "kernels/*.cu" "*.cc")
+file(GLOB_RECURSE SOURCES "kernels/*.cu" "kernels/*.cc" "*.cc")
 
+# Create the target first before setting properties
 cuda_add_library(${TARGET} SHARED ${SOURCES})
 
+# Define path for NVCC
+add_compile_definitions(NVCC_PATH="${CMAKE_CUDA_COMPILER}")
+
+# Now set properties on the existing target
 set_target_properties(
   ${TARGET}
   PROPERTIES CXX_STANDARD 20
@@ -46,4 +51,8 @@ target_compile_options(
          --generate-line-info
          >)
 target_compile_features(${TARGET} PUBLIC cxx_std_20 cuda_std_20)
-target_link_libraries(${TARGET} "${TORCH_LIBRARIES}")
+
+# Link with CUDA libraries
+find_package(CUDAToolkit REQUIRED)
+target_link_libraries(${TARGET} "${TORCH_LIBRARIES}" CUDA::cudart
+                      CUDA::cuda_driver)
