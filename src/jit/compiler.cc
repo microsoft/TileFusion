@@ -3,7 +3,11 @@
 
 #include "jit/compiler.hpp"
 
+#include "cuda_info.hpp"
 #include "cuda_utils.hpp"
+
+#include <cuda_runtime.h>
+#include <glog/logging.h>
 
 #include <array>
 #include <cstdio>
@@ -13,6 +17,7 @@
 #include <random>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 
 namespace tilefusion::jit {
 
@@ -34,17 +39,25 @@ std::string generate_random_string(size_t length) {
 }
 
 std::string exec_cmd(const std::string& cmd) {
+    LOG(INFO) << "Executing command: " << cmd;
     std::array<char, 128> buffer;
     std::string result;
     std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd.c_str(), "r"),
                                                   pclose);
 
     if (!pipe) {
+        LOG(ERROR) << "popen() failed for command: " << cmd;
         throw std::runtime_error("popen() failed!");
     }
 
     while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
         result += buffer.data();
+    }
+
+    int status = pclose(pipe.release());
+    if (status != 0) {
+        LOG(WARNING) << "Command failed with status " << status << ": " << cmd;
+        LOG(WARNING) << "Output: " << result;
     }
 
     return result;
@@ -79,8 +92,11 @@ JitCompiler& JitCompiler::instance() {
 }
 
 JitCompiler::JitCompiler() {
+    // FIXME(ying): GLog should be initialized before this function is called
+
     CUresult result = cuInit(0);
     if (result != CUDA_SUCCESS) {
+        LOG(FATAL) << "Failed to initialize CUDA driver";
         throw std::runtime_error("Failed to initialize CUDA driver");
     }
 
@@ -119,11 +135,8 @@ CUfunction JitCompiler::compile_kernel(
 
     try {
         std::string ptx = compile_to_ptx(cuda_source, compile_args);
-
         CUfunction kernel = load_ptx_and_get_kernel(ptx, kernel_name);
-
         kernel_cache_[key] = kernel;
-
         return kernel;
     } catch (const std::exception& e) {
         std::cerr << "Error compiling kernel: " << e.what() << std::endl;
@@ -151,13 +164,12 @@ void JitCompiler::clear_cache() {
 std::string JitCompiler::compile_to_ptx(
     const std::string& cuda_source,
     const std::vector<std::string>& compile_args) {
-    // Write the CUDA source to a temporary file
     std::string cu_file = write_to_temp_file(cuda_source, ".cu");
 
     std::stringstream cmd;
     cmd << get_nvcc_path() << " -ptx ";
 
-    cmd << "-arch=sm_70 ";  // FIXME(ying): Auto-detect this
+    cmd << "-arch=" << GetComputeCapability() << " ";
 
     for (const auto& arg : compile_args) {
         cmd << arg << " ";
@@ -170,14 +182,23 @@ std::string JitCompiler::compile_to_ptx(
 
     std::ifstream ptx_stream(ptx_file);
     if (!ptx_stream.good()) {
+        LOG(ERROR) << "Failed to open PTX file: " << ptx_file;
+        LOG(ERROR) << "nvcc output: " << output;
         throw std::runtime_error("Failed to compile CUDA source: " + output);
     }
 
     std::stringstream ptx_content;
     ptx_content << ptx_stream.rdbuf();
+    ptx_stream.close();
 
-    std::remove(cu_file.c_str());
-    std::remove(ptx_file.c_str());
+    // For debugging, keep the files instead of removing them
+    LOG(INFO) << "Keeping temporary files for debugging:";
+    LOG(INFO) << "  Source: " << cu_file;
+    LOG(INFO) << "  PTX: " << ptx_file;
+
+    // Comment out the removal for debugging
+    // std::remove(cu_file.c_str());
+    // std::remove(ptx_file.c_str());
 
     return ptx_content.str();
 }
@@ -201,23 +222,62 @@ CUfunction JitCompiler::load_ptx_and_get_kernel(
     }
 
     module_cache_[module_key] = module;
-
+    LOG(INFO) << "Loaded PTX module: " << module_key;
     return kernel;
 }
 
 std::string JitCompiler::write_to_temp_file(const std::string& content,
                                             const std::string& extension) {
+    const char* home_dir = getenv("HOME");
+    std::string cache_dir;
+
+    if (!home_dir || strlen(home_dir) == 0) {
+        LOG(WARNING)
+            << "HOME environment variable not set or empty, using /tmp instead";
+        cache_dir = "/tmp/tilefusion";
+    } else {
+        cache_dir = std::string(home_dir) + "/.cache/tilefusion";
+    }
+
+    std::string mkdir_cmd = "mkdir -p " + cache_dir;
+
+    int ret = system(mkdir_cmd.c_str());
+    if (ret != 0) {
+        LOG(ERROR) << "Failed to create cache directory (ret=" << ret
+                   << "): " << cache_dir;
+        throw std::runtime_error("Failed to create cache directory: " +
+                                 cache_dir);
+    }
+
     std::string filename =
-        "/tmp/tilefusion_" + generate_random_string(10) + extension;
+        cache_dir + "/" + generate_random_string(10) + extension;
 
     std::ofstream out(filename);
     if (!out.good()) {
+        LOG(ERROR) << "Failed to open file for writing: " << filename;
         throw std::runtime_error("Failed to create temporary file: " +
                                  filename);
     }
 
     out << content;
+    if (!out.good()) {
+        LOG(ERROR) << "Failed to write content to file: " << filename;
+        throw std::runtime_error("Failed to write to temporary file: " +
+                                 filename);
+    }
+
     out.close();
+    if (!out) {
+        LOG(ERROR) << "Failed to close file: " << filename;
+        throw std::runtime_error("Failed to close temporary file: " + filename);
+    }
+
+    std::ifstream check(filename);
+    if (!check.good()) {
+        LOG(ERROR) << "File verification failed: " << filename;
+        throw std::runtime_error("File doesn't exist after write: " + filename);
+    }
+    check.close();
 
     return filename;
 }

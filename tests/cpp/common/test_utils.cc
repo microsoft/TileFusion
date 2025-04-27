@@ -27,4 +27,5 @@ void assert_equal(const float* v1, const float* v2, int64_t numel,
             << "v1[" << i << "] vs. v2[" << i << "] = " << v1[i] << " vs. "
             << v2[i] << std::endl;
 }
+
 }  // namespace tilefusion::testing

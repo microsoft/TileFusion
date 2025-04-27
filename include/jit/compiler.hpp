@@ -20,7 +20,6 @@ namespace tilefusion::jit {
  */
 class JitCompiler {
   public:
-    // Singleton pattern
     static JitCompiler& instance();
 
     /**
@@ -58,30 +57,21 @@ class JitCompiler {
     JitCompiler();
     ~JitCompiler();
 
-    // Delete copy constructor and assignment operator
     JitCompiler(const JitCompiler&) = delete;
     JitCompiler& operator=(const JitCompiler&) = delete;
 
-    // Compile a CUDA source file to PTX
     std::string compile_to_ptx(const std::string& cuda_source,
                                const std::vector<std::string>& compile_args);
 
-    // Load a PTX string and get a handle to the specified kernel
     CUfunction load_ptx_and_get_kernel(const std::string& ptx,
                                        const std::string& kernel_name);
 
-    // Write a string to a temporary file
     std::string write_to_temp_file(const std::string& content,
                                    const std::string& extension);
 
-    // CUDA context and module
     CUcontext cuda_context_;
-
-    // Cache of compiled kernels
     std::unordered_map<std::string, CUmodule> module_cache_;
     std::unordered_map<std::string, CUfunction> kernel_cache_;
-
-    // Mutex for thread safety
     std::mutex mutex_;
 };
 

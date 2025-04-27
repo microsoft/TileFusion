@@ -87,4 +87,17 @@ std::string GetDeviceName() {
     out_ss << out[i];
     return out_ss.str();
 }
+
+std::string GetComputeCapability() {
+    int device_id;
+    CudaCheck(cudaGetDevice(&device_id));
+
+    cudaDeviceProp prop;
+    CudaCheck(cudaGetDeviceProperties(&prop, device_id));
+
+    std::stringstream ss;
+    ss << "sm_" << prop.major << prop.minor;
+    return ss.str();
+}
+
 }  // namespace tilefusion

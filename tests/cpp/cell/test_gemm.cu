@@ -16,6 +16,7 @@ using namespace cell::copy;
 namespace tl = tile_layout;
 
 namespace {
+
 float rand_float(float a = 1e-3, float b = 1) {
     float random = ((float)rand()) / (float)RAND_MAX;
     float diff = b - a;
@@ -319,7 +320,6 @@ TEST(TestGemm, test) {
     // This unit test loads the entire matrices A and B into shared memory.
     // For example, on A100, do not test GEMM larger than [128, 128, 128],
     // as this will cause a shared memory overflow.
-
     {
         static constexpr int kSharedAccessInBytes = 128;
         // 1 warp

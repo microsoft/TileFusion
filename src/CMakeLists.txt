@@ -55,4 +55,4 @@ target_compile_features(${TARGET} PUBLIC cxx_std_20 cuda_std_20)
 # Link with CUDA libraries
 find_package(CUDAToolkit REQUIRED)
 target_link_libraries(${TARGET} "${TORCH_LIBRARIES}" CUDA::cudart
-                      CUDA::cuda_driver)
+                      CUDA::cuda_driver glog::glog)
