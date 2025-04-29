@@ -7,17 +7,28 @@
 
 using namespace tilefusion;
 using namespace cell;
-using namespace cell::copy;
+using namespace copy;
 using namespace compute;
-
 namespace tl = tile_layout;
 
 namespace tilefusion::kernels {
 
-template <typename InType, typename AccType,  //
-          typename WholeShape, typename CtaTileShape, typename WarpLayout,
-          const int kSharedAccess>
+template <typename InType, typename AccType, typename WarpLayout,  //
+          const int kM, const int kN, const int kK, const int kP>
 struct FusedTwoGemmsTraits {
+    static constexpr int kTM = 64;
+    static constexpr int kTN = 64;
+    static constexpr int kTK = 64;
+    static constexpr int kTP = 64;
+
+    static constexpr int kSharedAccess = 64;
+
+    static constexpr int kShmInput = (kTM * kTK + kTK * kTN + kTN * kTP);
+    static constexpr int kShmOutput = kTM * kTP;
+    static constexpr int kShmSize = kShmInput < kShmOutput
+                                        ? kShmOutput * sizeof(InType)
+                                        : kShmInput * sizeof(InType);
+
     using BaseShape = traits::BaseTileShape<InType>;
 
     static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
@@ -25,16 +36,6 @@ struct FusedTwoGemmsTraits {
     static_assert(kWarpPerCol == 1, "WarpPerCol must be 1");
 
     static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
-
-    static constexpr int kM = dim_size<0, WholeShape>;
-    static constexpr int kN = dim_size<1, WholeShape>;
-    static constexpr int kK = dim_size<2, WholeShape>;
-    static constexpr int kP = dim_size<3, WholeShape>;
-
-    static constexpr int kTM = dim_size<0, CtaTileShape>;
-    static constexpr int kTN = dim_size<1, CtaTileShape>;
-    static constexpr int kTK = dim_size<2, CtaTileShape>;
-    static constexpr int kTP = dim_size<3, CtaTileShape>;
 
     // operand A
     using GlobalA = GlobalTile<InType, tl::RowMajor<kTM, kK>>;
@@ -122,7 +123,7 @@ template <typename InType, typename AccType,                     //
           typename SharedD, typename RegD, typename RegDHalf,
           typename StoreRegD, typename StoreSharedD, typename ConvertAcc,
           typename ConvertD>
-__global__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
+__device__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
                                    const InType* dC, InType* dD, int kM, int kN,
                                    int kK, int kP, int kTM, int kTN, int kTK,
                                    int kTP) {
@@ -206,5 +207,4 @@ __global__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
     __syncthreads();
     store_sD(sD, gD);
 }
-
 }  // namespace tilefusion::kernels

@@ -2,13 +2,13 @@
 // Licensed under the MIT License.
 
 #include "cell/mod.hpp"
-#include "kernels/flash_attn.hpp"
+#include "kernels/ops.hpp"
 #include "types/mod.hpp"
 
 using namespace tilefusion;
 using namespace cell;
-using namespace cell::copy;
-using namespace cell::compute;
+using namespace copy;
+using namespace compute;
 namespace tl = tile_layout;
 
 namespace tilefusion::kernels {

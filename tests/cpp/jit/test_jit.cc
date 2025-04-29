@@ -3,7 +3,7 @@
 
 #include "common/test_utils.hpp"
 #include "cuda_utils.hpp"
-#include "jit/compiler.hpp"
+#include "jit/mod.hpp"
 #include "kernels/common.hpp"
 
 #include <cuda_runtime.h>
@@ -16,25 +16,13 @@
 namespace tilefusion::testing {
 
 using namespace tilefusion::jit;
+
 namespace {
 float rand_float(float a = 1e-3, float b = 1) {
     float random = ((float)rand()) / (float)RAND_MAX;
     float diff = b - a;
     float r = random * diff;
     return a + r;
-}
-
-template <typename T>
-std::string get_type_string() {
-    if (std::is_same<T, float>::value) {
-        return "float";
-    } else if (std::is_same<T, double>::value) {
-        return "double";
-    } else if (std::is_same<T, int>::value) {
-        return "int";
-    } else {
-        throw std::runtime_error("Unsupported data type");
-    }
 }
 
 std::string generate_add_kernel_source(const std::string& dtype, int numel) {
@@ -58,11 +46,11 @@ extern "C" __global__ void add_kernel_)"
     return ss.str();
 }
 
-template <typename T>
-void jit_add_template(const T* a, const T* b, T* out, int n) {
+template <typename DType>
+void jit_add_template(const DType* a, const DType* b, DType* out, int n) {
     if (n == 0) return;
 
-    std::string dtype = get_type_string<T>();
+    std::string dtype = get_type_string<DType>();
     std::string kernel_source = generate_add_kernel_source(dtype, n);
     std::string kernel_name = "add_kernel_" + dtype + "_" + std::to_string(n);
 

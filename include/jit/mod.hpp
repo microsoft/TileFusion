@@ -3,5 +3,5 @@
 
 #pragma once
 
-#include "kernels/flash_attn.hpp"
-#include "kernels/scatter_nd.hpp"
+#include "jit/common.hpp"
+#include "jit/compiler.hpp"

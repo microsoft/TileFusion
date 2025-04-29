@@ -1,10 +1,9 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#include "kernels/scatter_nd.hpp"
+#include "kernels/dispatch_macros.hpp"
+#include "kernels/ops.hpp"
 #include "traits/base.hpp"
-
-#include <torch/script.h>
 
 namespace tilefusion::kernels {
 

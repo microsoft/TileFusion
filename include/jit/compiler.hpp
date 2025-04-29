@@ -28,12 +28,14 @@ class JitCompiler {
      *
      * @param kernel_name The name of the kernel function to compile
      * @param cuda_source The CUDA source code containing the kernel
+     * @param include_paths Additional include paths to pass to NVCC
      * @param compile_args Additional compiler arguments to pass to NVCC
      * @return Function pointer to the compiled kernel or nullptr if compilation
      * fails
      */
     CUfunction compile_kernel(
         const std::string& kernel_name, const std::string& cuda_source,
+        const std::vector<std::string>& include_paths = {},
         const std::vector<std::string>& compile_args = {});
 
     /**
@@ -41,11 +43,13 @@ class JitCompiler {
      *
      * @param kernel_name The name of the kernel function
      * @param cuda_source The CUDA source code
+     * @param include_paths Additional include paths
      * @param compile_args Additional compiler arguments
      * @return Function pointer to the compiled kernel
      */
     CUfunction get_or_compile_kernel(
         const std::string& kernel_name, const std::string& cuda_source,
+        const std::vector<std::string>& include_paths = {},
         const std::vector<std::string>& compile_args = {});
 
     /**
@@ -61,6 +65,7 @@ class JitCompiler {
     JitCompiler& operator=(const JitCompiler&) = delete;
 
     std::string compile_to_ptx(const std::string& cuda_source,
+                               const std::vector<std::string>& include_paths,
                                const std::vector<std::string>& compile_args);
 
     CUfunction load_ptx_and_get_kernel(const std::string& ptx,

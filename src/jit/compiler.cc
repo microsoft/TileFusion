@@ -123,6 +123,7 @@ JitCompiler::~JitCompiler() {
 
 CUfunction JitCompiler::compile_kernel(
     const std::string& kernel_name, const std::string& cuda_source,
+    const std::vector<std::string>& include_paths,
     const std::vector<std::string>& compile_args) {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -134,7 +135,8 @@ CUfunction JitCompiler::compile_kernel(
     }
 
     try {
-        std::string ptx = compile_to_ptx(cuda_source, compile_args);
+        std::string ptx =
+            compile_to_ptx(cuda_source, include_paths, compile_args);
         CUfunction kernel = load_ptx_and_get_kernel(ptx, kernel_name);
         kernel_cache_[key] = kernel;
         return kernel;
@@ -146,8 +148,10 @@ CUfunction JitCompiler::compile_kernel(
 
 CUfunction JitCompiler::get_or_compile_kernel(
     const std::string& kernel_name, const std::string& cuda_source,
+    const std::vector<std::string>& include_paths,
     const std::vector<std::string>& compile_args) {
-    return compile_kernel(kernel_name, cuda_source, compile_args);
+    return compile_kernel(kernel_name, cuda_source, include_paths,
+                          compile_args);
 }
 
 void JitCompiler::clear_cache() {
@@ -163,6 +167,7 @@ void JitCompiler::clear_cache() {
 
 std::string JitCompiler::compile_to_ptx(
     const std::string& cuda_source,
+    const std::vector<std::string>& include_paths,
     const std::vector<std::string>& compile_args) {
     std::string cu_file = write_to_temp_file(cuda_source, ".cu");
 
@@ -170,6 +175,10 @@ std::string JitCompiler::compile_to_ptx(
     cmd << get_nvcc_path() << " -ptx ";
 
     cmd << "-arch=" << GetComputeCapability() << " ";
+
+    for (const auto& path : include_paths) {
+        cmd << "-I" << path << " ";
+    }
 
     for (const auto& arg : compile_args) {
         cmd << arg << " ";
