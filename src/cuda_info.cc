@@ -12,16 +12,16 @@ namespace tilefusion {
 // Returns the number of GPUs.
 int GetGPUDeviceCount() {
     int deviceCount = 0;
-    CudaCheck(cudaGetDeviceCount(&deviceCount));
+    CUDA_CHECK(cudaGetDeviceCount(&deviceCount));
     return deviceCount;
 }
 
 // Returns the compute capability of the given GPU.
 int GetGPUComputeCapability(int id) {
     int major, minor;
-    CudaCheck(
+    CUDA_CHECK(
         cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, id));
-    CudaCheck(
+    CUDA_CHECK(
         cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, id));
     return major * 10 + minor;
 }
@@ -29,7 +29,7 @@ int GetGPUComputeCapability(int id) {
 // Returns the number of multiprocessors for the given GPU.
 int GetGPUMultiProcessors(int id) {
     int count;
-    CudaCheck(
+    CUDA_CHECK(
         cudaDeviceGetAttribute(&count, cudaDevAttrMultiProcessorCount, id));
     return count;
 }
@@ -37,7 +37,7 @@ int GetGPUMultiProcessors(int id) {
 // Returns the maximum number of threads per multiprocessor for the given GPU.
 int GetGPUMaxThreadsPerMultiProcessor(int id) {
     int count;
-    CudaCheck(cudaDeviceGetAttribute(
+    CUDA_CHECK(cudaDeviceGetAttribute(
         &count, cudaDevAttrMaxThreadsPerMultiProcessor, id));
     return count;
 }
@@ -45,7 +45,7 @@ int GetGPUMaxThreadsPerMultiProcessor(int id) {
 // Returns the maximum number of threads per block for the given GPU.
 int GetGPUMaxThreadsPerBlock(int id) {
     int count;
-    CudaCheck(
+    CUDA_CHECK(
         cudaDeviceGetAttribute(&count, cudaDevAttrMaxThreadsPerBlock, id));
     return count;
 }
@@ -55,13 +55,13 @@ dim3 GetGpuMaxGridDimSize(int id) {
     dim3 grid_size;
 
     int size;
-    CudaCheck(cudaDeviceGetAttribute(&size, cudaDevAttrMaxGridDimX, id));
+    CUDA_CHECK(cudaDeviceGetAttribute(&size, cudaDevAttrMaxGridDimX, id));
     grid_size.x = size;
 
-    CudaCheck(cudaDeviceGetAttribute(&size, cudaDevAttrMaxGridDimY, id));
+    CUDA_CHECK(cudaDeviceGetAttribute(&size, cudaDevAttrMaxGridDimY, id));
     grid_size.y = size;
 
-    CudaCheck(cudaDeviceGetAttribute(&size, cudaDevAttrMaxGridDimZ, id));
+    CUDA_CHECK(cudaDeviceGetAttribute(&size, cudaDevAttrMaxGridDimZ, id));
     grid_size.z = size;
     return grid_size;
 }
@@ -90,10 +90,10 @@ std::string GetDeviceName() {
 
 std::string GetComputeCapability() {
     int device_id;
-    CudaCheck(cudaGetDevice(&device_id));
+    CUDA_CHECK(cudaGetDevice(&device_id));
 
     cudaDeviceProp prop;
-    CudaCheck(cudaGetDeviceProperties(&prop, device_id));
+    CUDA_CHECK(cudaGetDeviceProperties(&prop, device_id));
 
     std::stringstream ss;
     ss << "sm_" << prop.major << prop.minor;

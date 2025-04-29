@@ -13,20 +13,6 @@
 
 #include <sstream>
 
-#define CUDA_CHECK(call)                                                       \
-    do {                                                                       \
-        CUresult result = call;                                                \
-        if (result != CUDA_SUCCESS) {                                          \
-            const char* error_string;                                          \
-            cuGetErrorString(result, &error_string);                           \
-            std::stringstream err;                                             \
-            err << "CUDA error: " << error_string << " (" << result << ") at " \
-                << __FILE__ << ":" << __LINE__;                                \
-            LOG(ERROR) << err.str();                                           \
-            throw std::runtime_error(err.str());                               \
-        }                                                                      \
-    } while (0)
-
 namespace tilefusion::testing {
 
 using namespace tilefusion::jit;
@@ -38,23 +24,50 @@ float rand_float(float a = 1e-3, float b = 1) {
     return a + r;
 }
 
-const std::string kAddKernelSource = R"(
-extern "C" __global__ void add_kernel(const float* a, const float* b,
-                                      float* out, int n) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < n) {
-        out[idx] = a[idx] + b[idx];
+template <typename T>
+std::string get_type_string() {
+    if (std::is_same<T, float>::value) {
+        return "float";
+    } else if (std::is_same<T, double>::value) {
+        return "double";
+    } else if (std::is_same<T, int>::value) {
+        return "int";
+    } else {
+        throw std::runtime_error("Unsupported data type");
     }
 }
-)";
-}  // namespace
 
-void jit_add(const float* a, const float* b, float* out, int n) {
+std::string generate_add_kernel_source(const std::string& dtype, int numel) {
+    std::stringstream ss;
+    ss << R"(
+template <typename DType, const int kNumel>
+__device__ void add_device(const DType* a, const DType* b, DType* out) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < kNumel) out[idx] = a[idx] + b[idx];
+}
+
+extern "C" __global__ void add_kernel_)"
+       << dtype << "_" << numel << R"((
+    const )"
+       << dtype << R"(* a, const )" << dtype << R"(* b, )" << dtype
+       << R"(* out) {
+    add_device<)"
+       << dtype << ", " << numel << R"(>(a, b, out);
+}
+)";
+    return ss.str();
+}
+
+template <typename T>
+void jit_add_template(const T* a, const T* b, T* out, int n) {
     if (n == 0) return;
 
+    std::string dtype = get_type_string<T>();
+    std::string kernel_source = generate_add_kernel_source(dtype, n);
+    std::string kernel_name = "add_kernel_" + dtype + "_" + std::to_string(n);
+
     auto& jit = JitCompiler::instance();
-    CUfunction kernel =
-        jit.get_or_compile_kernel("add_kernel", kAddKernelSource);
+    CUfunction kernel = jit.get_or_compile_kernel(kernel_name, kernel_source);
 
     if (!kernel) {
         throw std::runtime_error("Failed to compile or retrieve kernel");
@@ -63,15 +76,14 @@ void jit_add(const float* a, const float* b, float* out, int n) {
     int block_size = 128;
     int grid_size = (n + block_size - 1) / block_size;
 
-    // NOTE: The CUDA driver API expects pointers to pointers for kernel
-    // arguments
-    void* args[] = {&a, &b, &out, &n};
+    void* args[] = {&a, &b, &out};
 
-    CUDA_CHECK(cuLaunchKernel(kernel, grid_size, 1, 1, block_size, 1, 1, 0,
-                              nullptr, args, nullptr));
+    CUDA_DRIVER_CHECK(cuLaunchKernel(kernel, grid_size, 1, 1, block_size, 1, 1,
+                                     0, nullptr, args, nullptr));
 
     LOG(INFO) << "Kernel launched successfully";
 }
+}  // namespace
 
 TEST(TESTJit, test_jit) {
     const int kNumel = 1024;
@@ -90,9 +102,9 @@ TEST(TESTJit, test_jit) {
     thrust::device_vector<Element> d_b = h_b;
     thrust::device_vector<Element> d_out = h_out;
 
-    jit_add(thrust::raw_pointer_cast(d_a.data()),
-            thrust::raw_pointer_cast(d_b.data()),
-            thrust::raw_pointer_cast(d_out.data()), kNumel);
+    jit_add_template(thrust::raw_pointer_cast(d_a.data()),
+                     thrust::raw_pointer_cast(d_b.data()),
+                     thrust::raw_pointer_cast(d_out.data()), kNumel);
     h_out = d_out;
 
     // Verify results

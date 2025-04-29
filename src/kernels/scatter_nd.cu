@@ -55,9 +55,9 @@ void scatter_nd(const torch::Tensor& data, torch::Tensor& updates,
     }
 
     unsigned int* device_strides;
-    CudaCheck(cudaMalloc(&device_strides, rank * sizeof(unsigned int)));
-    CudaCheck(cudaMemcpy(device_strides, strides, rank * sizeof(unsigned int),
-                         cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc(&device_strides, rank * sizeof(unsigned int)));
+    CUDA_CHECK(cudaMemcpy(device_strides, strides, rank * sizeof(unsigned int),
+                          cudaMemcpyHostToDevice));
 
     // `n` is the product of all dimensions excluding the innermost
     // dimension of `indices`.
