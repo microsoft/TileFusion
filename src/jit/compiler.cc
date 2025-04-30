@@ -83,8 +83,7 @@ std::string get_nvcc_path() {
     return "nvcc";
 #endif
 }
-
-}  // anonymous namespace
+}  // namespace
 
 JitCompiler& JitCompiler::instance() {
     static JitCompiler instance;
@@ -217,18 +216,11 @@ CUfunction JitCompiler::load_ptx_and_get_kernel(
     std::string module_key = kernel_name + "_" + generate_random_string(10);
 
     CUmodule module;
-    CUresult result = cuModuleLoadData(&module, ptx.c_str());
-    if (result != CUDA_SUCCESS) {
-        throw std::runtime_error("Failed to load PTX module");
-    }
+    CUDA_DRIVER_CHECK(cuModuleLoadData(&module, ptx.c_str()));
 
     CUfunction kernel;
-    result = cuModuleGetFunction(&kernel, module, kernel_name.c_str());
-    if (result != CUDA_SUCCESS) {
-        cuModuleUnload(module);
-        throw std::runtime_error("Failed to get kernel function: " +
-                                 kernel_name);
-    }
+    CUDA_DRIVER_CHECK(
+        cuModuleGetFunction(&kernel, module, kernel_name.c_str()));
 
     module_cache_[module_key] = module;
     LOG(INFO) << "Loaded PTX module: " << module_key;

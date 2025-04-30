@@ -115,8 +115,10 @@ struct FusedTwoGemmsTraits {
 };
 
 template <typename InType, typename AccType, typename KeTraits>
-__device__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
-                                   const InType* dC, InType* dD) {
+__device__ __forceinline__ void ke_fused_two_gemms(const InType* dA,
+                                                   const InType* dB,
+                                                   const InType* dC,
+                                                   InType* dD) {
     // constants
     static constexpr int kM = KeTraits::kM;
     static constexpr int kN = KeTraits::kN;
