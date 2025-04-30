@@ -5,7 +5,6 @@
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
-
 import pytest
 import torch
 
@@ -50,14 +49,14 @@ def create_tensor(
     )
 
 
-# @pytest.mark.parametrize(
-#     "a_rows,a_cols,b_cols,c_cols",
-#     [
-#         (256, 128, 64, 64),
-#         # (1024, 1024, 1024, 1024),
-#         # (512, 512, 512, 512),
-#     ],
-# )
+@pytest.mark.parametrize(
+    "a_rows,a_cols,b_cols,c_cols",
+    [
+        (256, 128, 64, 64),
+        # (1024, 1024, 1024, 1024),
+        # (512, 512, 512, 512),
+    ],
+)
 def test_fused_two_gemms(
     a_rows: int,
     a_cols: int,
@@ -90,19 +89,17 @@ def test_fused_two_gemms(
     output = torch.zeros(a_rows, c_cols, dtype=dtype, device=device)
 
     fused_two_gemms(input_a, input_b, input_c, output)
+    ref = input_a @ input_b @ input_c
 
-    # ref = input_a @ input_b @ input_c
+    print(output)  # noqa: T201
+    print(ref)  # noqa: T201
 
-    # assert torch.allclose(output, ref, rtol=1e-3, atol=1e-3), (
-    #     "Fused two gemms result does not match reference for "
-    #     f"matrix sizes: {a_rows}x{a_cols}, "
-    #     f"{a_cols}x{b_cols}, {b_cols}x{c_cols}"
-    # )
+    assert torch.allclose(output, ref, rtol=1e-3, atol=1e-3), (
+        "Fused two gemms result does not match reference for "
+        f"matrix sizes: {a_rows}x{a_cols}, "
+        f"{a_cols}x{b_cols}, {b_cols}x{c_cols}"
+    )
 
 
 if __name__ == "__main__":
-    # pytest.main([__file__, "-v"])
-
-    test_fused_two_gemms(
-        256, 128, 64, 64, torch.float16, "cuda", {"mean": 5e-3, "std": 1e-2}
-    )
+    pytest.main([__file__, "-v"])

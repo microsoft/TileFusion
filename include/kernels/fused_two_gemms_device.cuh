@@ -13,29 +13,31 @@ namespace tl = tile_layout;
 
 namespace tilefusion::kernels {
 
-template <typename InType, typename AccType, typename WarpLayout,  //
-          const int kM, const int kN, const int kK, const int kP>
+template <typename InType_, typename AccType_, typename WarpLayout,  //
+          const int kM_, const int kN_, const int kK_, const int kP_,
+          const int kTM_, const int kTN_, const int kTK_, const int kTP_>
 struct FusedTwoGemmsTraits {
-    static constexpr int kTM = 64;
-    static constexpr int kTN = 64;
-    static constexpr int kTK = 64;
-    static constexpr int kTP = 64;
+    /// constants
+    using InType = InType_;
+    using AccType = AccType_;
+
+    static constexpr int kM = kM_;
+    static constexpr int kN = kN_;
+    static constexpr int kK = kK_;
+    static constexpr int kP = kP_;
+
+    static constexpr int kTM = kTM_;
+    static constexpr int kTN = kTN_;
+    static constexpr int kTK = kTK_;
+    static constexpr int kTP = kTP_;
 
     static constexpr int kSharedAccess = 64;
-
-    static constexpr int kShmInput = (kTM * kTK + kTK * kTN + kTN * kTP);
-    static constexpr int kShmOutput = kTM * kTP;
-    static constexpr int kShmSize = kShmInput < kShmOutput
-                                        ? kShmOutput * sizeof(InType)
-                                        : kShmInput * sizeof(InType);
 
     using BaseShape = traits::BaseTileShape<InType>;
 
     static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
     static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
     static_assert(kWarpPerCol == 1, "WarpPerCol must be 1");
-
-    static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
 
     // operand A
     using GlobalA = GlobalTile<InType, tl::RowMajor<kTM, kK>>;
@@ -112,21 +114,23 @@ struct FusedTwoGemmsTraits {
     using StoreSharedD = SharedToGlobalStorer<SharedD, WarpLayout>;
 };
 
-template <typename InType, typename AccType,                     //
-          typename GIteratorA, typename SharedA, typename RegA,  //
-          typename SharedALoader, typename RegALoader,           //
-          typename GIteratorB, typename SharedB, typename RegB,  //
-          typename SharedBLoader, typename RegBLoader,           //
-          typename GIteratorC, typename SharedC, typename RegC,  //
-          typename SharedCLoader, typename RegCLoader,           //
-          typename RegAcc, typename RegAccCast, typename GlobalD,
-          typename SharedD, typename RegD, typename RegDHalf,
-          typename StoreRegD, typename StoreSharedD, typename ConvertAcc,
-          typename ConvertD>
+template <typename InType, typename AccType, typename KeTraits>
 __device__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
-                                   const InType* dC, InType* dD, int kM, int kN,
-                                   int kK, int kP, int kTM, int kTN, int kTK,
-                                   int kTP) {
+                                   const InType* dC, InType* dD) {
+    // constants
+    static constexpr int kM = KeTraits::kM;
+    static constexpr int kN = KeTraits::kN;
+    static constexpr int kK = KeTraits::kK;
+    static constexpr int kP = KeTraits::kP;
+
+    static constexpr int kTM = KeTraits::kTM;
+    static constexpr int kTP = KeTraits::kTP;
+
+    using SharedA = KeTraits::SharedA;
+    using SharedB = KeTraits::SharedB;
+    using SharedC = KeTraits::SharedC;
+    using SharedD = KeTraits::SharedD;
+
     // Advance to the global data tile to the current CTA.
     const InType* A = dA + blockIdx.z * (kM * kK) + blockIdx.x * (kTM * kK);
     const InType* B = dB + blockIdx.z * (kK * kN);
@@ -136,6 +140,7 @@ __device__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
     InType* gD_ptr = dD + blockIdx.z * (kM * kP) + blockIdx.x * (kTM * kP) +
                      (blockIdx.y * kTP);
 
+    // shared memory buffer
     extern __shared__ __align__(sizeof(double)) unsigned char shared_buf[];
     auto* shm = reinterpret_cast<InType*>(shared_buf);
 
@@ -144,44 +149,43 @@ __device__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
     InType* sC_ptr = shm + SharedA::kNumel + SharedB::kNumel;
     InType* sD_ptr = shm;
 
-    GIteratorA gAs(A);
-    SharedA sA(sA_ptr);
-    RegA rA;
+    // declare tile, iterators, loaders, and storers
+    typename KeTraits::GIteratorA gAs(A);
+    typename KeTraits::SharedA sA(sA_ptr);
+    typename KeTraits::RegA rA;
 
-    SharedALoader load_sa;
-    RegALoader load_ra;
+    typename KeTraits::SharedALoader load_sa;
+    typename KeTraits::RegALoader load_ra;
 
-    GIteratorB gBs(B);
-    SharedB sB(sB_ptr);
-    RegB rB;
+    typename KeTraits::GIteratorB gBs(B);
+    typename KeTraits::SharedB sB(sB_ptr);
+    typename KeTraits::RegB rB;
 
-    SharedBLoader load_sb;
-    RegBLoader load_rb;
+    typename KeTraits::SharedBLoader load_sb;
+    typename KeTraits::RegBLoader load_rb;
 
-    GIteratorC gCs(gC_ptr);
-    SharedC sC(sC_ptr);
+    typename KeTraits::GIteratorC gCs(gC_ptr);
+    typename KeTraits::SharedC sC(sC_ptr);
 
-    SharedCLoader load_sc;
-    RegCLoader load_rc;
-    RegC rC;
+    typename KeTraits::SharedCLoader load_sc;
+    typename KeTraits::RegCLoader load_rc;
+    typename KeTraits::RegC rC;
 
-    GlobalD gD(gD_ptr);
-    SharedD sD(sD_ptr);
-    RegD rD;
-    RegDHalf rD_half;
-    StoreRegD store_rD;
-    StoreSharedD store_sD;
+    typename KeTraits::GlobalD gD(gD_ptr);
+    typename KeTraits::SharedD sD(sD_ptr);
+    typename KeTraits::RegD rD;
+    typename KeTraits::RegDHalf rD_half;
 
-    RegAcc acc;
-    RegAccCast acc_half;
+    typename KeTraits::RegAcc acc;
+    typename KeTraits::RegAccCast acc_half;
 
-    ConvertAcc cast_acc;  // Convert acc to half precision
-    ConvertD convert_d;   // Convert D to half precision
+    typename KeTraits::ConvertHalf cast_acc;
+    typename KeTraits::ConvertD convert_d;
 
-    for (int n = 0; n < GIteratorC::sc0; ++n) {
+    for (int n = 0; n < KeTraits::GIteratorC::sc0; ++n) {
         load_sc(gCs(n), sC);
 
-        for (int k = 0; k < GIteratorA::sc1; ++k) {
+        for (int k = 0; k < KeTraits::GIteratorA::sc1; ++k) {
             load_sa(gAs(k), sA);
             load_sb(gBs(k, n), sB);
             __copy_async();
@@ -203,8 +207,11 @@ __device__ void ke_fused_two_gemms(const InType* dA, const InType* dB,
     __syncthreads();
     convert_d(rD, rD_half);
 
+    typename KeTraits::StoreRegD store_rD;
     store_rD(rD_half, sD);
     __syncthreads();
+
+    typename KeTraits::StoreSharedD store_sD;
     store_sD(sD, gD);
 }
 }  // namespace tilefusion::kernels

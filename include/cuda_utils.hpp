@@ -12,8 +12,12 @@
 #include <stdlib.h>
 
 namespace tilefusion {
+
 template <int a, int b>
 inline constexpr int CeilDiv = (a + b - 1) / b;  // for compile-time values
+
+// Runtime version of CeilDiv
+inline int ceil_div(int a, int b) { return (a + b - 1) / b; }
 
 const char* cublasGetErrorString(cublasStatus_t status);
 

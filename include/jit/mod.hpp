@@ -5,3 +5,4 @@
 
 #include "jit/common.hpp"
 #include "jit/compiler.hpp"
+#include "jit/config.hpp"
