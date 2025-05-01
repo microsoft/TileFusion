@@ -66,10 +66,11 @@ TILEFUSION_EXPORT void scatter_nd(const torch::Tensor& data,
                                   torch::Tensor& updates,
                                   const torch::Tensor& indices);
 
-// declare the host function for flash attention
+// declare the host function for fused two gemms
 TILEFUSION_EXPORT void fused_two_gemms(const torch::Tensor& A,
                                        const torch::Tensor& B,
-                                       const torch::Tensor& C,
-                                       torch::Tensor& D);
+                                       const torch::Tensor& C, torch::Tensor& D,
+                                       int64_t tm, int64_t tn, int64_t tk,
+                                       int64_t tp);
 
 }  // namespace tilefusion::kernels

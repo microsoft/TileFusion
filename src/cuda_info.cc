@@ -100,4 +100,13 @@ std::string GetComputeCapability() {
     return ss.str();
 }
 
+int GetMaxSharedMemoryPerBlock() {
+    int device_id;
+    CUDA_CHECK(cudaGetDevice(&device_id));
+
+    cudaDeviceProp prop;
+    CUDA_CHECK(cudaGetDeviceProperties(&prop, device_id));
+    return prop.sharedMemPerBlock;
+}
+
 }  // namespace tilefusion

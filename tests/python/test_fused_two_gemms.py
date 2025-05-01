@@ -50,9 +50,9 @@ def create_tensor(
 
 
 @pytest.mark.parametrize(
-    "kM, kN, kK, kP",
-    [
-        (256, 128, 64, 64),  # TODO(ying): pass more test cases
+    "kM, kN, kK, kP, kTM, kTN, kTK, kTP",
+    [  # TODO(ying): pass more test cases
+        (256, 128, 64, 64, 64, 64, 64, 64),
     ],
 )
 def test_fused_two_gemms(
@@ -60,6 +60,10 @@ def test_fused_two_gemms(
     kN: int,
     kK: int,
     kP: int,
+    kTM: int,
+    kTN: int,
+    kTK: int,
+    kTP: int,
     dtype: torch.dtype,
     device: str,
     tensor_params: dict[str, float],
@@ -89,7 +93,7 @@ def test_fused_two_gemms(
     # It is required that:
     # A and D are laid out in row-major fashion
     # B and C are laid out in column-major fashion
-    fused_two_gemms(input_a, input_b, input_c, output)
+    fused_two_gemms(input_a, input_b, input_c, output, kTM, kTN, kTK, kTP)
     ref = input_a @ input_b.t() @ input_c.t()
 
     print(output)  # noqa: T201

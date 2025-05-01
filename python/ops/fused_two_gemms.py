@@ -43,6 +43,10 @@ def fused_two_gemms(
     input_b: torch.Tensor,
     input_c: torch.Tensor,
     output: torch.Tensor,
+    tm: int = 64,
+    tn: int = 64,
+    tk: int = 64,
+    tp: int = 64,
 ) -> None:
     """Fused two gemms implementation.
 
@@ -60,10 +64,16 @@ def fused_two_gemms(
                  in the column-major fashion.
         output: The output matrix with a shape of (M, P), laid out in the
                 row-major fashion.
+        tm: The shared memory tile size of the m-dimension.
+        tn: The shared memory tile size of the n-dimension.
+        tk: The shared memory tile size of the k-dimension.
+        tp: The shared memory tile size of the p-dimension.
     """
     _validate_tensor(input_a, "input_a")
     _validate_tensor(input_b, "input_b")
     _validate_tensor(input_c, "input_c")
     _validate_tensor(output, "output")
 
-    torch.ops.tilefusion.fused_two_gemms(input_a, input_b, input_c, output)
+    torch.ops.tilefusion.fused_two_gemms(
+        input_a, input_b, input_c, output, tm, tn, tk, tp
+    )

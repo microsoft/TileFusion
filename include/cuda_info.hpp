@@ -32,4 +32,7 @@ std::string GetDeviceName();
 
 // Returns the compute capability of the current device.
 std::string GetComputeCapability();
+
+// Returns the maximum shared memory per block for the current device.
+int GetMaxSharedMemoryPerBlock();
 }  // namespace tilefusion

@@ -19,7 +19,8 @@ REGISTER_OP(
     &flash_attention);
 
 REGISTER_OP(fused_two_gemms,
-            "fused_two_gemms(Tensor A, Tensor B, Tensor C, Tensor(a!) D) ->()",
+            "fused_two_gemms(Tensor A, Tensor B, Tensor C, Tensor(a!) D, "
+            "int tm, int tn, int tk, int tp) ->()",
             &fused_two_gemms);
 
 }  // namespace tilefusion::kernels
