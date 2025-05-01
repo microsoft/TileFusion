@@ -11,4 +11,5 @@ from .scatter_nd import scatter_nd
 __all__ = [
     "TiledFlashAttention",
     "scatter_nd",
+    "fused_two_gemms",
 ]

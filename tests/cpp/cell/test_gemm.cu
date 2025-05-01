@@ -97,10 +97,10 @@ void cublas_hgemm(int m, int n, int k, const __half* A, const __half* B,
     __half bet = 0.;
 
     cublasHandle_t handle;
-    CublasCheck(cublasCreate(&handle));
-    CublasCheck(cublasHgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, m, n, k, &alf, A,
-                            lda, B, ldb, &bet, C, ldc));
-    CublasCheck(cublasDestroy(handle));
+    CUBLAS_CHECK(cublasCreate(&handle));
+    CUBLAS_CHECK(cublasHgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, m, n, k, &alf, A,
+                             lda, B, ldb, &bet, C, ldc));
+    CUBLAS_CHECK(cublasDestroy(handle));
 }
 
 // @param strided_k: chunk size to partition the k dimension of the shared
@@ -319,7 +319,6 @@ TEST(TestGemm, test) {
     // This unit test loads the entire matrices A and B into shared memory.
     // For example, on A100, do not test GEMM larger than [128, 128, 128],
     // as this will cause a shared memory overflow.
-
     {
         static constexpr int kSharedAccessInBytes = 128;
         // 1 warp

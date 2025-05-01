@@ -19,7 +19,7 @@ namespace tilefusion {
 // import the TileFusion module in Python.
 #define TILEFUSION_EXPORT extern "C" __attribute__((visibility("default")))
 
-#define REGISTER_KERNEL(name, schema, func)                              \
+#define REGISTER_OP(name, schema, func)                                  \
     namespace {                                                          \
     static bool name##_registered = []() {                               \
         tilefusion::KernelRegistry::instance().add_kernel(#name, schema, \

@@ -1,11 +1,18 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#include "kernels/fused_two_gemms.hpp"
+#include "kernels/fused_two_gemms_device.cuh"
 #include "util.hpp"
 
 using namespace tilefusion::kernels;
 namespace tl = tilefusion::tile_layout;
+
+// kernel wrapper
+template <typename InType, typename AccType, typename Config>
+__attribute__((global)) void kernel_wrapper(const InType* A, const InType* B,
+                                            const InType* C, InType* D) {
+    ke_fused_two_gemms<InType, AccType, Config>(A, B, C, D);
+}
 
 template <typename WholeShape, typename CtaTileShape, typename WarpLayout,
           const int kBatch, const int kSharedAccess>
@@ -55,70 +62,33 @@ void run(float epsilon = 1e-3) {
     const InType* C = thrust::raw_pointer_cast(d_c.data());
     InType* D = thrust::raw_pointer_cast(d_d.data());
 
-    using Config = FusedTwoGemmsTraits<InType, AccType, WholeShape,
-                                       CtaTileShape, WarpLayout, kSharedAccess>;
-
-    using RegA = typename Config::RegA;
-    using RegB = typename Config::RegB;
-    using RegC = typename Config::RegC;
-    using RegD = typename Config::RegD;
-    using RegDHalf = typename Config::RegDHalf;
-    using RegAcc = typename Config::RegAcc;
-    using RegAccCast = typename Config::RegAccCast;
-
-    using GIteratorA = typename Config::GIteratorA;
-    using SharedA = typename Config::SharedA;
-    using SharedALoader = typename Config::SharedALoader;
-    using RegALoader = typename Config::RegALoader;
-
-    using GIteratorB = typename Config::GIteratorB;
-    using SharedB = typename Config::SharedB;
-    using SharedBLoader = typename Config::SharedBLoader;
-    using RegBLoader = typename Config::RegBLoader;
-
-    using GIteratorC = typename Config::GIteratorC;
-    using SharedC = typename Config::SharedC;
-    using SharedCLoader = typename Config::SharedCLoader;
-    using RegCLoader = typename Config::RegCLoader;
-
-    using SharedD = typename Config::SharedD;
-    using StoreRegD = typename Config::StoreRegD;
-    using StoreSharedD = typename Config::StoreSharedD;
-
-    using ConvertAcc = typename Config::ConvertHalf;
-    using ConvertD = typename Config::ConvertD;
+    using Config = FusedTwoGemmsTraits<InType, AccType, WarpLayout, kM, kN, kK,
+                                       kP, kTM, kTN, kTK, kTP>;
 
     int block_x = CeilDiv<kM, kTM>;
     int block_y = CeilDiv<kP, kTP>;
     int block_z = kBatch;
-
     dim3 grid(block_x, block_y, block_z);
-    dim3 block(Config::kThreads, 1, 1);
 
-    int shm_input = (kTM * kTK + kTK * kTN + kTN * kTP);
-    int shm_output = kTM * kTP;
-    int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
-                                          : shm_input * sizeof(InType);
+    static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
+    dim3 block(kThreads, 1, 1);
 
-    auto kernel =
-        &ke_fused_two_gemms<InType, AccType,            //
-                            GIteratorA, SharedA, RegA,  //
-                            SharedALoader, RegALoader,  //
-                            GIteratorB, SharedB, RegB,  //
-                            SharedBLoader, RegBLoader,  //
-                            GIteratorC, SharedC, RegC,  //
-                            SharedCLoader, RegCLoader,  //
-                            RegAcc, RegAccCast, typename Config::GlobalD,
-                            SharedD, RegD, RegDHalf, StoreRegD, StoreSharedD,
-                            ConvertAcc, ConvertD>;
+    static constexpr int kShmInput = (kTM * kTK + kTK * kTN + kTN * kTP);
+    static constexpr int kShmOutput = kTM * kTP;
+    static constexpr int kSharedSize = kShmInput < kShmOutput
+                                           ? kShmOutput * sizeof(InType)
+                                           : kShmInput * sizeof(InType);
 
-    if (shm_size > 48 * 1024) {
+    auto kernel = &kernel_wrapper<InType, AccType, Config>;
+
+    // FIXME(ying): make the hard-coded shared memory size dependent on the
+    // underlying hardware through `cudaGetDeviceProperties`
+    if (kSharedSize > 48 * 1024) {
         cudaFuncSetAttribute(
-            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
+            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSharedSize);
     }
 
-    kernel<<<grid, block, shm_size, 0>>>(A, B, C, D, kM, kN, kK, kP, kTM, kTN,
-                                         kTK, kTP);
+    kernel<<<grid, block, kSharedSize, 0>>>(A, B, C, D);
     cudaDeviceSynchronize();
 
     h_d = d_d;
@@ -141,14 +111,16 @@ void run(float epsilon = 1e-3) {
     InType* data = thrust::raw_pointer_cast(h_d.data());
     __half* ground_truth = thrust::raw_pointer_cast(h_d2.data());
 
-#ifdef DEBUG
+#if 0
+    int cut_off = 128;
+    cut_off = cut_off > h_d.size() ? h_d.size() : cut_off;
     printf("ours:\n");
-    for (int i = 0; i < h_d.size(); ++i) {
+    for (int i = 0; i < cut_off; ++i) {
         printf("%.3f, ", __half2float(data[i]));
         if (i && (i + 1) % 16 == 0) printf("\n");
     }
     printf("\nground_truth:\n");
-    for (int i = 0; i < h_d.size(); ++i) {
+    for (int i = 0; i < cut_off; ++i) {
         printf("%.3f, ", __half2float(ground_truth[i]));
         if (i && (i + 1) % 16 == 0) printf("\n");
     }

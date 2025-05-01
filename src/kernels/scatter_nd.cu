@@ -1,10 +1,9 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#include "kernels/scatter_nd.hpp"
+#include "kernels/dispatch_macros.hpp"
+#include "kernels/ops.hpp"
 #include "traits/base.hpp"
-
-#include <torch/script.h>
 
 namespace tilefusion::kernels {
 
@@ -55,9 +54,9 @@ void scatter_nd(const torch::Tensor& data, torch::Tensor& updates,
     }
 
     unsigned int* device_strides;
-    CudaCheck(cudaMalloc(&device_strides, rank * sizeof(unsigned int)));
-    CudaCheck(cudaMemcpy(device_strides, strides, rank * sizeof(unsigned int),
-                         cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc(&device_strides, rank * sizeof(unsigned int)));
+    CUDA_CHECK(cudaMemcpy(device_strides, strides, rank * sizeof(unsigned int),
+                          cudaMemcpyHostToDevice));
 
     // `n` is the product of all dimensions excluding the innermost
     // dimension of `indices`.

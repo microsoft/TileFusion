@@ -84,7 +84,7 @@ bool check_results(const __half* values1, const __half* values2, int numel,
         max_abs_diff = max_abs_diff < diff ? diff : max_abs_diff;
         total_diff += diff;
 
-#ifdef DEBUG
+#if 0
         if (diff > epsilon) {
             printf("%d-th value has large differences: %.3f vs. %.3f\n", i, v1,
                    v2);

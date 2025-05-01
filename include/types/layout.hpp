@@ -6,7 +6,7 @@
 #include "cuda_utils.hpp"
 #include "traits/base.hpp"
 
-#include <cute/tensor.hpp>
+#include <iostream>
 
 namespace tilefusion::tile_layout {
 /**
