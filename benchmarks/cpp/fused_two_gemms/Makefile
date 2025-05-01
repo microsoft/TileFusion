@@ -6,7 +6,7 @@
 
 BUILD_DIR := build
 
-.PHONY: build clean
+.PHONY: build clean run
 
 build:
 	@mkdir -p $(BUILD_DIR)
@@ -14,3 +14,6 @@ build:
 
 clean:
 	@rm -rf $(BUILD_DIR)
+
+run: build
+	@$(BUILD_DIR)/bench_fused_two_gemms

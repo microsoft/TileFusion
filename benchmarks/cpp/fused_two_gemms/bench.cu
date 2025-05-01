@@ -2,10 +2,17 @@
 // Licensed under the MIT License.
 
 #include "cutlass_fused_two_gemms.cuh"
-#include "kernels/fused_two_gemms.hpp"
+#include "kernels/fused_two_gemms_device.cuh"
 #include "util.cuh"
 
 using namespace tilefusion::kernels;
+
+// kernel wrapper
+template <typename InType, typename AccType, typename Config>
+__attribute__((global)) void kernel_wrapper(const InType* A, const InType* B,
+                                            const InType* C, InType* D) {
+    ke_fused_two_gemms<InType, AccType, Config>(A, B, C, D);
+}
 
 template <typename WholeShape, typename CtaTileShape, typename WarpLayout,
           const int kBatch, const int kSharedAccess>
@@ -71,75 +78,36 @@ void run(float epsilon = 1e-3) {
     const InType* C = reinterpret_cast<const InType*>(CC);
     InType* D = thrust::raw_pointer_cast(d_d.data());
 
-    using Config = FusedTwoGemmsTraits<InType, AccType, WholeShape,
-                                       CtaTileShape, WarpLayout, kSharedAccess>;
-
-    using RegA = typename Config::RegA;
-    using RegB = typename Config::RegB;
-    using RegC = typename Config::RegC;
-    using RegD = typename Config::RegD;
-    using RegDHalf = typename Config::RegDHalf;
-    using RegAcc = typename Config::RegAcc;
-    using RegAccCast = typename Config::RegAccCast;
-
-    using GIteratorA = typename Config::GIteratorA;
-    using SharedA = typename Config::SharedA;
-    using SharedALoader = typename Config::SharedALoader;
-    using RegALoader = typename Config::RegALoader;
-
-    using GIteratorB = typename Config::GIteratorB;
-    using SharedB = typename Config::SharedB;
-    using SharedBLoader = typename Config::SharedBLoader;
-    using RegBLoader = typename Config::RegBLoader;
-
-    using GIteratorC = typename Config::GIteratorC;
-    using SharedC = typename Config::SharedC;
-    using SharedCLoader = typename Config::SharedCLoader;
-    using RegCLoader = typename Config::RegCLoader;
-
-    using SharedD = typename Config::SharedD;
-    using StoreRegD = typename Config::StoreRegD;
-    using StoreSharedD = typename Config::StoreSharedD;
-
-    using ConvertAcc = typename Config::ConvertHalf;
-    using ConvertD = typename Config::ConvertD;
+    using Config = FusedTwoGemmsTraits<InType, AccType, WarpLayout, kM, kN, kK,
+                                       kP, kTM, kTN, kTK, kTP>;
 
     int block_x = CeilDiv<kM, kTM>;
     int block_y = CeilDiv<kP, kTP>;
     int block_z = kBatch;
+    static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
 
     dim3 grid(block_x, block_y, block_z);
-    dim3 block(Config::kThreads, 1, 1);
+    dim3 block(kThreads, 1, 1);
 
-    int shm_input = (kTM * kTK + kTK * kTN + kTN * kTP);
-    int shm_output = kTM * kTP;
-    int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
-                                          : shm_input * sizeof(InType);
+    static constexpr int kShmInput = (kTM * kTK + kTK * kTN + kTN * kTP);
+    static constexpr int kShmOutput = kTM * kTP;
+    static constexpr int kSharedSize = kShmInput < kShmOutput
+                                           ? kShmOutput * sizeof(InType)
+                                           : kShmInput * sizeof(InType);
 
-    auto ke_tilefusion =
-        &ke_fused_two_gemms<InType, AccType,            //
-                            GIteratorA, SharedA, RegA,  //
-                            SharedALoader, RegALoader,  //
-                            GIteratorB, SharedB, RegB,  //
-                            SharedBLoader, RegBLoader,  //
-                            GIteratorC, SharedC, RegC,  //
-                            SharedCLoader, RegCLoader,  //
-                            RegAcc, RegAccCast, typename Config::GlobalD,
-                            SharedD, RegD, RegDHalf, StoreRegD, StoreSharedD,
-                            ConvertAcc, ConvertD>;
+    auto ke_tilefusion = &kernel_wrapper<InType, AccType, Config>;
 
     auto cutlass_fused_gemm =
         &cute_fused_gemm<cutlass::half_t, kWarpPerRow, kWarpPerCol, kM, kN, kK,
                          kP, kTM, kTN, kTK, kTP>;
 
-    if (shm_size > 48 * 1024) {
+    if (kSharedSize > 48 * 1024) {
         cudaFuncSetAttribute(ke_tilefusion,
                              cudaFuncAttributeMaxDynamicSharedMemorySize,
-                             shm_size);
+                             kSharedSize);
     }
 
-    ke_tilefusion<<<grid, block, shm_size, 0>>>(A, B, C, D, kM, kN, kK, kP, kTM,
-                                                kTN, kTK, kTP);
+    ke_tilefusion<<<grid, block, kSharedSize, 0>>>(A, B, C, D);
     cudaDeviceSynchronize();
 
     h_d = d_d;
@@ -202,15 +170,13 @@ void run(float epsilon = 1e-3) {
     const int iters = 50;
 
     for (int i = 0; i < warm_up; ++i) {
-        ke_tilefusion<<<grid, block, shm_size, 0>>>(A, B, C, D, kM, kN, kK, kP,
-                                                    kTM, kTN, kTK, kTP);
+        ke_tilefusion<<<grid, block, kSharedSize, 0>>>(A, B, C, D);
     }
     cudaDeviceSynchronize();
 
     timer.start();
     for (int i = 0; i < iters; ++i) {
-        ke_tilefusion<<<grid, block, shm_size, 0>>>(A, B, C, D, kM, kN, kK, kP,
-                                                    kTM, kTN, kTK, kTP);
+        ke_tilefusion<<<grid, block, kSharedSize, 0>>>(A, B, C, D);
     }
     cudaDeviceSynchronize();
     float tilefusion_time = timer.stop() / iters;
@@ -224,59 +190,59 @@ void run(float epsilon = 1e-3) {
 
     std::cout << "[" << kM << ", " << kN << ", " << kK << ", " << kP << "]\t["
               << kTM << ", " << kTN << ", " << kTK << ", " << kTP << "]\t"
-              << cublas_time << "\t" << cutlass_time << "("
-              << cutlass_time / cublas_time << ")"
+              << std::fixed << std::setprecision(4) << cublas_time << "\t"
+              << cutlass_time << "(" << cutlass_time / cublas_time << ")"
               << "\t" << tilefusion_time << "(" << tilefusion_time / cublas_time
               << ")" << std::endl;
 }
 
 int main() {
-    using WarpLayout2 = tl::RowMajor<4, 1>;
-    static constexpr int kSharedAccess1 = 128;
+    using WarpLayout = tl::RowMajor<4, 1>;
+    static constexpr int kSharedAccess = 128;
 
     run<B2BGemmShape<4096 /*M*/, 1024 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, kSharedAccess0>(5e-3);
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     run<B2BGemmShape<4096 /*M*/, 2048 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, kSharedAccess0>(5e-3);
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     run<B2BGemmShape<8192 /*M*/, 1024 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, kSharedAccess0>(5e-3);
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     run<B2BGemmShape<8192 /*M*/, 2048 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, kSharedAccess0>(5e-3);
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     run<B2BGemmShape<4096 /*M*/, 4096 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, kSharedAccess0>(5e-3);
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     run<B2BGemmShape<4096 /*M*/, 2048 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, kSharedAccess0>(5e-3);
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     run<B2BGemmShape<8192 /*M*/, 8192 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, kSharedAccess0>(5e-3);
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     run<B2BGemmShape<8192 /*M*/, 4096 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, kSharedAccess0>(5e-3);
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     run<B2BGemmShape<2048 /*M*/, 2048 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, kSharedAccess0>(5e-3);
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     run<B2BGemmShape<1024 /*M*/, 1024 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, kSharedAccess0>(5e-3);
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     run<B2BGemmShape<512 /*M*/, 512 /*N*/, 128 /*K*/, 128 /*P*/>,
         B2BGemmShape<64 /*kTM*/, 128 /*kTN*/, 128 /*kTK*/, 128 /*kTP*/>,
-        WarpLayout2, 1, kSharedAccess0>(5e-3);
+        WarpLayout, 1, kSharedAccess>(5e-3);
 
     return 0;
 }
