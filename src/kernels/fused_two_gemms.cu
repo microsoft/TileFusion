@@ -50,9 +50,9 @@ void fused_two_gemms(const torch::Tensor& A, const torch::Tensor& B,
                 "the inputs and output must be half-precision (fp16).");
 
     const int64_t m = A.size(0);
-    const int64_t n = B.size(1);
+    const int64_t n = B.size(0);
     const int64_t k = B.size(1);
-    const int64_t p = C.size(1);
+    const int64_t p = C.size(0);
 
     // TODO(ying): fix this hard-coded shared memory tile sizes.
     static constexpr int kTM = 64;

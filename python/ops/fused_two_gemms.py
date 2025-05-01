@@ -5,7 +5,6 @@
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
-
 import torch
 
 __all__ = [
@@ -53,10 +52,14 @@ def fused_two_gemms(
         D = input_a @ input_b @ input_c
 
     Args:
-        input_a: The first input matrix.
-        input_b: The second input matrix.
-        input_c: The third input matrix.
-        output: The output matrix.
+        input_a: The first input matrix with a shape of (M, K) and is laid out
+                 in the row-major fashion.
+        input_b: The second input matrix with a shape of (K, N) and is laid out
+                 in the column-major fashion.
+        input_c: The third input matrix with a shape of (N, P) and is laid out
+                 in the column-major fashion.
+        output: The output matrix with a shape of (M, P), laid out in the
+                row-major fashion.
     """
     _validate_tensor(input_a, "input_a")
     _validate_tensor(input_b, "input_b")

@@ -81,6 +81,8 @@ void run(float epsilon = 1e-3) {
 
     auto kernel = &kernel_wrapper<InType, AccType, Config>;
 
+    // FIXME(ying): make the hard-coded shared memory size dependent on the
+    // underlying hardware through `cudaGetDeviceProperties`
     if (kSharedSize > 48 * 1024) {
         cudaFuncSetAttribute(
             kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSharedSize);
@@ -109,14 +111,16 @@ void run(float epsilon = 1e-3) {
     InType* data = thrust::raw_pointer_cast(h_d.data());
     __half* ground_truth = thrust::raw_pointer_cast(h_d2.data());
 
-#ifdef DEBUG
+#if 0
+    int cut_off = 128;
+    cut_off = cut_off > h_d.size() ? h_d.size() : cut_off;
     printf("ours:\n");
-    for (int i = 0; i < h_d.size(); ++i) {
+    for (int i = 0; i < cut_off; ++i) {
         printf("%.3f, ", __half2float(data[i]));
         if (i && (i + 1) % 16 == 0) printf("\n");
     }
     printf("\nground_truth:\n");
-    for (int i = 0; i < h_d.size(); ++i) {
+    for (int i = 0; i < cut_off; ++i) {
         printf("%.3f, ", __half2float(ground_truth[i]));
         if (i && (i + 1) % 16 == 0) printf("\n");
     }

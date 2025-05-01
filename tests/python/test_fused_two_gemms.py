@@ -34,7 +34,7 @@ def tensor_params() -> dict[str, float]:
 
 def create_tensor(
     size: tuple[int, ...],
-    mean: float = 5e-3,
+    mean: float = 5e-2,
     std: float = 1e-2,
     dtype: torch.dtype = torch.float16,
     device: str = "cuda",
@@ -50,54 +50,54 @@ def create_tensor(
 
 
 @pytest.mark.parametrize(
-    "a_rows,a_cols,b_cols,c_cols",
+    "kM, kN, kK, kP",
     [
-        (256, 128, 64, 64),
-        # (1024, 1024, 1024, 1024),
-        # (512, 512, 512, 512),
+        (256, 128, 64, 64),  # TODO(ying): pass more test cases
     ],
 )
 def test_fused_two_gemms(
-    a_rows: int,
-    a_cols: int,
-    b_cols: int,
-    c_cols: int,
+    kM: int,
+    kN: int,
+    kK: int,
+    kP: int,
     dtype: torch.dtype,
     device: str,
     tensor_params: dict[str, float],
 ) -> None:
     """Test the fused two gemms operation with different matrix sizes."""
+    # torch tensors by default are laid out in row-major fashion
     input_a = create_tensor(
-        (a_rows, a_cols),
+        (kM, kK),
         dtype=dtype,
         device=device,
         **tensor_params,
     )
     input_b = create_tensor(
-        (a_cols, b_cols),
+        (kN, kK),
         dtype=dtype,
         device=device,
         **tensor_params,
     )
     input_c = create_tensor(
-        (b_cols, c_cols),
+        (kP, kN),
         dtype=dtype,
         device=device,
         **tensor_params,
     )
+    output = torch.zeros(kM, kP, dtype=dtype, device=device)
 
-    output = torch.zeros(a_rows, c_cols, dtype=dtype, device=device)
-
+    # It is required that:
+    # A and D are laid out in row-major fashion
+    # B and C are laid out in column-major fashion
     fused_two_gemms(input_a, input_b, input_c, output)
-    ref = input_a @ input_b @ input_c
+    ref = input_a @ input_b.t() @ input_c.t()
 
     print(output)  # noqa: T201
     print(ref)  # noqa: T201
 
     assert torch.allclose(output, ref, rtol=1e-3, atol=1e-3), (
         "Fused two gemms result does not match reference for "
-        f"matrix sizes: {a_rows}x{a_cols}, "
-        f"{a_cols}x{b_cols}, {b_cols}x{c_cols}"
+        f"matrix sizes: {kM}x{kK}, {kK}x{kN}, {kN}x{kP}"
     )
 
 
