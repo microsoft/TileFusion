@@ -38,3 +38,6 @@ MANIFEST
 # Build directories in examples and benchmarks
 examples/**/build/
 benchmarks/**/build/
+
+# Development mode soft link
+tilefusion

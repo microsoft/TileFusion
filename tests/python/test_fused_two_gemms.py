@@ -1,4 +1,7 @@
-"""Test for fused two gemms operation."""
+"""Test for fused two gemms operation.
+
+isort:skip_file
+"""
 
 # -------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
