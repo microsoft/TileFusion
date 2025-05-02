@@ -33,8 +33,6 @@ struct FusedTwoGemmsTraits {
 
     static constexpr int kSharedAccess = 64;
 
-    using BaseShape = traits::BaseTileShape<InType>;
-
     static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
     static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
     static_assert(kWarpPerCol == 1, "WarpPerCol must be 1");
@@ -49,6 +47,7 @@ struct FusedTwoGemmsTraits {
     using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kUseSwizzling,
                                kSharedAccess>;
 
+    using BaseShape = traits::BaseTileShape<InType>;
     static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kAKs = kTK / BaseShape::kCols;
     using RegA = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kAMs, kAKs>>;
@@ -97,10 +96,9 @@ struct FusedTwoGemmsTraits {
     using RegDHalf =
         RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kDMs, kDPs>>;
 
+    // Reg Acc
     static constexpr int kAccMs = kTM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kAccNs = kTN / kWarpPerCol / BaseShape::kCols;
-
-    // Reg Acc
     using RegAcc =
         RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kAccMs, kAccNs>>;
     using RegAccCast =
