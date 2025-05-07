@@ -84,6 +84,9 @@ class SharedTile {
     DEVICE SharedTile(DType* data)
         : data_(data), layout_(Layout{}), offset_(0) {}
 
+    DEVICE SharedTile(const DType* data)
+        : data_(const_cast<DType*>(data)), layout_(Layout{}), offset_(0) {}
+
     DEVICE SharedTile(DType* data, int offset)
         : data_(data), layout_(Layout{}), offset_(offset) {}
 

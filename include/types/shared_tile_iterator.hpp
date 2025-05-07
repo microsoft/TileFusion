@@ -53,6 +53,8 @@ class STileIterator {
 
     DEVICE STileIterator(const DType* data) : data_(const_cast<DType*>(data)) {}
 
+    DEVICE void reset(DType* data) { data_ = data; }
+
     // Since a Tile is considered to be at most a 2D array, the iterator
     // traverses over these two dimensions. The current rules are:
     // 1. If the index is a 2D integer, this access is considered to be a
