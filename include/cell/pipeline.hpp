@@ -25,15 +25,15 @@ namespace tilefusion::cell {
  * ```
  *
  * ```
- * pipeline.prologue();
+ * pipeline.commit();
  * for(int i = 0; i < Pipeline::kBodyIterator; ++i){
- *     pipeline.body(i);
+ *     pipeline.commit();
  *     // other computation
  *
  *     // Wait for the previous stage to complete.
  *     pipeline.wait_group(1);
  * }
- * pipeline.epilogue();
+ * pipeline.commit();
  * pipeline.wait_group(0);
  *
  * // other computation
@@ -87,7 +87,6 @@ struct Pipeline {
      * @brief Commit the copy operation.
      */
     DEVICE void commit(bool async = false) {
-        // assert(data_ptr < Iterations);
         copy(tile_iter(data_ptr), cyc_buffer[cur_stages % NUM_STAGES]);
 
         if (async) {

@@ -17,86 +17,9 @@ template <const int kM, const int kN, const int kK>
 using GemmShape = TileShape<kM, kN, kK>;
 
 template <typename InType, typename AccType, typename WholeShape,
-          typename CtaTileShape, const int kRK, typename WarpLayout>
-struct KeGemmTraits {
-    using BaseShape = traits::BaseTileShape<InType>;
-
-    static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
-    static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
-    static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
-
-    static constexpr int kM = dim_size<0, WholeShape>;
-    static constexpr int kN = dim_size<1, WholeShape>;
-    static constexpr int kK = dim_size<2, WholeShape>;
-
-    static constexpr int kTM = dim_size<0, CtaTileShape>;
-    static constexpr int kTN = dim_size<1, CtaTileShape>;
-    static constexpr int kTK = dim_size<2, CtaTileShape>;
-
-    static const bool kSwizzled = true;
-
-    // Total data access for operand A in global memory
-    using GlobalA = GlobalTile<InType, tl::RowMajor<kTM, kK, kK>>;
-    // Access a single global tile for operand A
-    using GIteratorA = GTileIterator<GlobalA, TileShape<kTM, kTK>>;
-
-    // Shared Tile for operand A
-    using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kSwizzled>;
-    // Access a single register tile for operand A
-    using SIteratorA = STileIterator<SharedA, TileShape<kTM, kRK>>;
-
-    // Register tile for a single thread of operand A
-    static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
-    static constexpr int kAKs = kRK / BaseShape::kCols;
-    using RegA = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kAMs, kAKs>>;
-
-    // Loaders for operand A
-    using G2SLoaderA = GlobalToSharedLoader<SharedA, WarpLayout>;
-    using S2RLoaderA =
-        SharedToRegLoader<RegA, WarpLayout, WarpReuse::kRowReuseCont>;
-
-    // Total data access for operand B in global memory
-    using GlobalB = GlobalTile<InType, tl::ColMajor<kK, kTN, kK>>;
-    // Access a single global tile for operand B
-    using GIteratorB = GTileIterator<GlobalB, TileShape<kTK, kTN>>;
-
-    // Shared Tile for operand B
-    using SharedB = SharedTile<InType, tl::ColMajor<kTK, kTN>, kSwizzled>;
-    // Access a single register tile for operand B
-    using SIteratorB = STileIterator<SharedB, TileShape<kRK, kTN>>;
-
-    static_assert(GIteratorA::sc1 == GIteratorB::sc0,
-                  "mismatched K dimension!");
-    static_assert(SIteratorA::sc1 == SIteratorB::sc0,
-                  "mismatched K dimension!");
-
-    // Register tile for a single thread of operand A
-    static constexpr int kBKs = kRK / BaseShape::kRows;
-    static constexpr int kBNs = kTN / kWarpPerCol / BaseShape::kCols;
-    using RegB = RegTile<BaseTileColMajor<InType>, tl::ColMajor<kBKs, kBNs>>;
-
-    using G2SLoaderB = GlobalToSharedLoader<SharedB, WarpLayout>;
-    using S2RLoaderB =
-        SharedToRegLoader<RegB, WarpLayout, WarpReuse::kColReuseCont>;
-
-    // Global Tile for output C
-    using GlobalC = GlobalTile<AccType, tl::RowMajor<kTM, kTN, kN>>;
-    // Shared Tile for output C
-    using SharedC = SharedTile<AccType, tl::RowMajor<kTM, kTN>, kSwizzled>;
-
-    // Register Tile for output C
-    static constexpr int kCMs = kTM / kWarpPerRow / BaseShape::kRows;
-    static constexpr int kCNs = kTN / kWarpPerCol / BaseShape::kCols;
-    using RegC = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kCMs, kCNs>>;
-
-    using R2SStorerC = RegToSharedStorer<RegC, WarpLayout>;
-    using S2GStorerC = SharedToGlobalStorer<SharedC, WarpLayout>;
-};
-
-template <typename InType, typename AccType, typename WholeShape,
           typename CtaTileShape, const int kRK, typename WarpLayout,
           const int kNumStages, const int kSharedAccess = 64>
-struct KeGemmPipelineTraits {
+struct KeGemmTraits {
     using BaseShape = traits::BaseTileShape<InType>;
 
     static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
@@ -162,6 +85,8 @@ struct KeGemmPipelineTraits {
 
     // Global Tile for output C
     using GlobalC = GlobalTile<AccType, tl::RowMajor<kTM, kTN, kN>>;
+    // Shared Tile for output C
+    using SharedC = SharedTile<AccType, tl::RowMajor<kTM, kTN>, kSwizzled>;
 
     // Register Tile for output C
     static constexpr int kCMs = kTM / kWarpPerRow / BaseShape::kRows;
@@ -169,15 +94,9 @@ struct KeGemmPipelineTraits {
     using RegC = RegTile<BaseTileRowMajor<AccType>, tl::RowMajor<kCMs, kCNs>>;
 
     using R2GStorerC = RegToGlobalStorer<GlobalC, RegC, WarpLayout>;
+    using R2SStorerC = RegToSharedStorer<RegC, WarpLayout>;
+    using S2GStorerC = SharedToGlobalStorer<SharedC, WarpLayout>;
 
-    // using PipelineG2SA =
-    //     Pipeline<InType, GlobalA, SharedA, GIteratorA, G2SLoaderA,
-    //     kNumStages,
-    //              GIteratorA::sc1 - kNumStages + 1>;
-    // using PipelineG2SB =
-    //     Pipeline<InType, GlobalB, SharedB, GIteratorB, G2SLoaderB,
-    //     kNumStages,
-    //              GIteratorA::sc1 - kNumStages + 1>;
     using PipelineG2SA = Pipeline<InType, GlobalA, SharedA, GIteratorA,
                                   G2SLoaderA, kNumStages, GIteratorA::sc1>;
     using PipelineG2SB = Pipeline<InType, GlobalB, SharedB, GIteratorB,
@@ -512,9 +431,8 @@ void run_gemm(const InType* dA, const InType* dB, AccType* dC, int64_t m,
     static constexpr int kTN = dim_size<1, CtaTileShape>;
     static constexpr int kTK = dim_size<2, CtaTileShape>;
 
-    using Config =
-        KeGemmPipelineTraits<InType, AccType, WholeShape, CtaTileShape, kRK,
-                             WarpLayout, kNumStages>;
+    using Config = KeGemmTraits<InType, AccType, WholeShape, CtaTileShape, kRK,
+                                WarpLayout, kNumStages>;
 
     int block_x = CeilDiv<kM, kTM>;
     int block_y = CeilDiv<kN, kTN>;
@@ -537,8 +455,13 @@ void run_gemm(const InType* dA, const InType* dB, AccType* dC, int64_t m,
     using G2SLoaderB = typename Config::G2SLoaderB;
     using S2RLoaderB = typename Config::S2RLoaderB;
     using GlobalC = typename Config::GlobalC;
+    using SharedC = typename Config::SharedC;
     using RegC = typename Config::RegC;
+    using R2SStorerC = typename Config::R2SStorerC;
+    using S2GStorerC = typename Config::S2GStorerC;
     using R2GStorerC = typename Config::R2GStorerC;
+    using GIteratorA = typename Config::GIteratorA;
+    using GIteratorB = typename Config::GIteratorB;
     using SIteratorA = typename Config::SIteratorA;
     using SIteratorB = typename Config::SIteratorB;
     using PipelineG2SA = typename Config::PipelineG2SA;
@@ -549,7 +472,13 @@ void run_gemm(const InType* dA, const InType* dB, AccType* dC, int64_t m,
     using KernelType = void (*)(const InType*, const InType*, AccType*);
     KernelType kernel = nullptr;
 
-    if (num_stages == 2) {
+    if (num_stages == 1) {
+        kernel = &ke_gemm_stage1<InType, AccType, kM, kN, kK, kTM, kTN, kTK,
+                                 GIteratorA, SIteratorA, SharedA, RegA,
+                                 G2SLoaderA, S2RLoaderA, GIteratorB, SIteratorB,
+                                 SharedB, RegB, G2SLoaderB, S2RLoaderB, GlobalC,
+                                 SharedC, RegC, R2SStorerC, S2GStorerC>;
+    } else if (num_stages == 2) {
         kernel = &ke_gemm_stage2<InType, AccType, kM, kN, kK, kTM, kTN, kTK,
                                  kNumStages, SharedA, RegA, G2SLoaderA,
                                  S2RLoaderA, SharedB, RegB, G2SLoaderB,
@@ -588,7 +517,14 @@ void gemm(const torch::Tensor& A, const torch::Tensor& B, torch::Tensor& C,
     constexpr int kRK = 16;
     using WarpLayout = tl::RowMajor<1, 1>;
 
-    if (num_stages == 2 && m == 128 && n == 128 && k == 128) {
+    if (num_stages == 1 && m == 128 && n == 128 && k == 128) {
+        using WholeShape = GemmShape<128, 128, 128>;
+        // TODO(KuangjuX): `NUM_STAGES` is not actually used and
+        // is fixed to 2 to avoid compilation errors.
+        constexpr int NUM_STAGES = 2;
+        run_gemm<InType, AccType, WholeShape, CtaTileShape, kRK, WarpLayout,
+                 NUM_STAGES>(a_ptr, b_ptr, c_ptr, m, n, k, num_stages);
+    } else if (num_stages == 2 && m == 128 && n == 128 && k == 128) {
         using WholeShape = GemmShape<128, 128, 128>;
         constexpr int NUM_STAGES = 2;
         run_gemm<InType, AccType, WholeShape, CtaTileShape, kRK, WarpLayout,

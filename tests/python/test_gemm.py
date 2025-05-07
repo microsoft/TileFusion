@@ -60,6 +60,13 @@ def run_gemm(
     "test_case",
     [
         {
+            "name": "test_case0",
+            "m": 128,
+            "n": 128,
+            "k": 128,
+            "num_stages": 2,
+        },
+        {
             "name": "test_case1",
             "m": 128,
             "n": 128,
