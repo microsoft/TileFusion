@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 import torch
+import math
 
 from tilefusion.ops import TiledFlashAttention
 
@@ -251,7 +252,7 @@ def run_flash_attention(
             "tile_n": 128,
             "tile_k": 128,
             "tile_p": 128,
-            "softmax_scale": 1.0,
+            "softmax_scale": 1.0 / math.sqrt(128),
             "causal": False,
         },
         {
@@ -264,7 +265,7 @@ def run_flash_attention(
             "tile_n": 128,
             "tile_k": 128,
             "tile_p": 128,
-            "softmax_scale": 1.0 / 128.0,
+            "softmax_scale": 1.0 / math.sqrt(128),
             "causal": False,
         },
         {
@@ -277,7 +278,7 @@ def run_flash_attention(
             "tile_n": 128,
             "tile_k": 128,
             "tile_p": 128,
-            "softmax_scale": 1.0 / 128.0,
+            "softmax_scale": 1.0 / math.sqrt(128),
             "causal": True,
         },
     ],

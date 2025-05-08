@@ -86,12 +86,8 @@ struct Pipeline {
     /**
      * @brief Commit the copy operation.
      */
-    DEVICE void commit(bool async = false) {
+    DEVICE void commit() {
         copy(tile_iter(data_ptr), cyc_buffer[cur_stages % NUM_STAGES]);
-
-        if (async) {
-            commit_copy_group();
-        }
         data_ptr++;
         cur_stages++;
     }
@@ -117,8 +113,8 @@ struct Pipeline {
      * @param index The index of the destination tile.
      */
     DEVICE void dump_dst_tile_value(int index) {
-        if (threadIdx.x == 0) {
-            printf("data[%d]: \n", index);
+        if (thread0()) {
+            printf("data[%d]:\n", index);
             cyc_buffer[index % NUM_STAGES].dump_value();
         }
     }

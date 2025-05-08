@@ -57,12 +57,8 @@ inline void __cublasCheck(const cublasStatus_t err, const char* file,
 inline void check_gpu_memory() {
     size_t free_byte;
     size_t total_byte;
-    cudaError_t cuda_status = cudaMemGetInfo(&free_byte, &total_byte);
-    if (cuda_status != cudaSuccess) {
-        printf("Error: cudaMemGetInfo fails, %s \n",
-               cudaGetErrorString(cuda_status));
-        exit(1);
-    }
+    CUDA_CHECK(cudaMemGetInfo(&free_byte, &total_byte));
+
     double free_db = (double)free_byte;
     double total_db = (double)total_byte;
     double used_db = total_db - free_db;

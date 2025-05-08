@@ -34,8 +34,7 @@ struct KeGemmTraits {
     static constexpr int kTN = dim_size<1, CtaTileShape>;
     static constexpr int kTK = dim_size<2, CtaTileShape>;
 
-    // static const bool kSwizzled = true;
-    static const bool kSwizzled = false;
+    static const bool kSwizzled = true;
 
     // Total data access for operand A in global memory
     using GlobalA = GlobalTile<InType, tl::RowMajor<kTM, kK, kK>>;
@@ -213,16 +212,17 @@ __global__ void ke_gemm_stage2(const InType* dA, const InType* dB,
 
     // Issue the global to shared copy before
     // main loop.
-    pipeline_g2s_a.commit(true);
-    pipeline_g2s_b.commit(true);
+    pipeline_g2s_a.commit();
+    pipeline_g2s_b.commit();
+    commit_copy_group();
 
     for (int k = 0; k < PipelineG2SA::Iterations - 1; ++k) {
         // Barrier to wait for the previous copy to finish.
         wait_group<0>();
         __syncthreads();
-        pipeline_g2s_a.commit(true);
-        pipeline_g2s_b.commit(true);
-
+        pipeline_g2s_a.commit();
+        pipeline_g2s_b.commit();
+        commit_copy_group();
         // Compute(i - 1)
         const InType* sA_ptr_prev = pipeline_g2s_a.get_prev_dst();
         const InType* sB_ptr_prev = pipeline_g2s_b.get_prev_dst();
@@ -294,10 +294,15 @@ __global__ void ke_gemm_stage3(const InType* dA, const InType* dB,
 
     // In 3-stage pipeline, we need to issue 2 global to shared copies
     // before the main loop.
-    pipeline_g2s_a.commit(true);
-    pipeline_g2s_b.commit(true);
-    pipeline_g2s_a.commit(true);
-    pipeline_g2s_b.commit(true);
+
+    // We issue copy instructions using 2 commit groups.
+    pipeline_g2s_a.commit();
+    pipeline_g2s_b.commit();
+    commit_copy_group();
+
+    pipeline_g2s_a.commit();
+    pipeline_g2s_b.commit();
+    commit_copy_group();
 
     // Wait for at least 1 copy to finish.
     wait_group<1>();
@@ -355,8 +360,9 @@ __global__ void ke_gemm_stage3(const InType* dA, const InType* dB,
         }
 
         // Issue the next global to shared copy.
-        pipeline_g2s_a.commit(true);
-        pipeline_g2s_b.commit(true);
+        pipeline_g2s_a.commit();
+        pipeline_g2s_b.commit();
+        commit_copy_group();
     }
 
     // gemm stage 2: handle the second-to-last shared tile.
