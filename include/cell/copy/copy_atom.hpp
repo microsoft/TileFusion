@@ -190,6 +190,7 @@ struct LoadMatBase {
         uint32_t* reg = reinterpret_cast<uint32_t*>(dst);
         uint32_t smem_addr =
             static_cast<uint32_t>(__cvta_generic_to_shared(src));
+
         asm volatile(
             "ldmatrix.sync.aligned.x4.m8n8.shared.b16 {%0, %1, %2, %3}, [%4];\n"
             : "=r"(reg[0]), "=r"(reg[1]), "=r"(reg[2]), "=r"(reg[3])

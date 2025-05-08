@@ -331,6 +331,7 @@ __global__ void ke_gemm_stage3(const InType* dA, const InType* dB,
 
             if (k2 == PipelineS2RA::Iterations - 2) {
                 wait_group<0>();
+                __syncthreads();
                 /**
                  * When `k2 == PipelineS2RA::Iterations - 2`, the current shared
                  * tile has just been traversed and needs to be replaced with a
@@ -356,9 +357,6 @@ __global__ void ke_gemm_stage3(const InType* dA, const InType* dB,
         // Issue the next global to shared copy.
         pipeline_g2s_a.commit(true);
         pipeline_g2s_b.commit(true);
-        // Wait for the least recent global to shared copy to finish.
-        wait_group<1>();
-        __syncthreads();
     }
 
     // gemm stage 2: handle the second-to-last shared tile.
