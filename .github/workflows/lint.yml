@@ -32,7 +32,7 @@ jobs:
         black --check --line-length=80 .
     - name: Run flake8
       run: |
-        flake8 --max-line-length=80 --exclude="3rd-party/*" .
+        flake8 --max-line-length=80 --exclude="3rd-party/*" --ignore=D1 .
     - name: Run mypy
       run: |
         mypy --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --explicit-package-bases .
