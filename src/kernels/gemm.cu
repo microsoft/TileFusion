@@ -118,8 +118,7 @@ template <typename InType, typename AccType,                  //
           typename G2SLoaderB, typename S2RLoaderB,           //
           typename GlobalC, typename SharedC, typename RegC,  //
           typename R2SStorerC, typename S2GStorerC>
-__global__ void ke_gemm_stage1(const InType* dA, const InType* dB,
-                               AccType* dC) {
+__global__ void ke_gemm(const InType* dA, const InType* dB, AccType* dC) {
     int offset_a = blockIdx.x * kTM * kK;
     int offset_b = blockIdx.y * kTN * kK;
     int offset_c = blockIdx.x * kTM * kN + blockIdx.y * kTN;
@@ -173,20 +172,20 @@ __global__ void ke_gemm_stage1(const InType* dA, const InType* dB,
     s2g_c(sC, gC);
 }
 
-template <typename InType, typename AccType,            //
-          const int kM, const int kN, const int kK,     //
-          const int kTM, const int kTN, const int kTK,  //
-          const int kNumStages,                         //
-          typename SharedA, typename RegA,              //
-          typename G2SLoaderA, typename S2RLoaderA,     //
-          typename SharedB, typename RegB,              //
-          typename G2SLoaderB, typename S2RLoaderB,     //
-          typename SIteratorA, typename SIteratorB,     //
-          typename GlobalC, typename RegC,              //
-          typename R2GStorerC,                          //
+template <typename InType, typename AccType,                  //
+          const int kM, const int kN, const int kK,           //
+          const int kTM, const int kTN, const int kTK,        //
+          const int kNumStages,                               //
+          typename SharedA, typename RegA,                    //
+          typename G2SLoaderA, typename S2RLoaderA,           //
+          typename SharedB, typename RegB,                    //
+          typename G2SLoaderB, typename S2RLoaderB,           //
+          typename SIteratorA, typename SIteratorB,           //
+          typename GlobalC, typename SharedC, typename RegC,  //
+          typename R2SStorerC, typename S2GStorerC,           //
           typename PipelineG2SA, typename PipelineG2SB>
-__global__ void ke_gemm_stage2(const InType* dA, const InType* dB,
-                               AccType* dC) {
+__global__ void ke_gemm_level1_pipeline(const InType* dA, const InType* dB,
+                                        AccType* dC) {
     int offset_a = blockIdx.x * kTM * kK;
     int offset_b = blockIdx.y * kTN * kK;
     int offset_c = blockIdx.x * kTM * kN + blockIdx.y * kTN;
@@ -194,11 +193,13 @@ __global__ void ke_gemm_stage2(const InType* dA, const InType* dB,
     extern __shared__ __align__(sizeof(double)) unsigned char buf[];
     InType* sA_ptr = reinterpret_cast<InType*>(buf);
     InType* sB_ptr = sA_ptr + SIteratorA::Tile::kNumel * kNumStages;
+    AccType* sC_ptr = reinterpret_cast<AccType*>(buf);
 
     RegA rA;
     RegB rB;
 
     RegC acc;
+    SharedC sC(sC_ptr);
     GlobalC gC(dC + offset_c);
 
     G2SLoaderA g2s_a;
@@ -249,25 +250,28 @@ __global__ void ke_gemm_stage2(const InType* dA, const InType* dB,
     }
     __syncthreads();
     // Store the result from register tile to global memory.
-    R2GStorerC r2g_c;
-    r2g_c(acc, gC);
+    R2SStorerC r2s_c;
+    S2GStorerC s2g_c;
+    r2s_c(acc, sC);
+    __syncthreads();
+    s2g_c(sC, gC);
 }
 
-template <typename InType, typename AccType,             //
-          const int kM, const int kN, const int kK,      //
-          const int kTM, const int kTN, const int kTK,   //
-          const int kNumStages,                          //
-          typename SharedA, typename RegA,               //
-          typename G2SLoaderA, typename S2RLoaderA,      //
-          typename SharedB, typename RegB,               //
-          typename G2SLoaderB, typename S2RLoaderB,      //
-          typename SIteratorA, typename SIteratorB,      //
-          typename GlobalC, typename RegC,               //
-          typename R2GStorerC,                           //
-          typename PipelineG2SA, typename PipelineG2SB,  //
+template <typename InType, typename AccType,                  //
+          const int kM, const int kN, const int kK,           //
+          const int kTM, const int kTN, const int kTK,        //
+          const int kNumStages,                               //
+          typename SharedA, typename RegA,                    //
+          typename G2SLoaderA, typename S2RLoaderA,           //
+          typename SharedB, typename RegB,                    //
+          typename G2SLoaderB, typename S2RLoaderB,           //
+          typename SIteratorA, typename SIteratorB,           //
+          typename GlobalC, typename SharedC, typename RegC,  //
+          typename R2SStorerC, typename S2GStorerC,           //
+          typename PipelineG2SA, typename PipelineG2SB,       //
           typename PipelineS2RA, typename PipelineS2RB>
-__global__ void ke_gemm_stage3(const InType* dA, const InType* dB,
-                               AccType* dC) {
+__global__ void ke_gemm_level2_pipeline(const InType* dA, const InType* dB,
+                                        AccType* dC) {
     int offset_a = blockIdx.x * kTM * kK;
     int offset_b = blockIdx.y * kTN * kK;
     int offset_c = blockIdx.x * kTM * kN + blockIdx.y * kTN;
@@ -275,12 +279,14 @@ __global__ void ke_gemm_stage3(const InType* dA, const InType* dB,
     extern __shared__ __align__(sizeof(double)) unsigned char buf[];
     InType* sA_ptr = reinterpret_cast<InType*>(buf);
     InType* sB_ptr = sA_ptr + SIteratorA::Tile::kNumel * kNumStages;
+    AccType* sC_ptr = reinterpret_cast<AccType*>(buf);
 
     // Declare the cycle buffer for the register tiles.
     RegA rA_cyc_buf[kNumStages - 1];
     RegB rB_cyc_buf[kNumStages - 1];
 
     RegC acc;
+    SharedC sC(sC_ptr);
     GlobalC gC(dC + offset_c);
 
     G2SLoaderA g2s_a;
@@ -417,9 +423,11 @@ __global__ void ke_gemm_stage3(const InType* dA, const InType* dB,
 
     __syncthreads();
 
-    // Store the result from register tile to global memory.
-    R2GStorerC r2g_c;
-    r2g_c(acc, gC);
+    R2SStorerC r2s_c;
+    S2GStorerC s2g_c;
+    r2s_c(acc, sC);
+    __syncthreads();
+    s2g_c(sC, gC);
 }
 
 template <typename InType, typename AccType, typename WholeShape,
@@ -477,24 +485,23 @@ void run_gemm(const InType* dA, const InType* dB, AccType* dC, int64_t m,
     KernelType kernel = nullptr;
 
     if (num_stages == 1) {
-        kernel = &ke_gemm_stage1<InType, AccType, kM, kN, kK, kTM, kTN, kTK,
-                                 GIteratorA, SIteratorA, SharedA, RegA,
-                                 G2SLoaderA, S2RLoaderA, GIteratorB, SIteratorB,
-                                 SharedB, RegB, G2SLoaderB, S2RLoaderB, GlobalC,
-                                 SharedC, RegC, R2SStorerC, S2GStorerC>;
+        kernel = &ke_gemm<InType, AccType, kM, kN, kK, kTM, kTN, kTK,
+                          GIteratorA, SIteratorA, SharedA, RegA, G2SLoaderA,
+                          S2RLoaderA, GIteratorB, SIteratorB, SharedB, RegB,
+                          G2SLoaderB, S2RLoaderB, GlobalC, SharedC, RegC,
+                          R2SStorerC, S2GStorerC>;
     } else if (num_stages == 2) {
-        kernel = &ke_gemm_stage2<InType, AccType, kM, kN, kK, kTM, kTN, kTK,
-                                 kNumStages, SharedA, RegA, G2SLoaderA,
-                                 S2RLoaderA, SharedB, RegB, G2SLoaderB,
-                                 S2RLoaderB, SIteratorA, SIteratorB, GlobalC,
-                                 RegC, R2GStorerC, PipelineG2SA, PipelineG2SB>;
+        kernel = &ke_gemm_level1_pipeline<
+            InType, AccType, kM, kN, kK, kTM, kTN, kTK, kNumStages, SharedA,
+            RegA, G2SLoaderA, S2RLoaderA, SharedB, RegB, G2SLoaderB, S2RLoaderB,
+            SIteratorA, SIteratorB, GlobalC, SharedC, RegC, R2SStorerC,
+            S2GStorerC, PipelineG2SA, PipelineG2SB>;
     } else if (num_stages == 3) {
-        kernel =
-            &ke_gemm_stage3<InType, AccType, kM, kN, kK, kTM, kTN, kTK,
-                            kNumStages, SharedA, RegA, G2SLoaderA, S2RLoaderA,
-                            SharedB, RegB, G2SLoaderB, S2RLoaderB, SIteratorA,
-                            SIteratorB, GlobalC, RegC, R2GStorerC, PipelineG2SA,
-                            PipelineG2SB, PipelineS2RA, PipelineS2RB>;
+        kernel = &ke_gemm_level2_pipeline<
+            InType, AccType, kM, kN, kK, kTM, kTN, kTK, kNumStages, SharedA,
+            RegA, G2SLoaderA, S2RLoaderA, SharedB, RegB, G2SLoaderB, S2RLoaderB,
+            SIteratorA, SIteratorB, GlobalC, SharedC, RegC, R2SStorerC,
+            S2GStorerC, PipelineG2SA, PipelineG2SB, PipelineS2RA, PipelineS2RB>;
     }
 
     if (shm_size > 48 * 1024) {

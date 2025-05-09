@@ -49,7 +49,7 @@ template <typename InType, typename AccType,                  //
           typename G2SLoaderB, typename S2RLoaderB,           //
           typename GlobalC, typename SharedC, typename RegC,  //
           typename R2SStorerC, typename S2GStorerC>
-__global__ void ke_gemm_stage1(const InType* dA, const InType* dB, AccType* dC);
+__global__ void ke_gemm(const InType* dA, const InType* dB, AccType* dC);
 
 // gemm kernel function with 2 stages pipeline
 template <typename InType, typename AccType,                  //
@@ -64,7 +64,8 @@ template <typename InType, typename AccType,                  //
           typename GlobalC, typename SharedC, typename RegC,  //
           typename R2GStorerC, typename PipelineG2SA,         //
           typename PipelineG2SB>
-__global__ void ke_gemm_stage2(const InType* dA, const InType* dB, AccType* dC);
+__global__ void ke_gemm_level1_pipeline(const InType* dA, const InType* dB,
+                                        AccType* dC);
 
 // gemm kernel function with 3 stages pipeline
 template <typename InType, typename AccType,                  //
@@ -78,8 +79,10 @@ template <typename InType, typename AccType,                  //
           typename G2SLoaderB, typename S2RLoaderB,           //
           typename GlobalC, typename SharedC, typename RegC,  //
           typename R2GStorerC, typename PipelineG2SA,         //
-          typename PipelineG2SB>
-__global__ void ke_gemm_stage3(const InType* dA, const InType* dB, AccType* dC);
+          typename PipelineG2SB, typename PipelineS2RA,       //
+          typename PipelineS2RB>
+__global__ void ke_gemm_level2_pipeline(const InType* dA, const InType* dB,
+                                        AccType* dC);
 
 // declare the host function for gemm
 TILEFUSION_EXPORT void gemm(const torch::Tensor& A, const torch::Tensor& B,
