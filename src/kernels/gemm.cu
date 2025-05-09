@@ -434,7 +434,7 @@ template <typename InType, typename AccType, typename WholeShape,
           typename CtaTileShape, const int kRK, typename WarpLayout,
           const int kNumStages>
 void run_gemm(const InType* dA, const InType* dB, AccType* dC, int64_t m,
-              int64_t n, int64_t k, int64_t num_stages) {
+              int64_t n, int64_t k, int64_t pipeline_level) {
     static constexpr int kM = dim_size<0, WholeShape>;
     static constexpr int kN = dim_size<1, WholeShape>;
     static constexpr int kK = dim_size<2, WholeShape>;
@@ -484,19 +484,19 @@ void run_gemm(const InType* dA, const InType* dB, AccType* dC, int64_t m,
     using KernelType = void (*)(const InType*, const InType*, AccType*);
     KernelType kernel = nullptr;
 
-    if (num_stages == 1) {
+    if (pipeline_level == 0) {
         kernel = &ke_gemm<InType, AccType, kM, kN, kK, kTM, kTN, kTK,
                           GIteratorA, SIteratorA, SharedA, RegA, G2SLoaderA,
                           S2RLoaderA, GIteratorB, SIteratorB, SharedB, RegB,
                           G2SLoaderB, S2RLoaderB, GlobalC, SharedC, RegC,
                           R2SStorerC, S2GStorerC>;
-    } else if (num_stages == 2) {
+    } else if (pipeline_level == 1) {
         kernel = &ke_gemm_level1_pipeline<
             InType, AccType, kM, kN, kK, kTM, kTN, kTK, kNumStages, SharedA,
             RegA, G2SLoaderA, S2RLoaderA, SharedB, RegB, G2SLoaderB, S2RLoaderB,
             SIteratorA, SIteratorB, GlobalC, SharedC, RegC, R2SStorerC,
             S2GStorerC, PipelineG2SA, PipelineG2SB>;
-    } else if (num_stages == 3) {
+    } else if (pipeline_level == 2) {
         kernel = &ke_gemm_level2_pipeline<
             InType, AccType, kM, kN, kK, kTM, kTN, kTK, kNumStages, SharedA,
             RegA, G2SLoaderA, S2RLoaderA, SharedB, RegB, G2SLoaderB, S2RLoaderB,
@@ -516,7 +516,8 @@ void run_gemm(const InType* dA, const InType* dB, AccType* dC, int64_t m,
 }
 
 void gemm(const torch::Tensor& A, const torch::Tensor& B, torch::Tensor& C,
-          int64_t m, int64_t n, int64_t k, int64_t num_stages) {
+          int64_t m, int64_t n, int64_t k, int64_t num_stages,
+          int64_t pipeline_level) {
     using InType = __half;
     using AccType = float;
 
@@ -534,27 +535,27 @@ void gemm(const torch::Tensor& A, const torch::Tensor& B, torch::Tensor& C,
         // is fixed to 2 to avoid compilation errors.
         constexpr int NUM_STAGES = 2;
         run_gemm<InType, AccType, WholeShape, CtaTileShape, kRK, WarpLayout,
-                 NUM_STAGES>(a_ptr, b_ptr, c_ptr, m, n, k, num_stages);
+                 NUM_STAGES>(a_ptr, b_ptr, c_ptr, m, n, k, pipeline_level);
     } else if (num_stages == 2 && m == 128 && n == 128 && k == 128) {
         using WholeShape = GemmShape<128, 128, 128>;
         constexpr int NUM_STAGES = 2;
         run_gemm<InType, AccType, WholeShape, CtaTileShape, kRK, WarpLayout,
-                 NUM_STAGES>(a_ptr, b_ptr, c_ptr, m, n, k, num_stages);
+                 NUM_STAGES>(a_ptr, b_ptr, c_ptr, m, n, k, pipeline_level);
     } else if (num_stages == 2 && m == 256 && n == 256 && k == 256) {
         using WholeShape = GemmShape<256, 256, 256>;
         constexpr int NUM_STAGES = 2;
         run_gemm<InType, AccType, WholeShape, CtaTileShape, kRK, WarpLayout,
-                 NUM_STAGES>(a_ptr, b_ptr, c_ptr, m, n, k, num_stages);
+                 NUM_STAGES>(a_ptr, b_ptr, c_ptr, m, n, k, pipeline_level);
     } else if (num_stages == 3 && m == 256 && n == 256 && k == 256) {
         using WholeShape = GemmShape<256, 256, 256>;
         constexpr int NUM_STAGES = 3;
         run_gemm<InType, AccType, WholeShape, CtaTileShape, kRK, WarpLayout,
-                 NUM_STAGES>(a_ptr, b_ptr, c_ptr, m, n, k, num_stages);
+                 NUM_STAGES>(a_ptr, b_ptr, c_ptr, m, n, k, pipeline_level);
     } else if (num_stages == 3 && m == 512 && n == 512 && k == 512) {
         using WholeShape = GemmShape<512, 512, 512>;
         constexpr int NUM_STAGES = 3;
         run_gemm<InType, AccType, WholeShape, CtaTileShape, kRK, WarpLayout,
-                 NUM_STAGES>(a_ptr, b_ptr, c_ptr, m, n, k, num_stages);
+                 NUM_STAGES>(a_ptr, b_ptr, c_ptr, m, n, k, pipeline_level);
     } else {
         throw std::runtime_error("Unsupported shape");
     }

@@ -20,7 +20,7 @@ REGISTER_OP(
 
 REGISTER_OP(gemm,
             "gemm(Tensor A, Tensor B, Tensor(a!) C, int m, int n, int k, "
-            "int num_stages) -> ()",
+            "int num_stages, int pipeline_level) -> ()",
             &gemm);
 
 REGISTER_OP(fused_two_gemms,

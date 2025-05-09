@@ -22,7 +22,11 @@ os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 
 def run_gemm(
-    matrix_m: int, matrix_n: int, matrix_k: int, num_stages: bool
+    matrix_m: int,
+    matrix_n: int,
+    matrix_k: int,
+    num_stages: bool,
+    pipeline_level: int,
 ) -> None:
     """Run GEMM operation."""
     tensor_a = torch.randn(
@@ -34,7 +38,7 @@ def run_gemm(
     tensor_c = torch.randn(
         matrix_m, matrix_n, dtype=torch.float32, device="cuda"
     )
-    gemm(tensor_a, tensor_b, tensor_c, num_stages)
+    gemm(tensor_a, tensor_b, tensor_c, num_stages, pipeline_level)
 
     ref_c = torch.mm(tensor_a.cpu(), tensor_b.cpu().T)
     c_cpu = tensor_c.cpu().half()
@@ -64,7 +68,8 @@ def run_gemm(
             "m": 128,
             "n": 128,
             "k": 128,
-            "num_stages": 2,
+            "num_stages": 1,
+            "pipeline_level": 0,
         },
         {
             "name": "test_case1",
@@ -72,6 +77,7 @@ def run_gemm(
             "n": 128,
             "k": 128,
             "num_stages": 2,
+            "pipeline_level": 1,
         },
         {
             "name": "test_case2",
@@ -79,6 +85,7 @@ def run_gemm(
             "n": 256,
             "k": 256,
             "num_stages": 2,
+            "pipeline_level": 1,
         },
         {
             "name": "test_case3",
@@ -86,6 +93,7 @@ def run_gemm(
             "n": 256,
             "k": 256,
             "num_stages": 3,
+            "pipeline_level": 2,
         },
         {
             "name": "test_case4",
@@ -93,6 +101,7 @@ def run_gemm(
             "n": 512,
             "k": 512,
             "num_stages": 3,
+            "pipeline_level": 2,
         },
     ],
     ids=lambda x: x["name"],
@@ -100,7 +109,11 @@ def run_gemm(
 def test_gemm(test_case: dict[str, Any]) -> None:
     """Test GEMM operation."""
     run_gemm(
-        test_case["m"], test_case["n"], test_case["k"], test_case["num_stages"]
+        test_case["m"],
+        test_case["n"],
+        test_case["k"],
+        test_case["num_stages"],
+        test_case["pipeline_level"],
     )
 
 

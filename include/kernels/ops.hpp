@@ -51,7 +51,7 @@ template <typename InType, typename AccType,                  //
           typename R2SStorerC, typename S2GStorerC>
 __global__ void ke_gemm(const InType* dA, const InType* dB, AccType* dC);
 
-// gemm kernel function with 2 stages pipeline
+// gemm kernel function with 1 level pipeline
 template <typename InType, typename AccType,                  //
           const int kM, const int kN, const int kK,           //
           const int kTM, const int kTN, const int kTK,        //
@@ -67,7 +67,7 @@ template <typename InType, typename AccType,                  //
 __global__ void ke_gemm_level1_pipeline(const InType* dA, const InType* dB,
                                         AccType* dC);
 
-// gemm kernel function with 3 stages pipeline
+// gemm kernel function with 2 level pipeline
 template <typename InType, typename AccType,                  //
           const int kM, const int kN, const int kK,           //
           const int kTM, const int kTN, const int kTK,        //
@@ -87,7 +87,7 @@ __global__ void ke_gemm_level2_pipeline(const InType* dA, const InType* dB,
 // declare the host function for gemm
 TILEFUSION_EXPORT void gemm(const torch::Tensor& A, const torch::Tensor& B,
                             torch::Tensor& C, int64_t m, int64_t n, int64_t k,
-                            int64_t num_stages);
+                            int64_t num_stages, int64_t pipeline_level);
 
 // reference:
 // https://github.com/InfiniTensor/RefactorGraph/blob/master/src/04kernel/cuda/src/scatter_nd.cu#L7
