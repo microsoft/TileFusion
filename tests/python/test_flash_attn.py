@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 import torch
+import math
 
 from tilefusion.ops import TiledFlashAttention
 
@@ -251,7 +252,7 @@ def run_flash_attention(
             "tile_n": 128,
             "tile_k": 128,
             "tile_p": 128,
-            "softmax_scale": 1.0 / 128.0,
+            "softmax_scale": 1.0 / math.sqrt(128),
             "causal": False,
         },
         {
@@ -264,7 +265,7 @@ def run_flash_attention(
             "tile_n": 128,
             "tile_k": 128,
             "tile_p": 128,
-            "softmax_scale": 1.0 / 128.0,
+            "softmax_scale": 1.0 / math.sqrt(128),
             "causal": False,
         },
         {
@@ -277,7 +278,7 @@ def run_flash_attention(
             "tile_n": 128,
             "tile_k": 128,
             "tile_p": 128,
-            "softmax_scale": 1.0 / 128.0,
+            "softmax_scale": 1.0 / math.sqrt(128),
             "causal": True,
         },
     ],
@@ -304,66 +305,4 @@ def test_flash_attention(test_case: dict[str, Any]) -> None:
 
 
 if __name__ == "__main__":
-    test_flash_attention(
-        {
-            "name": "test_case1",
-            "matrix_m": 128,
-            "matrix_n": 128,
-            "matrix_k": 128,
-            "matrix_p": 128,
-            "tile_m": 64,
-            "tile_n": 128,
-            "tile_k": 128,
-            "tile_p": 128,
-            "softmax_scale": 1.0,
-            "causal": False,
-        }
-    )
-
-    test_flash_attention(
-        {
-            "name": "test_case2",
-            "matrix_m": 128,
-            "matrix_n": 128,
-            "matrix_k": 128,
-            "matrix_p": 128,
-            "tile_m": 64,
-            "tile_n": 128,
-            "tile_k": 128,
-            "tile_p": 128,
-            "softmax_scale": 1.0 / 128,
-            "causal": False,
-        }
-    )
-
-    test_flash_attention(
-        {
-            "name": "test_case3",
-            "matrix_m": 128,
-            "matrix_n": 128,
-            "matrix_k": 128,
-            "matrix_p": 128,
-            "tile_m": 64,
-            "tile_n": 128,
-            "tile_k": 128,
-            "tile_p": 128,
-            "softmax_scale": 1.0,
-            "causal": True,
-        }
-    )
-
-    test_flash_attention(
-        {
-            "name": "test_case4",
-            "matrix_m": 128,
-            "matrix_n": 128,
-            "matrix_k": 128,
-            "matrix_p": 128,
-            "tile_m": 64,
-            "tile_n": 128,
-            "tile_k": 128,
-            "tile_p": 128,
-            "softmax_scale": 1.0 / 128.0,
-            "causal": True,
-        }
-    )
+    pytest.main([__file__, "-v"])

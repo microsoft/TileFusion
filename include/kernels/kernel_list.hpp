@@ -18,6 +18,11 @@ REGISTER_OP(
     "int m, int n, int k, int p, float softmax_scale, bool causal) -> ()",
     &flash_attention);
 
+REGISTER_OP(gemm,
+            "gemm(Tensor A, Tensor B, Tensor(a!) C, int m, int n, int k, "
+            "int num_stages, int pipeline_level) -> ()",
+            &gemm);
+
 REGISTER_OP(fused_two_gemms,
             "fused_two_gemms(Tensor A, Tensor B, Tensor C, Tensor(a!) D, "
             "int tm, int tn, int tk, int tp) ->()",

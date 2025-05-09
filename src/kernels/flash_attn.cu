@@ -156,9 +156,10 @@ template <typename InType,
           typename VecExp, typename RegVecPrinter, typename RegAccPrinter,
           typename ApplyScoreScale, typename ApplyMask>
 __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
-                                   const InType* dV, InType* dO, int kM, int kN,
-                                   int kK, int kP, int kTM, int kTN, int kTK,
-                                   int kTP, float softmax_scale, bool causal) {
+                                   const InType* dV, OutType* dO, int kM,
+                                   int kN, int kK, int kP, int kTM, int kTN,
+                                   int kTK, int kTP, float softmax_scale,
+                                   bool causal) {
     // Advance to the global data tile to the current CTA.
     const InType* Q = dQ + blockIdx.z * (kM * kK) + blockIdx.x * (kTM * kK);
     const InType* K = dK + blockIdx.z * (kK * kN);
@@ -255,7 +256,9 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
             load_rk(sK, rK);
             __syncthreads();
 
-            gemm(rQ, rK, attn_block_f32);
+            // NOTE(KuangjuX): use `compute` namespace to avoid name conflict
+            // with gemm function in `kernels/ops.hpp`.
+            compute::gemm(rQ, rK, attn_block_f32);
         }
         load_rv(sV, rV);
         __syncthreads();
@@ -297,7 +300,7 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
         vec_add(prev_norm_mul_sum, cur_norm_mul_sum, new_sum_vec);
 
         // Compute unnormized attention block.
-        gemm(attn_block, rV, exp_values_f32);
+        compute::gemm(attn_block, rV, exp_values_f32);
 
         cast_o(exp_values_f32, exp_values);
 
