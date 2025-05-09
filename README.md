@@ -35,7 +35,7 @@ TileFusion approaches the efficient implementation of a kernel by:
 1. Managing dataflow over memory hierarchies.
 2. Configuring tile primitives, such as tile shapes, layouts, and other parameters.
 
-This is an example of a simple GEMM (General Matrix Multiplication) kernel written using TileFusion. For the complete example, please refer to [this directory](examples/cpp/01_gemm/01_gemm_global_reg/gemm.hpp).
+This is an example of a simple GEMM (General Matrix Multiplication) kernel written using TileFusion. For the complete example, please refer to [this directory](examples/101_gemm/01_gemm_global_reg/gemm.hpp).
 
 ### Configuration of the Tile Primitives
 

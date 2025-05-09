@@ -15,25 +15,26 @@ namespace tilefusion {
 class CudaTimer {
   public:
     CudaTimer() {
-        CudaCheck(cudaEventCreate(&start_event));
-        CudaCheck(cudaEventCreate(&stop_event));
+        CUDA_CHECK(cudaEventCreate(&start_event));
+        CUDA_CHECK(cudaEventCreate(&stop_event));
     }
 
     ~CudaTimer() {
-        CudaCheck(cudaEventDestroy(start_event));
-        CudaCheck(cudaEventDestroy(stop_event));
+        CUDA_CHECK(cudaEventDestroy(start_event));
+        CUDA_CHECK(cudaEventDestroy(stop_event));
     }
 
     void start(cudaStream_t st = 0) {
         stream = st;
-        CudaCheck(cudaEventRecord(start_event, stream));
+        CUDA_CHECK(cudaEventRecord(start_event, stream));
     }
 
     float stop() {
         float milliseconds = 0.;
-        CudaCheck(cudaEventRecord(stop_event, stream));
-        CudaCheck(cudaEventSynchronize(stop_event));
-        CudaCheck(cudaEventElapsedTime(&milliseconds, start_event, stop_event));
+        CUDA_CHECK(cudaEventRecord(stop_event, stream));
+        CUDA_CHECK(cudaEventSynchronize(stop_event));
+        CUDA_CHECK(
+            cudaEventElapsedTime(&milliseconds, start_event, stop_event));
         return milliseconds;
     }
 
