@@ -13,16 +13,21 @@ namespace tl = tile_layout;
 
 namespace detail {
 
-template <typename InType, typename AccType>
-struct TiledMma;
+namespace {
+using GEMM_ATOM_16x16x16 = TileShape<16, 16, 16>;
+}
+
+template <typename InType, typename AccType, typename AtomicShape>
+struct Mma;
 
 template <>
-struct TiledMma<__half, float> {
+struct Mma<__half, float, GEMM_ATOM_16x16x16> {
     DEVICE void operator()(const __half* ra, const __half* rb, float* rc) {
         const uint32_t* A = reinterpret_cast<const uint32_t*>(ra);
         const uint32_t* B = reinterpret_cast<const uint32_t*>(rb);
         float* C = static_cast<float*>(rc);
 
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 800)
         asm volatile(
             "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
             "{%0,  %1,  %2,  %3},"
@@ -42,16 +47,23 @@ struct TiledMma<__half, float> {
             : "=f"(C[4]), "=f"(C[5]), "=f"(C[6]), "=f"(C[7])
             : "r"(A[0]), "r"(A[1]), "r"(A[2]), "r"(A[3]), "r"(B[1]), "r"(B[3]),
               "f"(C[4]), "f"(C[5]), "f"(C[6]), "f"(C[7]));
+#else
+        assert(false &&
+               "This GEMM implementation requires SM80 (Ampere) or later "
+               "architecture");
+
+#endif
     }
 };
 
 template <>
-struct TiledMma<__half, __half> {
+struct Mma<__half, __half, GEMM_ATOM_16x16x16> {
     DEVICE void operator()(const __half* ra, const __half* rb, __half* rc) {
         const uint32_t* A = reinterpret_cast<const uint32_t*>(ra);
         const uint32_t* B = reinterpret_cast<const uint32_t*>(rb);
         uint32_t* C = reinterpret_cast<uint32_t*>(rc);
 
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 800)
         asm volatile(
             "mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16 "
             "{%0, %1}, "
@@ -71,17 +83,23 @@ struct TiledMma<__half, __half> {
             : "=r"(C[2]), "=r"(C[3])
             : "r"(A[4]), "r"(A[5]), "r"(A[6]), "r"(A[7]), "r"(B[1]), "r"(B[3]),
               "r"(C[2]), "r"(C[3]));
+#else
+        assert(false &&
+               "This GEMM implementation requires SM80 (Ampere) or later "
+               "architecture");
+#endif
     }
 };
 
 template <>
-struct TiledMma<__bfloat16, float> {
+struct Mma<__bfloat16, float, GEMM_ATOM_16x16x16> {
     DEVICE void operator()(const __bfloat16* ra, const __bfloat16* rb,
                            float* rc) {
         const uint32_t* A = reinterpret_cast<const uint32_t*>(ra);
         const uint32_t* B = reinterpret_cast<const uint32_t*>(rb);
         float* C = static_cast<float*>(rc);
 
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 800)
         asm volatile(
             "mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 "
             "{%0,  %1,  %2,  %3},"
@@ -101,6 +119,11 @@ struct TiledMma<__bfloat16, float> {
             : "+f"(C[4]), "+f"(C[5]), "+f"(C[6]), "+f"(C[7])
             : "r"(A[0]), "r"(A[1]), "r"(A[2]), "r"(A[3]), "r"(B[1]), "r"(B[3]),
               "f"(C[4]), "f"(C[5]), "f"(C[6]), "f"(C[7]));
+#else
+        assert(false &&
+               "This GEMM implementation requires SM80 (Ampere) or later "
+               "architecture");
+#endif
     }
 };
 
@@ -108,12 +131,10 @@ struct TiledMma<__bfloat16, float> {
 ///         various choices and detailed parameters of the wmma PTX instruction.
 ///         https://docs.nvidia.com/cuda/parallel-thread-execution/#warp-level-matrix-instructions-mma
 template <typename RegTileA, typename RegTileB, typename RegTileC>
-struct Gemm {
+struct Gemm_16x16x16 {
     using InTypeA = typename RegTileA::DType::DType;
     using InTypeB = typename RegTileB::DType::DType;
     using OutType = typename RegTileC::DType::DType;
-
-    using BaseShape = traits::BaseTileShape<InTypeA>;
 
     static_assert(std::is_same_v<InTypeA, __half> ||
                       std::is_same_v<InTypeA, __bfloat16>,
@@ -137,22 +158,21 @@ struct Gemm {
             for (int j = 0; j < kNs; ++j) {
 #pragma unroll
                 for (int k = 0; k < kKs; ++k) {
-                    tile_wmma(a(i, k).data(), b(k, j).data(),
-                              c(i, j).mutable_data());
+                    mma(a(i, k).data(), b(k, j).data(), c(i, j).mutable_data());
                 }
             }
         }
     }
 
   private:
-    TiledMma<InTypeA, OutType> tile_wmma;
+    Mma<InTypeA, OutType, GEMM_ATOM_16x16x16> mma;
 };
 
 }  // namespace detail
 
 template <typename RegTileA, typename RegTileB, typename RegTileC>
 DEVICE void gemm(const RegTileA& a, const RegTileB& b, RegTileC& c) {
-    detail::Gemm<RegTileA, RegTileB, RegTileC> gemm;
+    detail::Gemm_16x16x16<RegTileA, RegTileB, RegTileC> gemm;
     gemm(a, b, c);
 }
 

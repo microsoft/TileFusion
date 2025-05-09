@@ -7,8 +7,9 @@
 #include "config.hpp"
 #include "cuda_utils.hpp"
 
-using namespace tilefusion::cell::copy;
 namespace tilefusion::cell {
+
+using namespace copy;
 
 /**
  * @brief Multiple-stage pipeline primitive.

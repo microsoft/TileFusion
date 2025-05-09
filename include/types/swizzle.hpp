@@ -4,13 +4,14 @@
 #pragma once
 
 #include "cuda_utils.hpp"
+#include "traits/base.hpp"
 #include "types/layout.hpp"
-
-#include <cassert>
 
 namespace tilefusion::cell {
 
+using namespace tilefusion::traits;
 namespace tl = tile_layout;
+
 /**
  * @brief A swizzle functor.
  * A Swizzle can handle 2^B * 2^S * 2^M elements.
@@ -132,6 +133,67 @@ struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kColMajor> {
   private:
     Swizzle swizzle_;
     Layout layout_;
+};
+
+/**
+ * @brief The base tile shape for Swizzle<3, 3, 3>.
+ */
+template <typename Element, int kBytes>
+    requires BaseType<Element>
+struct SwizzleBaseTileShape;
+
+template <typename Element>
+    requires HalfType<Element>
+struct SwizzleBaseTileShape<Element, 128> {
+    using DType = Element;
+
+    static constexpr int kRows = 8;
+    static constexpr int kCols = 64;
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 3;
+    static constexpr int M = 3;
+    static constexpr int S = 3;
+};
+
+template <>
+struct SwizzleBaseTileShape<float, 128> {
+    using DType = float;
+
+    static constexpr int kRows = 8;
+    static constexpr int kCols = 32;
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 3;
+    static constexpr int M = 2;
+    static constexpr int S = 3;
+};
+
+template <typename Element>
+    requires HalfType<Element>
+struct SwizzleBaseTileShape<Element, 64> {
+    using DType = Element;
+
+    static constexpr int kRows = 4;
+    static constexpr int kCols = 32;
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 2;
+    static constexpr int M = 3;
+    static constexpr int S = 2;
+};
+
+template <>
+struct SwizzleBaseTileShape<float, 64> {
+    using DType = float;
+
+    static constexpr int kRows = 4;
+    static constexpr int kCols = 16;
+    static constexpr int kNumel = kRows * kCols;
+
+    static constexpr int B = 2;
+    static constexpr int M = 2;
+    static constexpr int S = 2;
 };
 
 }  // namespace tilefusion::cell

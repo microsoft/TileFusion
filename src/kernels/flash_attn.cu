@@ -256,8 +256,6 @@ __global__ void ke_flash_attention(const InType* dQ, const InType* dK,
             load_rk(sK, rK);
             __syncthreads();
 
-            // NOTE(KuangjuX): use `compute` namespace to avoid name conflict
-            // with gemm function in `kernels/ops.hpp`.
             compute::gemm(rQ, rK, attn_block_f32);
         }
         load_rv(sV, rV);

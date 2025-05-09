@@ -26,7 +26,14 @@ def gemm(
         tensor_b: Input tensor.
         tensor_c: Output tensor.
         num_stages: pipeline the loop into this many stages.
-        pipeline_level: pipeline level in different instructions.
+        pipeline_level: The GEMM operation is executed in three levels:
+                        Level 1: Basic GEMM execution without pipelining.
+                        Level 2: Incorporates pipelining of some loops using
+                        asynchronous copy instructions from global to shared
+                        memory.
+                        Level 3: Further pipelining by prefetching data from
+                        shared memory to registers for certain loops and
+                        kernels.
     """
     matrix_m = tensor_a.shape[0]
     matrix_n = tensor_b.shape[1]

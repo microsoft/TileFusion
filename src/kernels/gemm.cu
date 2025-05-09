@@ -7,8 +7,8 @@
 
 using namespace tilefusion;
 using namespace cell;
-using namespace cell::copy;
-using namespace cell::compute;
+using namespace copy;
+using namespace compute;
 namespace tl = tile_layout;
 
 namespace tilefusion::kernels {
@@ -211,8 +211,7 @@ __global__ void ke_gemm_level1_pipeline(const InType* dA, const InType* dB,
     PipelineG2SA pipeline_g2s_a(dA + offset_a, sA_ptr);
     PipelineG2SB pipeline_g2s_b(dB + offset_b, sB_ptr);
 
-    // Issue the global to shared copy before
-    // main loop.
+    // Issue the global to shared copy before main loop.
     pipeline_g2s_a.commit();
     pipeline_g2s_b.commit();
     commit_copy_group();
@@ -249,6 +248,7 @@ __global__ void ke_gemm_level1_pipeline(const InType* dA, const InType* dB,
         compute::gemm(rA, rB, acc);
     }
     __syncthreads();
+
     // Store the result from register tile to global memory.
     R2SStorerC r2s_c;
     S2GStorerC s2g_c;
@@ -298,8 +298,8 @@ __global__ void ke_gemm_level2_pipeline(const InType* dA, const InType* dB,
     PipelineG2SA pipeline_g2s_a(dA + offset_a, sA_ptr);
     PipelineG2SB pipeline_g2s_b(dB + offset_b, sB_ptr);
 
-    // In 3-stage pipeline, we need to issue 2 global to shared copies
-    // before the main loop.
+    // In 3-stage pipeline, we need to issue 2 global to shared copies before
+    // the main loop.
 
     // We issue copy instructions using 2 commit groups.
     pipeline_g2s_a.commit();
