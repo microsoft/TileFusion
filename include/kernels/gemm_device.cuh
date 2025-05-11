@@ -13,11 +13,13 @@ namespace tl = tile_layout;
 
 namespace tilefusion::kernels {
 
-template <typename InType, typename AccType, typename WarpLayout,  //
-          const int kM_, const int kN_, const int kK_,             //
-          const int kTM_, const int kTN_, const int kTK_,          //
+template <typename InType_, typename AccType_, typename WarpLayout,  //
+          const int kM_, const int kN_, const int kK_,               //
+          const int kTM_, const int kTN_, const int kTK_,            //
           const int kRK_, const int kNumStages, const int kSharedAccess = 64>
 struct KeGemmTraits {
+    using InType = InType_;
+    using AccType = AccType_;
     using BaseShape = traits::BaseTileShape<InType>;
 
     static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;

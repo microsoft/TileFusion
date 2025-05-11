@@ -25,6 +25,7 @@ std::string generate_gemm_kernel_wrapper(const std::string& in_type,
                                          int64_t num_stages,
                                          int64_t pipeline_level) {
     int64_t kRK = 16;
+    int swizzle_bytes = 64;
     std::stringstream ss;
     ss << R"(
 #include "kernels/gemm_device.cuh"
@@ -32,9 +33,10 @@ std::string generate_gemm_kernel_wrapper(const std::string& in_type,
 using namespace tilefusion::kernels;
 using Config = KeGemmTraits<)"
        << in_type << ", " << acc_type << R"(,
-        tl::RowMajor<2, 2>, )"
+        tl::RowMajor<1, 1>, )"
        << m << ", " << n << ", " << k << ", " << tm << ", " << tn << ", " << tk
-       << ", " << kRK << ", " << num_stages << ", " << pipeline_level << R"(>;
+       << ", " << kRK << ", " << num_stages << ", " << pipeline_level << ", "
+       << swizzle_bytes << R"(>;
 
 extern "C" __global__ void gemm_kernel_)"
        << in_type << "_" << acc_type << "_" << m << "_" << n << "_" << k << "_"
@@ -54,18 +56,16 @@ void gemm(const torch::Tensor& A, const torch::Tensor& B, torch::Tensor& C,
           int64_t pipeline_level) {
     CHECK_INPUT(A);
     CHECK_INPUT(B);
-    CHECK_INPUT(C);
 
     const at::ScalarType dtype = A.scalar_type();
-    TORCH_CHECK(dtype == at::ScalarType::Half && B.scalar_type() == dtype &&
-                    C.scalar_type() == dtype,
-                "the inputs and output must be half-precision (fp16).");
+    TORCH_CHECK(dtype == at::ScalarType::Half && B.scalar_type() == dtype,
+                "the inputs must be half-precision (fp16).");
 
     const int64_t m = A.size(0);
     const int64_t k = A.size(1);
     const int64_t n = B.size(1);
 
-    using WarpLayout = tl::RowMajor<2, 2>;
+    using WarpLayout = tl::RowMajor<1, 1>;
     using InType = __half;
     using AccType = float;
 
