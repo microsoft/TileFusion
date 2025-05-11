@@ -13,9 +13,10 @@ namespace tl = tile_layout;
 
 namespace tilefusion::kernels {
 
-template <typename InType, typename AccType, typename WholeShape,
-          typename CtaTileShape, const int kRK, typename WarpLayout,
-          const int kNumStages, const int kSharedAccess = 64>
+template <typename InType, typename AccType, typename WarpLayout,  //
+          const int kM_, const int kN_, const int kK_,             //
+          const int kTM_, const int kTN_, const int kTK_,          //
+          const int kRK_, const int kNumStages, const int kSharedAccess = 64>
 struct KeGemmTraits {
     using BaseShape = traits::BaseTileShape<InType>;
 
@@ -23,13 +24,14 @@ struct KeGemmTraits {
     static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
     static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
 
-    static constexpr int kM = dim_size<0, WholeShape>;
-    static constexpr int kN = dim_size<1, WholeShape>;
-    static constexpr int kK = dim_size<2, WholeShape>;
+    static constexpr int kM = kM_;
+    static constexpr int kN = kN_;
+    static constexpr int kK = kK_;
 
-    static constexpr int kTM = dim_size<0, CtaTileShape>;
-    static constexpr int kTN = dim_size<1, CtaTileShape>;
-    static constexpr int kTK = dim_size<2, CtaTileShape>;
+    static constexpr int kTM = kTM_;
+    static constexpr int kTN = kTN_;
+    static constexpr int kTK = kTK_;
+    static constexpr int kRK = kRK_;
 
     static const bool kSwizzled = true;
 
