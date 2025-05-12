@@ -25,6 +25,9 @@ def run_gemm(
     matrix_m: int,
     matrix_n: int,
     matrix_k: int,
+    tile_m: int,
+    tile_n: int,
+    tile_k: int,
     num_stages: bool,
     pipeline_level: int,
 ) -> None:
@@ -38,7 +41,16 @@ def run_gemm(
     tensor_c = torch.randn(
         matrix_m, matrix_n, dtype=torch.float32, device="cuda"
     )
-    gemm(tensor_a, tensor_b, tensor_c, num_stages, pipeline_level)
+    gemm(
+        tensor_a,
+        tensor_b,
+        tensor_c,
+        tile_m,
+        tile_n,
+        tile_k,
+        num_stages,
+        pipeline_level,
+    )
 
     ref_c = torch.mm(tensor_a.cpu(), tensor_b.cpu().T)
     c_cpu = tensor_c.cpu().half()
@@ -68,6 +80,9 @@ def run_gemm(
             "m": 128,
             "n": 128,
             "k": 128,
+            "tile_m": 64,
+            "tile_n": 64,
+            "tile_k": 64,
             "num_stages": 1,
             "pipeline_level": 0,
         },
@@ -76,6 +91,9 @@ def run_gemm(
             "m": 128,
             "n": 128,
             "k": 128,
+            "tile_m": 64,
+            "tile_n": 64,
+            "tile_k": 64,
             "num_stages": 2,
             "pipeline_level": 1,
         },
@@ -84,6 +102,9 @@ def run_gemm(
             "m": 256,
             "n": 256,
             "k": 256,
+            "tile_m": 64,
+            "tile_n": 64,
+            "tile_k": 64,
             "num_stages": 2,
             "pipeline_level": 1,
         },
@@ -92,6 +113,9 @@ def run_gemm(
             "m": 256,
             "n": 256,
             "k": 256,
+            "tile_m": 64,
+            "tile_n": 64,
+            "tile_k": 64,
             "num_stages": 3,
             "pipeline_level": 2,
         },
@@ -100,6 +124,9 @@ def run_gemm(
             "m": 512,
             "n": 512,
             "k": 512,
+            "tile_m": 64,
+            "tile_n": 64,
+            "tile_k": 64,
             "num_stages": 3,
             "pipeline_level": 2,
         },
@@ -112,6 +139,9 @@ def test_gemm(test_case: dict[str, Any]) -> None:
         test_case["m"],
         test_case["n"],
         test_case["k"],
+        test_case["tile_m"],
+        test_case["tile_n"],
+        test_case["tile_k"],
         test_case["num_stages"],
         test_case["pipeline_level"],
     )

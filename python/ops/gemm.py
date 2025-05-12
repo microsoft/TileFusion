@@ -16,6 +16,9 @@ def gemm(
     tensor_a: torch.Tensor,
     tensor_b: torch.Tensor,
     tensor_c: torch.Tensor,
+    tile_m: int,
+    tile_n: int,
+    tile_k: int,
     num_stages: int,
     pipeline_level: int,
 ) -> None:
@@ -25,6 +28,9 @@ def gemm(
         tensor_a: Input tensor.
         tensor_b: Input tensor.
         tensor_c: Output tensor.
+        tile_m: The tile size for m dimension.
+        tile_n: The tile size for n dimension.
+        tile_k: The tile size for k dimension.
         num_stages: pipeline the loop into this many stages.
         pipeline_level: The GEMM operation is executed in three levels:
                         Level 1: Basic GEMM execution without pipelining.
@@ -35,16 +41,13 @@ def gemm(
                         shared memory to registers for certain loops and
                         kernels.
     """
-    matrix_m = tensor_a.shape[0]
-    matrix_n = tensor_b.shape[1]
-    matrix_k = tensor_a.shape[1]
     torch.ops.tilefusion.gemm(
         tensor_a,
         tensor_b,
         tensor_c,
-        matrix_m,
-        matrix_n,
-        matrix_k,
+        tile_m,
+        tile_n,
+        tile_k,
         num_stages,
         pipeline_level,
     )
