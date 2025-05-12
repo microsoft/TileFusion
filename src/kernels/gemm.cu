@@ -35,14 +35,13 @@ using Config = KeGemmTraits<)"
        << in_type << ", " << acc_type << R"(,
         tl::RowMajor<1, 1>, )"
        << m << ", " << n << ", " << k << ", " << tm << ", " << tn << ", " << tk
-       << ", " << kRK << ", " << num_stages << ", " << pipeline_level << ", "
-       << swizzle_bytes << R"(>;
+       << ", " << kRK << ", " << num_stages << ", " << swizzle_bytes << R"(>;
 
 extern "C" __global__ void gemm_kernel_)"
        << in_type << "_" << acc_type << "_" << m << "_" << n << "_" << k << "_"
        << tm << "_" << tn << "_" << tk << "_" << num_stages << "_"
        << pipeline_level << R"((const )" << in_type << R"(* A, const )"
-       << in_type << R"(* B, )" << in_type << R"(* C) {
+       << in_type << R"(* B, )" << acc_type << R"(* C) {
     ke_gemm<Config::InType, Config::AccType, Config>(A, B, C);
 })";
 
@@ -84,7 +83,6 @@ void gemm(const torch::Tensor& A, const torch::Tensor& B, torch::Tensor& C,
         "gemm_kernel_" + in_type + "_" + acc_type + "_" + std::to_string(m) +
         "_" + std::to_string(n) + "_" + std::to_string(k) + "_" +
         std::to_string(tm) + "_" + std::to_string(tn) + "_" +
-        std::to_string(tk) + "_" + std::to_string(tn) + "_" +
         std::to_string(tk) + "_" + std::to_string(num_stages) + "_" +
         std::to_string(pipeline_level);
 

@@ -16,11 +16,12 @@ namespace tilefusion::kernels {
 template <typename InType_, typename AccType_, typename WarpLayout,  //
           const int kM_, const int kN_, const int kK_,               //
           const int kTM_, const int kTN_, const int kTK_,            //
-          const int kRK_, const int kNumStages, const int kSharedAccess = 64>
+          const int kRK_, const int kNumStages_, const int kSharedAccess = 64>
 struct KeGemmTraits {
     using InType = InType_;
     using AccType = AccType_;
     using BaseShape = traits::BaseTileShape<InType>;
+    static constexpr int kNumStages = kNumStages_;
 
     static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
     static constexpr int kWarpPerRow = tl::num_rows<WarpLayout>;
@@ -109,12 +110,12 @@ struct KeGemmTraits {
 };
 
 template <typename InType, typename AccType, typename KeTraits>
-__global__ void ke_gemm(const InType* dA, const InType* dB, AccType* dC) {
+__device__ __forceinline__ void ke_gemm(const InType* dA, const InType* dB,
+                                        AccType* dC) {
+    static constexpr int kN = KeTraits::kN;
+    static constexpr int kK = KeTraits::kK;
     static constexpr int kTM = KeTraits::kTM;
     static constexpr int kTN = KeTraits::kTN;
-    static constexpr int kK = KeTraits::kK;
-    static constexpr int kRK = KeTraits::kRK;
-    static constexpr int kNumStages = KeTraits::kNumStages;
 
     int offset_a = blockIdx.x * kTM * kK;
     int offset_b = blockIdx.y * kTN * kK;
@@ -181,8 +182,9 @@ template <typename InType, typename AccType,                  //
           typename GlobalC, typename SharedC, typename RegC,  //
           typename R2SStorerC, typename S2GStorerC,           //
           typename PipelineG2SA, typename PipelineG2SB>
-__global__ void ke_gemm_level1_pipeline(const InType* dA, const InType* dB,
-                                        AccType* dC) {
+__device__ __forceinline__ void ke_gemm_level1_pipeline(const InType* dA,
+                                                        const InType* dB,
+                                                        AccType* dC) {
     int offset_a = blockIdx.x * kTM * kK;
     int offset_b = blockIdx.y * kTN * kK;
     int offset_c = blockIdx.x * kTM * kN + blockIdx.y * kTN;
@@ -255,88 +257,9 @@ __global__ void ke_gemm_level1_pipeline(const InType* dA, const InType* dB,
 }
 
 template <typename InType, typename AccType, typename KeTraits>
-__global__ void ke_gemm_level1_pipeline(const InType* dA, const InType* dB,
-                                        AccType* dC) {
-    static constexpr int kTM = KeTraits::kTM;
-    static constexpr int kTN = KeTraits::kTN;
-    static constexpr int kK = KeTraits::kK;
-    static constexpr int kRK = KeTraits::kRK;
-    static constexpr int kNumStages = KeTraits::kNumStages;
-
-    int offset_a = blockIdx.x * kTM * kK;
-    int offset_b = blockIdx.y * kTN * kK;
-    int offset_c = blockIdx.x * kTM * kN + blockIdx.y * kTN;
-
-    extern __shared__ __align__(sizeof(double)) unsigned char buf[];
-    InType* sA_ptr = reinterpret_cast<InType*>(buf);
-    InType* sB_ptr = sA_ptr + KeTraits::SIteratorA::Tile::kNumel * kNumStages;
-    AccType* sC_ptr = reinterpret_cast<AccType*>(buf);
-
-    typename KeTraits::RegA rA;
-    typename KeTraits::RegB rB;
-
-    typename KeTraits::RegC acc;
-    typename KeTraits::SharedC sC(sC_ptr);
-    typename KeTraits::GlobalC gC(dC + offset_c);
-
-    typename KeTraits::G2SLoaderA g2s_a;
-    typename KeTraits::S2RLoaderA s2r_a;
-
-    typename KeTraits::G2SLoaderB g2s_b;
-    typename KeTraits::S2RLoaderB s2r_b;
-
-    typename KeTraits::PipelineG2SA pipeline_g2s_a(dA + offset_a, sA_ptr);
-    typename KeTraits::PipelineG2SB pipeline_g2s_b(dB + offset_b, sB_ptr);
-
-    // Issue the global to shared copy before main loop.
-    pipeline_g2s_a.commit();
-    pipeline_g2s_b.commit();
-    commit_copy_group();
-
-    for (int k = 0; k < KeTraits::PipelineG2SA::Iterations - 1; ++k) {
-        // Barrier to wait for the previous copy to finish.
-        wait_group<0>();
-        __syncthreads();
-        pipeline_g2s_a.commit();
-        pipeline_g2s_b.commit();
-        commit_copy_group();
-        // Compute(i - 1)
-        const InType* sA_ptr_prev = pipeline_g2s_a.get_prev_dst();
-        const InType* sB_ptr_prev = pipeline_g2s_b.get_prev_dst();
-        SIteratorA sAs(sA_ptr_prev);
-        SIteratorB sBs(sB_ptr_prev);
-        for (int k2 = 0; k2 < KeTraits::SIteratorA::sc1; ++k2) {
-            s2r_a(sAs(k2), rA);
-            s2r_b(sBs(k2), rB);
-            compute::gemm(rA, rB, acc);
-        }
-    }
-    wait_group<0>();
-    __syncthreads();
-
-    // Compute(i)
-    const InType* sA_ptr_cur = pipeline_g2s_a.get_cur_dst();
-    const InType* sB_ptr_cur = pipeline_g2s_b.get_cur_dst();
-    SIteratorA sAs(sA_ptr_cur);
-    SIteratorB sBs(sB_ptr_cur);
-    for (int k2 = 0; k2 < SIteratorA::sc1; ++k2) {
-        s2r_a(sAs(k2), rA);
-        s2r_b(sBs(k2), rB);
-        compute::gemm(rA, rB, acc);
-    }
-    __syncthreads();
-
-    // Store the result from register tile to global memory.
-    typename KeTraits::R2SStorerC r2s_c;
-    typename KeTraits::S2GStorerC s2g_c;
-    r2s_c(acc, sC);
-    __syncthreads();
-    s2g_c(sC, gC);
-}
-
-template <typename InType, typename AccType, typename KeTraits>
-__global__ void ke_gemm_level2_pipeline(const InType* dA, const InType* dB,
-                                        AccType* dC) {
+__device__ __forceinline__ void ke_gemm_level2_pipeline(const InType* dA,
+                                                        const InType* dB,
+                                                        AccType* dC) {
     static constexpr int kTM = KeTraits::kTM;
     static constexpr int kTN = KeTraits::kTN;
     static constexpr int kK = KeTraits::kK;
