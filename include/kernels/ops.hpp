@@ -37,53 +37,6 @@ TILEFUSION_EXPORT void flash_attention(const torch::Tensor& Q,
                                        int64_t p, double softmax_scale,
                                        bool causal);
 
-// // gemm kernel function without pipeline
-// template <typename InType, typename AccType,                  //
-//           const int kM, const int kN, const int kK,           //
-//           const int kTM, const int kTN, const int kTK,        //
-//           typename GIteratorA, typename SIteratorA,           //
-//           typename SharedA, typename RegA,                    //
-//           typename G2SLoaderA, typename S2RLoaderA,           //
-//           typename GIteratorB, typename SIteratorB,           //
-//           typename SharedB, typename RegB,                    //
-//           typename G2SLoaderB, typename S2RLoaderB,           //
-//           typename GlobalC, typename SharedC, typename RegC,  //
-//           typename R2SStorerC, typename S2GStorerC>
-// __global__ void ke_gemm(const InType* dA, const InType* dB, AccType* dC);
-
-// // gemm kernel function with 1 level pipeline
-// template <typename InType, typename AccType,                  //
-//           const int kM, const int kN, const int kK,           //
-//           const int kTM, const int kTN, const int kTK,        //
-//           typename GIteratorA, typename SIteratorA,           //
-//           typename SharedA, typename RegA,                    //
-//           typename G2SLoaderA, typename S2RLoaderA,           //
-//           typename GIteratorB, typename SIteratorB,           //
-//           typename SharedB, typename RegB,                    //
-//           typename G2SLoaderB, typename S2RLoaderB,           //
-//           typename GlobalC, typename SharedC, typename RegC,  //
-//           typename R2GStorerC, typename PipelineG2SA,         //
-//           typename PipelineG2SB>
-// __global__ void ke_gemm_level1_pipeline(const InType* dA, const InType* dB,
-//                                         AccType* dC);
-
-// // gemm kernel function with 2 level pipeline
-// template <typename InType, typename AccType,                  //
-//           const int kM, const int kN, const int kK,           //
-//           const int kTM, const int kTN, const int kTK,        //
-//           typename GIteratorA, typename SIteratorA,           //
-//           typename SharedA, typename RegA,                    //
-//           typename G2SLoaderA, typename S2RLoaderA,           //
-//           typename GIteratorB, typename SIteratorB,           //
-//           typename SharedB, typename RegB,                    //
-//           typename G2SLoaderB, typename S2RLoaderB,           //
-//           typename GlobalC, typename SharedC, typename RegC,  //
-//           typename R2GStorerC, typename PipelineG2SA,         //
-//           typename PipelineG2SB, typename PipelineS2RA,       //
-//           typename PipelineS2RB>
-// __global__ void ke_gemm_level2_pipeline(const InType* dA, const InType* dB,
-//                                         AccType* dC);
-
 // declare the host function for gemm
 TILEFUSION_EXPORT void gemm(const torch::Tensor& A, const torch::Tensor& B,
                             torch::Tensor& C, int64_t m, int64_t n, int64_t k,
