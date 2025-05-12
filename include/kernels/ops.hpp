@@ -39,8 +39,9 @@ TILEFUSION_EXPORT void flash_attention(const torch::Tensor& Q,
 
 // declare the host function for gemm
 TILEFUSION_EXPORT void gemm(const torch::Tensor& A, const torch::Tensor& B,
-                            torch::Tensor& C, int64_t m, int64_t n, int64_t k,
-                            int64_t num_stages, int64_t pipeline_level);
+                            torch::Tensor& C, int64_t tm, int64_t tn,
+                            int64_t tk, int64_t num_stages,
+                            int64_t pipeline_level);
 
 // reference:
 // https://github.com/InfiniTensor/RefactorGraph/blob/master/src/04kernel/cuda/src/scatter_nd.cu#L7
