@@ -41,9 +41,19 @@ extern "C" __global__ void gemm_kernel_)"
        << in_type << "_" << acc_type << "_" << m << "_" << n << "_" << k << "_"
        << tm << "_" << tn << "_" << tk << "_" << num_stages << "_"
        << pipeline_level << R"((const )" << in_type << R"(* A, const )"
-       << in_type << R"(* B, )" << acc_type << R"(* C) {
-    ke_gemm<Config::InType, Config::AccType, Config>(A, B, C);
-})";
+       << in_type << R"(* B, )" << acc_type << R"(* C) {)";
+    ss << std::endl;
+    if (pipeline_level == 0) {
+        ss << "ke_gemm<Config::InType, Config::AccType, Config>(A, B, C);";
+    } else if (pipeline_level == 1) {
+        ss << "ke_gemm_level1_pipeline<Config::InType, Config::AccType, "
+              "Config>(A, B, C);";
+    } else if (pipeline_level == 2) {
+        ss << "ke_gemm_level2_pipeline<Config::InType, Config::AccType, "
+              "Config>(A, B, C);";
+    }
+
+    ss << std::endl << "}";
 
     return ss.str();
 }
