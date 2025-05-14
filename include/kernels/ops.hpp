@@ -38,10 +38,14 @@ TILEFUSION_EXPORT void flash_attention(const torch::Tensor& Q,
                                        bool causal);
 
 // declare the host function for gemm
+// TODO(KuangjuX): we use `torch::Tensor` to pass the warp_layout currently,
+// use `List[int]` seems to cause ABI errors
 TILEFUSION_EXPORT void gemm(const torch::Tensor& A, const torch::Tensor& B,
                             torch::Tensor& C, int64_t tm, int64_t tn,
                             int64_t tk, int64_t num_stages,
-                            int64_t pipeline_level);
+                            int64_t pipeline_level,
+                            const torch::Tensor& warp_layout,
+                            int64_t swizzle_bytes);
 
 // reference:
 // https://github.com/InfiniTensor/RefactorGraph/blob/master/src/04kernel/cuda/src/scatter_nd.cu#L7
