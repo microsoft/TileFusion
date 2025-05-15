@@ -157,7 +157,7 @@ __device__ __forceinline__ void ke_gemm(const InType* dA, const InType* dB,
         g2s_b(gBs(k1), sB);
         __copy_async();
         __syncthreads();
-
+        // #pragma unroll
         for (int k2 = 0; k2 < KeTraits::SIteratorA::sc1; ++k2) {
             s2r_a(sAs(k2), rA);
             s2r_b(sBs(k2), rB);
@@ -222,6 +222,7 @@ __device__ __forceinline__ void ke_gemm_level1_pipeline(const InType* dA,
         const InType* sB_ptr_prev = pipeline_g2s_b.get_prev_dst();
         typename KeTraits::SIteratorA sAs(sA_ptr_prev);
         typename KeTraits::SIteratorB sBs(sB_ptr_prev);
+        // #pragma unroll
         for (int k2 = 0; k2 < KeTraits::SIteratorA::sc1; ++k2) {
             s2r_a(sAs(k2), rA);
             s2r_b(sBs(k2), rB);

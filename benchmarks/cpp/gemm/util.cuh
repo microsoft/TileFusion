@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include "cutlass_gemm.cuh"
-#include "tilefusion_gemm.cuh"
 #include "util/cuda_timer.hpp"
 
 #include <thrust/device_vector.h>
@@ -14,6 +12,9 @@
 
 using namespace benchmarks;
 using namespace tilefusion;
+
+template <const int kM, const int kN, const int kK>
+using GemmShape = TileShape<kM, kN, kK>;
 
 float rand_float(float a = 1e-4, float b = 5e-3) {
     float random = ((float)rand()) / (float)RAND_MAX;
