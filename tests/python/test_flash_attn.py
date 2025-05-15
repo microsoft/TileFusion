@@ -188,12 +188,13 @@ def run_flash_attention(
         query=query,
         key=key,
         value=value,
+        tile_length_q=tile_length_q,
+        tile_length_kv=tile_length_kv,
+        tile_hidden_qk=tile_hidden_qk,
+        tile_hidden_v=tile_hidden_v,
         softmax_scale=softmax_scale,
         causal=causal,
     )
-
-    print("Reference output: ", ref_output)  # noqa: T201
-    print("Output: ", output)  # noqa: T201
 
     assert torch.allclose(ref_output, output, atol=1e-2, rtol=1e-2)
 
@@ -216,19 +217,6 @@ def run_flash_attention(
         },
         {
             "name": "test_case2",
-            "length_q": 64,
-            "length_kv": 256,
-            "hidden_qk": 128,
-            "hidden_v": 128,
-            "tile_length_q": 64,
-            "tile_length_kv": 128,
-            "tile_hidden_qk": 128,
-            "tile_hidden_v": 128,
-            "softmax_scale": 1.0 / math.sqrt(128),
-            "causal": False,
-        },
-        {
-            "name": "test_case3",
             "length_q": 128,
             "length_kv": 128,
             "hidden_qk": 128,

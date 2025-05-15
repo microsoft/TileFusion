@@ -17,17 +17,28 @@ class FlashAttention:
 
     def __init__(
         self,
+        tile_length_q: int,
+        tile_length_kv: int,
+        tile_hidden_qk: int,
+        tile_hidden_v: int,
         softmax_scale: float,
         causal: bool,
     ) -> None:
         """Initialize the flash attention.
 
         Args:
-            softmax_scale: Softmax scale.
-            The scaling of QK^T before applying softmax.
-                Default is 1.0 / sqrt(matrix_k).
+            tile_length_q: The tile size of the query length dimension.
+            tile_length_kv: The tile size of the key length dimension.
+            tile_hidden_qk: The tile size of the query and key hidden dimension.
+            tile_hidden_v: The tile size of the value hidden dimension.
+            softmax_scale: Softmax scale. The scaling of QK^T before applying
+                           softmax. Default is 1.0 / sqrt(hidden_qk).
             causal: bool. Whether to apply causal mask.
         """
+        self.tile_length_q = tile_length_q
+        self.tile_length_kv = tile_length_kv
+        self.tile_hidden_qk = tile_hidden_qk
+        self.tile_hidden_v = tile_hidden_v
         self.softmax_scale = softmax_scale
         self.causal = causal
 
@@ -47,8 +58,8 @@ class FlashAttention:
         Returns:
             torch.Tensor: The attention output.
         """
-        length_q, hidden_qk = query.size(-2), query.size(-1)
-        length_kv, hidden_v = value.size(-2), value.size(-1)
+        length_q = query.size(-2)
+        hidden_v = value.size(-1)
 
         output = torch.empty(
             length_q,
@@ -62,10 +73,10 @@ class FlashAttention:
             key.t().contiguous(),
             value.t().contiguous(),
             output,
-            length_q,
-            length_kv,
-            hidden_qk,
-            hidden_v,
+            self.tile_length_q,
+            self.tile_length_kv,
+            self.tile_hidden_qk,
+            self.tile_hidden_v,
             self.softmax_scale,
             self.causal,
         )
@@ -76,6 +87,10 @@ def flash_attention(
     query: torch.Tensor,
     key: torch.Tensor,
     value: torch.Tensor,
+    tile_length_q: int,
+    tile_length_kv: int,
+    tile_hidden_qk: int,
+    tile_hidden_v: int,
     softmax_scale: float,
     causal: bool,
 ) -> torch.Tensor:
@@ -90,6 +105,10 @@ def flash_attention(
         query: Query tensor of shape (batch_size, length_q, hidden_qk)
         key: Key tensor of shape (batch_size, length_kv, hidden_qk)
         value: Value tensor of shape (batch_size, length_kv, hidden_v)
+        tile_length_q: The tile size of the query length dimension.
+        tile_length_kv: The tile size of the key length dimension.
+        tile_hidden_qk: The tile size of the query and key hidden dimension.
+        tile_hidden_v: The tile size of the value hidden dimension.
         softmax_scale: Scale factor applied before softmax
                        (typically 1/sqrt(hidden_qk))
         causal: Whether to apply causal masking to prevent attention to
@@ -99,5 +118,12 @@ def flash_attention(
         torch.Tensor: Output tensor of shape (batch_size, length_q, hidden_v)
             containing the attention-weighted combination of values
     """
-    attn_func = FlashAttention(softmax_scale, causal)
+    attn_func = FlashAttention(
+        tile_length_q,
+        tile_length_kv,
+        tile_hidden_qk,
+        tile_hidden_v,
+        softmax_scale,
+        causal,
+    )
     return attn_func(query, key, value)
