@@ -8,63 +8,96 @@
 import torch
 
 __all__ = [
-    "TiledFlashAttention",
+    "flash_attention",
 ]
 
 
-class TiledFlashAttention:
-    """A class implementing tiled flash attention."""
+class FlashAttention:
+    """A class implementing flash attention."""
 
     def __init__(
         self,
-        query: torch.Tensor,
-        key: torch.Tensor,
-        value: torch.Tensor,
         softmax_scale: float,
         causal: bool,
     ) -> None:
-        """Initialize the tiled flash attention.
+        """Initialize the flash attention.
 
         Args:
-            query: Query tensor.
-            key: Key tensor.
-            value: Value tensor.
             softmax_scale: Softmax scale.
             The scaling of QK^T before applying softmax.
                 Default is 1.0 / sqrt(matrix_k).
             causal: bool. Whether to apply causal mask.
         """
-        self.m, self.k = query.size(-2), query.size(-1)
-        self.n, self.p = value.size(-2), value.size(-1)
-
-        self.query = query.half().flatten()
-        self.key = key.half().t().flatten()
-        self.value = value.half().t().flatten()
-
         self.softmax_scale = softmax_scale
         self.causal = causal
 
-        self.output = torch.empty(
-            self.m, self.p, dtype=torch.half, device="cuda"
-        ).flatten()
+    def __call__(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+    ) -> torch.Tensor:
+        """Perform the forward pass of flash attention.
 
-    def forward(self) -> torch.Tensor:
-        """Perform the forward pass of tiled flash attention.
+        Args:
+            query: Query tensor. shape (batch_size, length_q, hidden_qk).
+            key: Key tensor. shape (batch_size, length_kv, hidden_qk).
+            value: Value tensor. shape (batch_size, length_kv, hidden_v).
 
         Returns:
             torch.Tensor: The attention output.
         """
+        length_q, hidden_qk = query.size(-2), query.size(-1)
+        length_kv, hidden_v = value.size(-2), value.size(-1)
+
+        output = torch.empty(
+            length_q,
+            hidden_v,
+            dtype=query.dtype,
+            device=query.device,
+        )
+
         torch.ops.tilefusion.flash_attention(
-            self.query,
-            self.key,
-            self.value,
-            self.output,
-            self.m,
-            self.n,
-            self.k,
-            self.p,
+            query,
+            key.t().contiguous(),
+            value.t().contiguous(),
+            output,
+            length_q,
+            length_kv,
+            hidden_qk,
+            hidden_v,
             self.softmax_scale,
             self.causal,
         )
+        return output
 
-        return self.output.view(self.m, self.p)
+
+def flash_attention(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    softmax_scale: float,
+    causal: bool,
+) -> torch.Tensor:
+    """Compute flash attention between query, key and value tensors.
+
+    This is a convenience function that creates a FlashAttention instance
+    and applies it to the input tensors. Flash attention is an efficient
+    implementation of attention that uses tiling to reduce memory bandwidth
+    and improve performance.
+
+    Args:
+        query: Query tensor of shape (batch_size, length_q, hidden_qk)
+        key: Key tensor of shape (batch_size, length_kv, hidden_qk)
+        value: Value tensor of shape (batch_size, length_kv, hidden_v)
+        softmax_scale: Scale factor applied before softmax
+                       (typically 1/sqrt(hidden_qk))
+        causal: Whether to apply causal masking to prevent attention to
+                future tokens
+
+    Returns:
+        torch.Tensor: Output tensor of shape (batch_size, length_q, hidden_v)
+            containing the attention-weighted combination of values
+    """
+    attn_func = FlashAttention(softmax_scale, causal)
+    return attn_func(query, key, value)

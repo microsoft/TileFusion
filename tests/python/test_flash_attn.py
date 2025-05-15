@@ -8,31 +8,25 @@ isort:skip_file
 # Licensed under the MIT License.
 # --------------------------------------------------------------------------
 
+
 from typing import Any
 
 import pytest
 import torch
 import math
 
-from tilefusion.ops import TiledFlashAttention
+from tilefusion.ops import flash_attention
 
 
-class FlashAttention:
+class FlashAttentionRef:
     """Reference implementation of flash attention."""
 
     def __init__(
         self,
-        query: torch.Tensor,
-        key: torch.Tensor,
-        value: torch.Tensor,
-        matrix_m: int,
-        matrix_n: int,
-        matrix_k: int,
-        matrix_p: int,
-        tile_m: int,
-        tile_n: int,
-        tile_k: int,
-        tile_p: int,
+        tile_length_q: int,
+        tile_length_kv: int,
+        tile_hidden_qk: int,
+        tile_hidden_v: int,
         softmax_scale: float,
         causal: bool,
     ) -> None:
@@ -42,63 +36,65 @@ class FlashAttention:
             query: Query tensor.
             key: Key tensor.
             value: Value tensor.
-            matrix_m: Size of first dimension of query.
-            matrix_n: Size of first dimension of key/value.
-            matrix_k: Size of second dimension of query/key.
-            matrix_p: Size of second dimension of value/output.
-            tile_m: Tile size for M dimension.
-            tile_n: Tile size for N dimension.
-            tile_k: Tile size for K dimension.
-            tile_p: Tile size for P dimension.
+            length_q: Size of first dimension of query.
+            length_kv: Size of first dimension of key/value.
+            hidden_qk: Size of second dimension of query/key.
+            hidden_v: Size of second dimension of value/output.
+            tile_length_q: Tile size for M dimension.
+            tile_length_kv: Tile size for N dimension.
+            tile_hidden_qk: Tile size for K dimension.
+            tile_hidden_v: Tile size for P dimension.
             softmax_scale: Softmax scale.
                 The scaling of QK^T before applying softmax.
                 Default is 1.0 / sqrt(matrix_k).
             causal: bool. Whether to apply causal mask.
         """
-        self.matrix_m = matrix_m
-        self.matrix_n = matrix_n
-        self.matrix_k = matrix_k
-        self.matrix_p = matrix_p
-
-        self.tile_m = tile_m
-        self.tile_n = tile_n
-        self.tile_k = tile_k
-        self.tile_p = tile_p
+        self.tile_length_q = tile_length_q
+        self.tile_length_kv = tile_length_kv
+        self.tile_hidden_qk = tile_hidden_qk
+        self.tile_hidden_v = tile_hidden_v
 
         self.softmax_scale = softmax_scale
         self.causal = causal
 
-        self.query = query
-        self.key = key
-        self.value = value
-        self.output = torch.empty(matrix_m, matrix_p, device="cpu")
-
-    def forward(self) -> torch.Tensor:
+    def __call__(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+    ) -> torch.Tensor:
         """Perform the forward pass of flash attention.
 
         Returns:
             torch.Tensor: The attention output.
         """
-        iter_n = self.matrix_n // self.tile_n
+        dtype = query.dtype
+        device = query.device
 
-        prev_maxes = torch.zeros(self.matrix_m, 1, device="cpu")
-        prev_sums = torch.zeros(self.matrix_m, 1, device="cpu")
+        length_q = query.shape[0]
+        length_kv = key.shape[1]
+        hidden_v = value.shape[1]
 
-        output = self.output.view(self.matrix_m, self.matrix_p)
+        output = torch.empty(
+            length_q,
+            hidden_v,
+            dtype=dtype,
+            device=device,
+        )
 
-        dK = self.key.view(self.matrix_k, self.matrix_n)
-        dV = self.value.view(self.matrix_n, self.matrix_p)
+        iter_n = length_kv // self.tile_length_kv
 
-        ks = torch.chunk(dK, iter_n, dim=-1)
-        vs = torch.chunk(dV, iter_n, dim=-2)
+        prev_maxes = torch.zeros(length_q, 1, dtype=dtype, device=device)
+        prev_sums = torch.zeros(length_q, 1, dtype=dtype, device=device)
+
+        ks = torch.chunk(key, iter_n, dim=-1)
+        vs = torch.chunk(value, iter_n, dim=-2)
 
         for chunk_idx in range(iter_n):
-            query_view = self.query.view(self.matrix_m, self.matrix_k)  # m * k
-
             key_chunk = ks[chunk_idx]
             value_chunk = vs[chunk_idx]
 
-            attn_weights = query_view @ key_chunk  # m * ktn
+            attn_weights = query @ key_chunk  # m * ktn
 
             if self.causal:
                 # Create a causal mask for the attention weights.
@@ -135,9 +131,7 @@ class FlashAttention:
             prev_sums = new_sums
             prev_maxes = new_maxes
 
-        self.output = output
-
-        return self.output
+        return output
 
 
 @pytest.fixture(autouse=True)
@@ -147,96 +141,61 @@ def setup() -> None:
 
 
 def run_flash_attention(
-    matrix_m: int,
-    matrix_n: int,
-    matrix_k: int,
-    matrix_p: int,
-    tile_m: int,
-    tile_n: int,
-    tile_k: int,
-    tile_p: int,
+    length_q: int,
+    length_kv: int,
+    hidden_qk: int,
+    hidden_v: int,
+    tile_length_q: int,
+    tile_length_kv: int,
+    tile_hidden_qk: int,
+    tile_hidden_v: int,
     softmax_scale: float,
     causal: bool,
+    dtype: torch.dtype = torch.float16,
+    device: str = "cuda",
 ) -> None:
     """Run flash attention test with given dimensions.
 
     Args:
-        matrix_m: Size of first dimension of query.
-        matrix_n: Size of first dimension of key/value.
-        matrix_k: Size of second dimension of query/key.
-        matrix_p: Size of second dimension of value/output.
-        tile_m: Tile size for M dimension.
-        tile_n: Tile size for N dimension.
-        tile_k: Tile size for K dimension.
-        tile_p: Tile size for P dimension.
+        length_q: Size of first dimension of query.
+        length_kv: Size of first dimension of key/value.
+        hidden_qk: Size of second dimension of query/key.
+        hidden_v: Size of second dimension of value/output.
+        tile_length_q: Tile size for M dimension.
+        tile_length_kv: Tile size for N dimension.
+        tile_hidden_qk: Tile size for K dimension.
+        tile_hidden_v: Tile size for P dimension.
         softmax_scale: Softmax scale.
             The scaling of QK^T before applying softmax.
             Default is 1.0 / sqrt(matrix_k).
         causal: bool. Whether to apply causal mask.
     """
-    query = torch.randn(matrix_m, matrix_k, device="cpu")
-    key = torch.randn(matrix_k, matrix_n, device="cpu")
-    value = torch.randn(matrix_n, matrix_p, device="cpu")
+    query = torch.randn(length_q, hidden_qk, dtype=dtype, device=device)
+    key = torch.randn(hidden_qk, length_kv, dtype=dtype, device=device)
+    value = torch.randn(length_kv, hidden_v, dtype=dtype, device=device)
 
-    flash_attn = FlashAttention(
-        query.half().flatten(),
-        key.half().flatten(),
-        value.half().flatten(),
-        matrix_m,
-        matrix_n,
-        matrix_k,
-        matrix_p,
-        tile_m,
-        tile_n,
-        tile_k,
-        tile_p,
+    flash_attn_ref = FlashAttentionRef(
+        tile_length_q,
+        tile_length_kv,
+        tile_hidden_qk,
+        tile_hidden_v,
         softmax_scale,
         causal,
     )
+    ref_output = flash_attn_ref(query, key, value)
 
-    ref_output = flash_attn.forward().half()
-
-    cuda_query = query.cuda()
-    cuda_key = key.cuda()
-    cuda_value = value.cuda()
-
-    tiled_flash_attention = TiledFlashAttention(
-        query=cuda_query,
-        key=cuda_key,
-        value=cuda_value,
+    output = flash_attention(
+        query=query,
+        key=key,
+        value=value,
         softmax_scale=softmax_scale,
         causal=causal,
     )
-    output = tiled_flash_attention.forward()
 
-    print("CPU Reference output: ", ref_output)  # noqa: T201
-    print("tilefusion output: ", output)  # noqa: T201
+    print("Reference output: ", ref_output)  # noqa: T201
+    print("Output: ", output)  # noqa: T201
 
-    host_output = output.cpu()
-
-    passed = True
-
-    # Compare elements one by one and print the different numbers.
-    for row_idx in range(matrix_m):
-        for col_idx in range(matrix_p):
-            if (
-                abs(
-                    host_output[row_idx][col_idx] - ref_output[row_idx][col_idx]
-                )
-                > 8e-2
-            ):
-                print("(", row_idx, ", ", col_idx, ")")  # noqa: T201
-                print(  # noqa: T201
-                    "tilefusion O: ", host_output[row_idx][col_idx]
-                )
-                print(  # noqa: T201
-                    "CPU Reference O: ", ref_output[row_idx][col_idx]
-                )
-
-                passed = False
-                break
-
-    assert passed
+    assert torch.allclose(ref_output, output, atol=1e-2, rtol=1e-2)
 
 
 @pytest.mark.parametrize(
@@ -244,40 +203,40 @@ def run_flash_attention(
     [
         {
             "name": "test_case1",
-            "matrix_m": 64,
-            "matrix_n": 128,
-            "matrix_k": 128,
-            "matrix_p": 128,
-            "tile_m": 64,
-            "tile_n": 128,
-            "tile_k": 128,
-            "tile_p": 128,
+            "length_q": 64,
+            "length_kv": 128,
+            "hidden_qk": 128,
+            "hidden_v": 128,
+            "tile_length_q": 64,
+            "tile_length_kv": 128,
+            "tile_hidden_qk": 128,
+            "tile_hidden_v": 128,
             "softmax_scale": 1.0 / math.sqrt(128),
             "causal": False,
         },
         {
             "name": "test_case2",
-            "matrix_m": 64,
-            "matrix_n": 256,
-            "matrix_k": 128,
-            "matrix_p": 128,
-            "tile_m": 64,
-            "tile_n": 128,
-            "tile_k": 128,
-            "tile_p": 128,
+            "length_q": 64,
+            "length_kv": 256,
+            "hidden_qk": 128,
+            "hidden_v": 128,
+            "tile_length_q": 64,
+            "tile_length_kv": 128,
+            "tile_hidden_qk": 128,
+            "tile_hidden_v": 128,
             "softmax_scale": 1.0 / math.sqrt(128),
             "causal": False,
         },
         {
             "name": "test_case3",
-            "matrix_m": 128,
-            "matrix_n": 128,
-            "matrix_k": 128,
-            "matrix_p": 128,
-            "tile_m": 64,
-            "tile_n": 128,
-            "tile_k": 128,
-            "tile_p": 128,
+            "length_q": 128,
+            "length_kv": 128,
+            "hidden_qk": 128,
+            "hidden_v": 128,
+            "tile_length_q": 64,
+            "tile_length_kv": 128,
+            "tile_hidden_qk": 128,
+            "tile_hidden_v": 128,
             "softmax_scale": 1.0 / math.sqrt(128),
             "causal": True,
         },
@@ -291,14 +250,14 @@ def test_flash_attention(test_case: dict[str, Any]) -> None:
         test_case: Dictionary containing test parameters
     """
     run_flash_attention(
-        matrix_m=test_case["matrix_m"],
-        matrix_n=test_case["matrix_n"],
-        matrix_k=test_case["matrix_k"],
-        matrix_p=test_case["matrix_p"],
-        tile_m=test_case["tile_m"],
-        tile_n=test_case["tile_n"],
-        tile_k=test_case["tile_k"],
-        tile_p=test_case["tile_p"],
+        length_q=test_case["length_q"],
+        length_kv=test_case["length_kv"],
+        hidden_qk=test_case["hidden_qk"],
+        hidden_v=test_case["hidden_v"],
+        tile_length_q=test_case["tile_length_q"],
+        tile_length_kv=test_case["tile_length_kv"],
+        tile_hidden_qk=test_case["tile_hidden_qk"],
+        tile_hidden_v=test_case["tile_hidden_v"],
         softmax_scale=test_case["softmax_scale"],
         causal=test_case["causal"],
     )
