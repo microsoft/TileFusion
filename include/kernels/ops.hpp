@@ -8,41 +8,6 @@
 
 namespace tilefusion::kernels {
 
-template <typename InType,
-          typename AccType,                                      //
-          typename OutType,                                      //
-          typename GIteratorQ, typename SharedQ, typename RegQ,  //
-          typename SharedQLoader, typename RegQLoader,           //
-          typename GIteratorK, typename SharedK, typename RegK,  //
-          typename SharedKLoader, typename RegKLoader,           //
-          typename GIteratorV, typename SharedV, typename RegV,  //
-          typename SharedVLoader, typename RegVLoader,           //
-          typename RegAcc, typename RegAccCast, typename GlobalO, typename RegO,
-          typename RegOCast, typename OStorer, typename ConvertAcc,
-          typename ConvertO, typename RegVec, typename CopyVec, typename RowMax,
-          typename RowSum, typename BroadcastSub, typename BroadcastMul,
-          typename BroadcastDiv, typename BlockExp, typename BlockAdd,
-          typename VecMax, typename VecAdd, typename VecSub, typename VecMul,
-          typename VecExp>
-__global__ void ke_flash_attention(const InType* dQ, const InType* dK,
-                                   const InType* dV, InType* dO, int kM, int kN,
-                                   int kK, int kP, int kTM, int kTN, int kTK,
-                                   int kTP, float softmax_scale, bool causal);
-
-// declare the host function for flash attention
-TILEFUSION_EXPORT void flash_attention(const torch::Tensor& Q,
-                                       const torch::Tensor& K,
-                                       const torch::Tensor& V, torch::Tensor& O,
-                                       int64_t m, int64_t n, int64_t k,
-                                       int64_t p, double softmax_scale,
-                                       bool causal);
-
-// declare the host function for gemm
-TILEFUSION_EXPORT void gemm(const torch::Tensor& A, const torch::Tensor& B,
-                            torch::Tensor& C, int64_t tm, int64_t tn,
-                            int64_t tk, int64_t num_stages,
-                            int64_t pipeline_level);
-
 // reference:
 // https://github.com/InfiniTensor/RefactorGraph/blob/master/src/04kernel/cuda/src/scatter_nd.cu#L7
 // TODO: optimize the kernel by increasing the number of threads to perform
@@ -72,11 +37,24 @@ TILEFUSION_EXPORT void scatter_nd(const torch::Tensor& data,
                                   torch::Tensor& updates,
                                   const torch::Tensor& indices);
 
+// declare the host function for gemm
+TILEFUSION_EXPORT void gemm(const torch::Tensor& A, const torch::Tensor& B,
+                            torch::Tensor& C, int64_t tm, int64_t tn,
+                            int64_t tk, int64_t num_stages,
+                            int64_t pipeline_level);
+
 // declare the host function for fused two gemms
 TILEFUSION_EXPORT void fused_two_gemms(const torch::Tensor& A,
                                        const torch::Tensor& B,
                                        const torch::Tensor& C, torch::Tensor& D,
                                        int64_t tm, int64_t tn, int64_t tk,
                                        int64_t tp);
+
+// declare the host function for flash attention
+TILEFUSION_EXPORT void flash_attention(
+    const torch::Tensor& Q, const torch::Tensor& K, const torch::Tensor& V,
+    torch::Tensor& O, int64_t tile_length_q, int64_t tile_length_kv,
+    int64_t tile_hidden_qk, int64_t tile_hidden_v, double softmax_scale,
+    bool causal);
 
 }  // namespace tilefusion::kernels
