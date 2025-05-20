@@ -5,8 +5,10 @@
 #include "config.hpp"
 #include "cuda_utils.hpp"
 #include "traits/base.hpp"
+#include "util/math_utils.hpp"
 
 #include <iostream>
+#include <type_traits>
 
 namespace tilefusion::tile_layout {
 /**
@@ -17,7 +19,10 @@ namespace tilefusion::tile_layout {
  * tile_layout to avoid potential name conflicts.
  */
 
-enum class Layout { kRowMajor = 0, kColMajor = 1 };
+enum class Layout {
+    kRowMajor = 0,
+    kColMajor = 1,
+};
 
 HOST_DEVICE
 const char* layout_type_to_str(Layout type) {
@@ -103,4 +108,94 @@ static constexpr size_t get_numel = Layout::kNumel;
 // will also be identified as a row-major layout.
 template <typename Layout_>
 static constexpr Layout layout_type = Layout_::kType;
+
+template <typename Layout_>
+struct is_row_major {
+    static constexpr bool value = Layout_::kType == Layout::kRowMajor;
+};
+
+template <typename Layout_>
+struct is_col_major {
+    static constexpr bool value = Layout_::kType == Layout::kColMajor;
+};
+
+template <typename OuterLayout_, typename InnerLayout_>
+struct BlockMatrxLayout {
+    using InnerLayout = InnerLayout_;
+    using OuterLayout = OuterLayout_;
+
+    static constexpr int kRows = OuterLayout_::kRows;
+    static constexpr int kCols = OuterLayout_::kCols;
+
+    static constexpr int kInnerRows = InnerLayout_::kRows;
+    static constexpr int kInnerCols = InnerLayout_::kCols;
+
+    static_assert(kRows % kInnerRows == 0,
+                  "OuterLayout rows must be divisible by InnerLayout rows");
+    static_assert(kCols % kInnerCols == 0,
+                  "OuterLayout cols must be divisible by InnerLayout cols");
+
+    static constexpr int kInnerNumel = InnerLayout_::kNumel;
+    static constexpr Layout kType = OuterLayout::kType;
+
+    static constexpr int kTileRows = kRows / kInnerRows;
+    static constexpr int kTileCols = kCols / kInnerCols;
+
+    static constexpr int kRowStride = is_row_major<OuterLayout>::value
+                                          ? kTileCols * kInnerNumel
+                                          : kInnerNumel;
+    static constexpr int kColStride = is_row_major<InnerLayout>::value
+                                          ? kInnerNumel
+                                          : kTileRows * kInnerNumel;
+
+    HOST_DEVICE int operator()(int i, int j) const {
+        const int outer_i = RowDivMod::div(i);
+        const int inner_i = RowDivMod::mod(i);
+        const int outer_j = ColDivMod::div(j);
+        const int inner_j = ColDivMod::mod(j);
+
+        return outer_(outer_i, outer_j) + inner_(inner_i, inner_j);
+    }
+
+  private:
+    static constexpr bool kInnerRowsIsPow2 =
+        (kInnerRows & (kInnerRows - 1)) == 0;
+    static constexpr bool kInnerColsIsPow2 =
+        (kInnerCols & (kInnerCols - 1)) == 0;
+
+    using RowDivMod = DivModSelector<kInnerRowsIsPow2, kInnerRows>;
+    using ColDivMod = DivModSelector<kInnerColsIsPow2, kInnerCols>;
+
+    using BlockOuter =
+        MatrixLayout<kTileRows, kTileCols, kRowStride, kColStride>;
+    BlockOuter outer_;
+
+    InnerLayout inner_;
+};
+
+template <typename OuterLayout_, typename InnerLayout_>
+concept BlockRowMajorLayout =
+    is_row_major<OuterLayout_>::value && is_row_major<InnerLayout_>::value;
+
+template <typename OuterLayout_, typename InnerLayout_>
+concept BlockColMajorLayout =
+    is_col_major<OuterLayout_>::value && is_col_major<InnerLayout_>::value;
+
+template <typename OuterLayout_, typename InnerLayout_>
+concept BlockMixedLayout =
+    (is_row_major<OuterLayout_>::value && is_col_major<InnerLayout_>::value) ||
+    (is_col_major<OuterLayout_>::value && is_row_major<InnerLayout_>::value);
+
+template <typename OuterLayout_, typename InnerLayout_>
+    requires BlockRowMajorLayout<OuterLayout_, InnerLayout_>
+using BlockRowMajor = BlockMatrxLayout<OuterLayout_, InnerLayout_>;
+
+template <typename OuterLayout_, typename InnerLayout_>
+    requires BlockColMajorLayout<OuterLayout_, InnerLayout_>
+using BlockColMajor = BlockMatrxLayout<OuterLayout_, InnerLayout_>;
+
+template <typename OuterLayout_, typename InnerLayout_>
+    requires BlockMixedLayout<OuterLayout_, InnerLayout_>
+using BlockMixed = BlockMatrxLayout<OuterLayout_, InnerLayout_>;
+
 }  // namespace tilefusion::tile_layout
