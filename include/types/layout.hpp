@@ -144,7 +144,7 @@ struct BlockMatrxLayout {
     static constexpr int kRowStride = is_row_major<OuterLayout>::value
                                           ? kTileCols * kInnerNumel
                                           : kInnerNumel;
-    static constexpr int kColStride = is_row_major<InnerLayout>::value
+    static constexpr int kColStride = is_row_major<OuterLayout>::value
                                           ? kInnerNumel
                                           : kTileRows * kInnerNumel;
 
@@ -155,6 +155,15 @@ struct BlockMatrxLayout {
         const int inner_j = ColDivMod::mod(j);
 
         return outer_(outer_i, outer_j) + inner_(inner_i, inner_j);
+    }
+
+    HOST_DEVICE void dump() const {
+        for (int i = 0; i < kRows; ++i) {
+            for (int j = 0; j < kCols; ++j) {
+                printf("%d, ", operator()(i, j));
+            }
+            printf("\n");
+        }
     }
 
   private:
