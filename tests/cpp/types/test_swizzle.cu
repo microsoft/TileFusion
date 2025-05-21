@@ -4,10 +4,14 @@
 #include "common/test_utils.hpp"
 #include "types/mod.hpp"
 
+#include <cute/tensor.hpp>
+
 namespace tilefusion::testing {
 
 using namespace cell;
 namespace tl = tile_layout;
+
+using namespace cute;
 
 namespace {
 int flatten(int x, int y, int width) { return x * width + y; }
@@ -59,15 +63,45 @@ TEST(TestSwizzle, test_swizzle_function) {
     EXPECT_EQ(swizzled_idx_2_4.x, swizzled_idx_2_4.y);
 }
 
-TEST(TestSwizzle, test_swizzled_layout) {
+TEST(TestSwizzle, test_swizzled_row_major) {
     using BlockRowMajor = tl::BlockRowMajor<
         tl::RowMajor<16, 64>,
         SwizzledLayout<tl::RowMajor<8, 64>, Swizzle<3, 3, 3>>>;
 
-#if defined(DEBUG)
-    BlockRowMajor layout;
-    layout.dump();
-#endif
+    // for unit test
+    using Atom =
+        decltype(composition(cute::Swizzle<3, 3, 3>{},
+                             cute::Layout<Shape<_8, _64>, Stride<_64, _1>>{}));
+    using CuteLayout =
+        decltype(tile_to_shape(Atom{}, Shape<_16, _64>{}, Step<_16, _1>{}));
+
+    BlockRowMajor layout1;
+    CuteLayout layout2;
+
+    for (int i = 0; i < int(size<0>(layout2)); ++i) {
+        for (int j = 0; j < int(size<1>(layout2)); ++j) {
+            EXPECT_EQ(layout1(i, j), layout2(i, j));
+        }
+    }
+}
+
+TEST(TestSwizzle, test_swizzled_col_major) {
+    using BlockColMajor = tl::BlockColMajor<
+        tl::ColMajor<64, 16>,
+        SwizzledLayout<tl::ColMajor<64, 8>, Swizzle<3, 3, 3>>>;
+
+    using Atom = decltype(composition(cute::Swizzle<3, 3, 3>{},
+                                      cute::Layout<Shape<_64, _8>>{}));
+    using CuteLayout = decltype(tile_to_shape(Atom{}, Shape<_64, _16>{}));
+
+    BlockColMajor layout1;
+    CuteLayout layout2;
+
+    for (int i = 0; i < int(size<0>(layout2)); ++i) {
+        for (int j = 0; j < int(size<1>(layout2)); ++j) {
+            EXPECT_EQ(layout1(i, j), layout2(i, j));
+        }
+    }
 }
 
 }  // namespace tilefusion::testing
