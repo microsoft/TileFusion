@@ -4,8 +4,6 @@
 #include "common/test_utils.hpp"
 #include "types/mod.hpp"
 
-#include <iostream>
-
 namespace tilefusion::testing {
 
 using namespace tilefusion::cell;

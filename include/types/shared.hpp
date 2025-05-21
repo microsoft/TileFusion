@@ -21,7 +21,6 @@ struct SharedTilePrettyPrinter {
     template <typename Shared>
     static HOST void print(std::ostream& out, const Shared& tile) {
         // parameter `tile` here is not used
-
         auto swizzled = Shared::kSwizzled ? "swizzled" : "non-swizzled";
         out << "\t" << typename Shared::Layout{} << ", Swizzled = " << swizzled;
     }
@@ -36,21 +35,20 @@ class SharedTile {
     using DType = Element_;
     using Layout = Layout_;
 
-    static constexpr int kNumel = Layout::kNumel;
-
     static constexpr int kRows = Layout::kRows;
     static constexpr int kCols = Layout::kCols;
     static constexpr int kRowStride = Layout::kRowStride;
     static constexpr int kColStride = Layout::kColStride;
-    static constexpr int SwizzleBytes = SwizzleBytes_;
 
     static constexpr tl::Layout kType = Layout::kType;
+    static constexpr int kNumel = Layout::kNumel;
 
+    static constexpr bool isRowMajor = tl::is_row_major<Layout>::value;
+
+    static constexpr int SwizzleBytes = SwizzleBytes_;
     static constexpr bool kSwizzled = kSwizzled_;
 
     using SwizzleBaseShape = SwizzleBaseTileShape<DType, SwizzleBytes>;
-
-    static constexpr bool isRowMajor = (kType == tl::Layout::kRowMajor);
 
     static constexpr int kSwizzleRows =
         isRowMajor ? SwizzleBaseShape::kRows : SwizzleBaseShape::kCols;
@@ -61,9 +59,10 @@ class SharedTile {
         isRowMajor, tl::MatrixLayout<kSwizzleRows, kSwizzleCols, kRowStride, 1>,
         tl::MatrixLayout<kSwizzleRows, kSwizzleCols, 1, kColStride>>;
 
-    using Swizzled =
-        SwizzledLayout<NonSwizzled, SwizzleBaseShape::B, SwizzleBaseShape::M,
-                       SwizzleBaseShape::S, kType>;
+    using Swizzled = SwizzledLayout<
+        NonSwizzled,
+        Swizzle<SwizzleBaseShape::B, SwizzleBaseShape::M, SwizzleBaseShape::S>,
+        kType>;
 
     using InTileLayout = std::conditional_t<kSwizzled, Swizzled, NonSwizzled>;
 

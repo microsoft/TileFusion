@@ -332,13 +332,6 @@ class CppTest(Command):
 
     def run(self) -> None:
         """Run the C++ tests using ctest."""
-        build_dir = "build"
-        if not os.path.exists(build_dir):
-            print(  # noqa: T201
-                "Build directory not found. Building project first..."
-            )
-            self.run_command("build")
-
         try:
             cmake_path = subprocess.check_output(
                 ["which", "cmake"], text=True
@@ -347,6 +340,34 @@ class CppTest(Command):
             ctest_path = os.path.join(cmake_dir, "ctest")
         except subprocess.CalledProcessError:
             raise RuntimeError("Could not find cmake executable") from None
+
+        build_dir = "build"
+
+        # Reconfigure CMake with testing enabled
+        try:
+            cmake_path = subprocess.check_output(
+                ["which", "cmake"], text=True
+            ).strip()
+            print("Reconfiguring CMake with testing enabled...")  # noqa: T201
+            subprocess.run(
+                [cmake_path, "-DWITH_TESTING=ON", ".."],
+                cwd=build_dir,
+                check=True,
+            )
+            # Get parallel level from environment or use CPU count
+            parallel_level = os.environ.get("CMAKE_BUILD_PARALLEL_LEVEL")
+            if parallel_level is not None:
+                parallel = int(parallel_level)
+            else:
+                parallel = os.cpu_count() or 1
+            # Rebuild after reconfiguration with parallel jobs
+            subprocess.run(
+                [cmake_path, "--build", ".", f"-j{parallel}"],
+                cwd=build_dir,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Failed to configure CMake: {e}") from e
 
         try:
             # Run ctest in the build directory

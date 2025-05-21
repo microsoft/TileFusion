@@ -8,7 +8,6 @@
 #include "util/math_utils.hpp"
 
 #include <iostream>
-#include <type_traits>
 
 namespace tilefusion::tile_layout {
 /**
