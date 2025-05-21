@@ -330,47 +330,30 @@ class CppTest(Command):
         """Finalize the test command options."""
         pass
 
-    def run(self) -> None:
-        """Run the C++ tests using ctest."""
+    def _get_cmake_paths(self) -> tuple[str, str]:
+        """Get paths to cmake and ctest executables.
+
+        Returns:
+            tuple[str, str]: Paths to cmake and ctest executables.
+        """
         try:
             cmake_path = subprocess.check_output(
                 ["which", "cmake"], text=True
             ).strip()
             cmake_dir = os.path.dirname(cmake_path)
             ctest_path = os.path.join(cmake_dir, "ctest")
+            return cmake_path, ctest_path
         except subprocess.CalledProcessError:
             raise RuntimeError("Could not find cmake executable") from None
 
-        build_dir = "build"
+    def _run_ctest(self, ctest_path: str, build_dir: str) -> None:
+        """Run ctest in the build directory.
 
-        # Reconfigure CMake with testing enabled
+        Args:
+            ctest_path: Path to ctest executable.
+            build_dir: Path to build directory.
+        """
         try:
-            cmake_path = subprocess.check_output(
-                ["which", "cmake"], text=True
-            ).strip()
-            print("Reconfiguring CMake with testing enabled...")  # noqa: T201
-            subprocess.run(
-                [cmake_path, "-DWITH_TESTING=ON", ".."],
-                cwd=build_dir,
-                check=True,
-            )
-            # Get parallel level from environment or use CPU count
-            parallel_level = os.environ.get("CMAKE_BUILD_PARALLEL_LEVEL")
-            if parallel_level is not None:
-                parallel = int(parallel_level)
-            else:
-                parallel = os.cpu_count() or 1
-            # Rebuild after reconfiguration with parallel jobs
-            subprocess.run(
-                [cmake_path, "--build", ".", f"-j{parallel}"],
-                cwd=build_dir,
-                check=True,
-            )
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to configure CMake: {e}") from e
-
-        try:
-            # Run ctest in the build directory
             errno = subprocess.call(
                 [ctest_path, "--output-on-failure"] + self.ctest_args.split(),
                 cwd=build_dir,
@@ -379,6 +362,75 @@ class CppTest(Command):
                 raise SystemExit(errno)
         except OSError as e:
             raise RuntimeError(f"Failed to run ctest: {e}") from e
+
+    def _is_testing_enabled(self, build_dir: str) -> bool:
+        """Check if testing is enabled in CMake cache.
+
+        Args:
+            build_dir: Path to build directory.
+
+        Returns:
+            bool: True if testing is enabled, False otherwise.
+        """
+        try:
+            cache_file = os.path.join(build_dir, "CMakeCache.txt")
+            if os.path.exists(cache_file):
+                with open(cache_file) as f:
+                    return "WITH_TESTING:BOOL=ON" in f.read()
+        except Exception as e:
+            print(f"Warning: Could not check CMake cache: {e}")  # noqa: T201
+        return False
+
+    def _configure_and_build(self, cmake_path: str, build_dir: str) -> None:
+        """Configure and build the project with testing enabled.
+
+        Args:
+            cmake_path: Path to cmake executable.
+            build_dir: Path to build directory.
+        """
+        try:
+            if not os.path.exists(build_dir):
+                os.makedirs(build_dir)
+
+            subprocess.run(
+                [cmake_path, "-DWITH_TESTING=ON", ".."],
+                cwd=build_dir,
+                check=True,
+            )
+            parallel = int(
+                os.environ.get(
+                    "CMAKE_BUILD_PARALLEL_LEVEL", os.cpu_count() or 1
+                )
+            )
+            subprocess.run(
+                [cmake_path, "--build", ".", f"-j{parallel}"],
+                cwd=build_dir,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Failed to configure CMake: {e}") from e
+
+    def run(self) -> None:
+        """Run the C++ tests using ctest."""
+        build_dir = "build"
+        cmake_path, ctest_path = self._get_cmake_paths()
+
+        if not os.path.exists(build_dir):
+            print(  # noqa: T201
+                "Build directory not found. Building project first..."
+            )
+            self._configure_and_build(cmake_path, build_dir)
+        else:
+            if self._is_testing_enabled(build_dir):
+                print(  # noqa: T201
+                    "Testing already enabled, skipping reconfiguration"
+                )
+            else:
+                print(  # noqa: T201
+                    "Reconfiguring CMake with testing enabled..."
+                )
+                self._configure_and_build(cmake_path, build_dir)
+        self._run_ctest(ctest_path, build_dir)
 
 
 description = "Python wrapper for tilefusion C++ library."
