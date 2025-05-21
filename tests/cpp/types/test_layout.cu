@@ -1,14 +1,12 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#include "cell/copy/global_to_shared.hpp"
 #include "common/test_utils.hpp"
 #include "types/mod.hpp"
 
-#include <thrust/host_vector.h>
-
 namespace tilefusion::testing {
-using namespace cell;
+
+using namespace tilefusion::cell;
 namespace tl = tile_layout;
 
 TEST(TestLayout, test_layout) {
@@ -39,4 +37,85 @@ TEST(TestLayout, test_layout) {
     EXPECT_EQ(layout_name2, "ColMajor");
 }
 
+TEST(TestLayout, test_block_row_major) {
+    using Layout = tl::BlockRowMajor<tl::RowMajor<14, 9>, tl::RowMajor<2, 3>>;
+
+    EXPECT_EQ(Layout::kTileRows, 7);
+    EXPECT_EQ(Layout::kTileCols, 3);
+    EXPECT_EQ(Layout::kRowStride, 18);
+    EXPECT_EQ(Layout::kColStride, 6);
+    EXPECT_EQ(Layout::kType, tl::Layout::kRowMajor);
+
+    Layout layout;
+
+#if defined(DEBUG)
+    layout.dump();
+#endif
+
+    EXPECT_EQ(layout(2, 0), 18);
+    EXPECT_EQ(layout(2, 1), 19);
+    EXPECT_EQ(layout(4, 3), 42);
+    EXPECT_EQ(layout(4, 4), 43);
+}
+
+TEST(TestLayout, test_block_col_major) {
+    using Layout = tl::BlockColMajor<tl::ColMajor<14, 9>, tl::ColMajor<2, 3>>;
+
+    EXPECT_EQ(Layout::kTileRows, 7);
+    EXPECT_EQ(Layout::kTileCols, 3);
+    EXPECT_EQ(Layout::kRowStride, 6);
+    EXPECT_EQ(Layout::kColStride, 42);
+    EXPECT_EQ(Layout::kType, tl::Layout::kColMajor);
+
+    Layout layout;
+
+#if defined(DEBUG)
+    layout.dump();
+#endif
+
+    EXPECT_EQ(layout(6, 0), 18);
+    EXPECT_EQ(layout(7, 0), 19);
+    EXPECT_EQ(layout(0, 3), 42);
+    EXPECT_EQ(layout(1, 3), 43);
+}
+
+TEST(TestLayout, test_block_mixed1) {
+    using Layout = tl::BlockMixed<tl::RowMajor<14, 9>, tl::ColMajor<2, 3>>;
+
+    EXPECT_EQ(Layout::kTileRows, 7);
+    EXPECT_EQ(Layout::kTileCols, 3);
+    EXPECT_EQ(Layout::kRowStride, 18);
+    EXPECT_EQ(Layout::kColStride, 6);
+    EXPECT_EQ(Layout::kType, tl::Layout::kRowMajor);
+
+    Layout layout;
+#if defined(DEBUG)
+    layout.dump();
+#endif
+
+    EXPECT_EQ(layout(2, 0), 18);
+    EXPECT_EQ(layout(3, 0), 19);
+    EXPECT_EQ(layout(4, 3), 42);
+    EXPECT_EQ(layout(5, 3), 43);
+}
+
+TEST(TestLayout, test_block_mixed2) {
+    using Layout = tl::BlockMixed<tl::ColMajor<14, 9>, tl::RowMajor<2, 3>>;
+
+    EXPECT_EQ(Layout::kTileRows, 7);
+    EXPECT_EQ(Layout::kTileCols, 3);
+    EXPECT_EQ(Layout::kRowStride, 6);
+    EXPECT_EQ(Layout::kColStride, 42);
+    EXPECT_EQ(Layout::kType, tl::Layout::kColMajor);
+
+    Layout layout;
+#if defined(DEBUG)
+    layout.dump();
+#endif
+
+    EXPECT_EQ(layout(6, 0), 18);
+    EXPECT_EQ(layout(6, 1), 19);
+    EXPECT_EQ(layout(0, 3), 42);
+    EXPECT_EQ(layout(0, 4), 43);
+}
 }  // namespace tilefusion::testing
