@@ -2,11 +2,13 @@
 // Licensed under the MIT License.
 #pragma once
 
+#include "cell/compute/mod.hpp"
 #include "cell/copy/mod.hpp"
 #include "traits/base.hpp"
 #include "types/mod.hpp"
 
 namespace tilefusion::cell::copy {
+using namespace tilefusion::cell::compute;
 using namespace atom;
 namespace tl = tile_layout;
 
@@ -54,7 +56,10 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
+    using MmaAtom = compute::MmaAtom<DType, DType, DType, MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
+
     static constexpr int kSharedRowStride = Shared::kRowStride;
 
     Shared shared_tile;
@@ -100,7 +105,9 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
+    using MmaAtom = compute::MmaAtom<DType, DType, DType, MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
     static constexpr int kSharedColStride = Shared::kColStride;
 
     Shared shared_tile;
@@ -160,7 +167,11 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
+
     using PackedType =
         typename Packing<DType, StoreMat::kElemPerSeg>::PackedType;
 
@@ -221,7 +232,10 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
+    using MmaAtom = compute::MmaAtom<DType, DType, DType, MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
+
     using PackedType =
         typename Packing<DType, StoreMat::kElemPerSeg>::PackedType;
 
@@ -242,7 +256,9 @@ struct SharedToRegLoader {
     using WarpLayout = WarpLayout_;
     static constexpr WarpReuse kMode = kMode_;
 
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
+    using MmaAtom = compute::MmaAtom<DType, DType, DType, MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     // how many times a `BaseTile` is executed along the row and column
     // direction.
@@ -294,7 +310,9 @@ struct RegToSharedStorer {
     using DType = typename Reg::DType::DType;
     using WarpLayout = WarpLayout_;
 
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
+    using MmaAtom = compute::MmaAtom<__half, __half, __half, MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     // how many times a `BaseTile` is executed along the row and column
     // direction.

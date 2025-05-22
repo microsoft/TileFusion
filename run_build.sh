@@ -31,7 +31,8 @@ cd $build_dir
 
 # cmake -DCMAKE_BUILD_TYPE=Debug ../../ 2>&1 | tee ../../build.log
 
-TEST_NAME="test_single_wmma"
+# TEST_NAME="test_single_wmma"
+TEST_NAME="test_g2r_copy"
 TEST_DIR="$build_dir/tests/cpp"
 TEST_PATH="$TEST_DIR/${TEST_NAME}"
 

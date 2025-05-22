@@ -116,7 +116,11 @@ struct GlobalToRegLoaderImpl<Global_, Reg_, kRowExec_, kColExec_,
     using Global = Global_;
     using Reg = Reg_;
     using DType = typename Global::DType;
-    using BaseShape = traits::BaseTileShape<DType>;
+
+    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
@@ -150,7 +154,11 @@ struct GlobalToRegLoaderImpl<Global_, Reg_, kRowExec_, kColExec_,
     using Global = Global_;
     using Reg = Reg_;
     using DType = typename Global::DType;
-    using BaseShape = traits::BaseTileShape<DType>;
+
+    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
@@ -196,7 +204,10 @@ struct RegToGlobalStorerImpl<Global_, Reg_, kRowExec_, kColExec_,
     using Reg = Reg_;
     using DType = typename Global::DType;
 
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
@@ -231,7 +242,10 @@ struct RegToGlobalStorerImpl<Global_, Reg_, kRowExec_, kColExec_,
     using Reg = Reg_;
     using DType = typename Global::DType;
 
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     static constexpr int kRowExec = kRowExec_;
     static constexpr int kColExec = kColExec_;
