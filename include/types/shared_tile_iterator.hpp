@@ -3,15 +3,12 @@
 
 #pragma once
 
-#include "cell/compute/gemm.hpp"
 #include "traits/base.hpp"
 #include "types/shared.hpp"
 #include "types/tile_shape.hpp"
 
 namespace tilefusion::cell {
 namespace tl = tile_layout;
-
-using namespace compute;
 
 namespace {
 /// @brief Helper for pretty printing a tile iterator's static shape-related
@@ -37,10 +34,7 @@ class STileIterator {
     using Tile = Tile_;
     using DType = Tile::DType;
     using ChunkShape = ChunkShape_;
-
-    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
-    using MmaAtom = compute::MmaAtom<DType, DType, DType, MMA_ATOM_16x16x16>;
-    using BaseShape = MmaAtom::BaseTile;
+    using BaseShape = traits::BaseTileShape<DType>;
 
     static constexpr int kChunkRows = dim_size<0, ChunkShape>;
     static constexpr int kChunkCols = dim_size<1, ChunkShape>;

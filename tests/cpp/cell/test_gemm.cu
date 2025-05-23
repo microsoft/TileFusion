@@ -109,7 +109,6 @@ template <typename Element, typename ElementAcc, const int kM, const int kN,
           const int kK, typename WarpLayout_, const int kChunkK,
           const bool kSwizzled, const int kSharedAccessInBytes>
 struct TestTraits {
-    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
     using MmaAtom = compute::MmaAtom<Element, Element, ElementAcc,
                                      compute::MMA_ATOM_16x16x16>;
     using BaseShape = MmaAtom::BaseTile;

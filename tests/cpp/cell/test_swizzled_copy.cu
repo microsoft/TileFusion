@@ -116,10 +116,7 @@ void run_test_rowmajor() {
                                kSharedAccessInBytes>;
     using SIterator2 = STileIterator<Shared2, TileShape<kShmRows, kChunkShm>>;
 
-    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
-    using MmaAtom =
-        compute::MmaAtom<Element, Element, Element, compute::MMA_ATOM_16x16x16>;
-    using BaseShape = MmaAtom::BaseTile;
+    using BaseShape = traits::BaseTileShape<Element>;
 
     const int kSc0 = kShmRows / kWarpPerRow / BaseShape::kRows;
     const int kSc1 = kChunkShm / BaseShape::kCols;
@@ -211,10 +208,7 @@ void run_test_colmajor() {
                                kSharedAccessInBytes>;
     using SIterator2 = STileIterator<Shared2, TileShape<kChunkShm, kShmCols>>;
 
-    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
-    using MmaAtom =
-        compute::MmaAtom<Element, Element, Element, compute::MMA_ATOM_16x16x16>;
-    using BaseShape = MmaAtom::BaseTile;
+    using BaseShape = traits::BaseTileShape<Element>;
 
     const int kSc0 = kChunkShm / BaseShape::kRows;
     const int kSc1 = kShmCols / BaseShape::kCols / kWarpPerCol;
@@ -317,10 +311,7 @@ __global__ void swizzled_store(const Element* src, Element* dst) {
 template <typename Element, typename WarpLayout, const int kRows,
           const int kCols, const bool kSwizzled, const int kSharedAccessInBytes>
 void test_row_major_store() {
-    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
-    using MmaAtom =
-        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
-    using BaseShape = MmaAtom::BaseTile;
+    using BaseShape = traits::BaseTileShape<Element>;
 
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
@@ -374,11 +365,7 @@ void test_row_major_store() {
 template <typename Element, typename WarpLayout, const int kRows,
           const int kCols, const bool kSwizzled>
 void test_col_major_store() {
-    // FIXME(ying): quite awkward dependency on `compute::gemm.hpp`
-    using MmaAtom =
-        compute::MmaAtom<Element, Element, Element, compute::MMA_ATOM_16x16x16>;
-    using BaseShape = MmaAtom::BaseTile;
-
+    using BaseShape = traits::BaseTileShape<Element>;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
     // define tiles

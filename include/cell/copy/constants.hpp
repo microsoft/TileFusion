@@ -3,16 +3,7 @@
 
 #pragma once
 
-#include "config.hpp"
-
 namespace tilefusion::cell::copy {
-enum class CopyInst {
-    kLoadMat = 0,   // ldmatrix for loading data from shared memory to register.
-    kStoreMat = 1,  // stmatrix for storing data from register to shared memory.
-    kLoadShared32 = 2,  // ldsm32 for loading 32-bit data from shared memory.
-    kLoadShared128 = 3  // ldsm128 for loading 128-bit data from shared memory.
-};
-
 enum class WarpReuse {
     // data are evenly partitioned to be loaded by warps.
     kCont = 0,          // all warps continuously load data, no reuse
