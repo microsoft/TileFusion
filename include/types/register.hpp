@@ -109,9 +109,9 @@ using BaseTileColMajor = RegTile<Element, tl::ColMajor<4, 2>>;
 ///        Note: This printer function works ONLY on the host. The current
 ///        implementation prints a flattened layout and only displays the outer
 ///        name of the tile layout.
-/// @tparam T: element type, which must be a `RegTile` rather than a basic
-///            element type like float
-/// @tparam Layout: tile layout
+/// @param T: element type, which must be a `RegTile` rather than a basic
+///           element type like float
+/// @param Layout: tile layout
 template <typename T, typename Layout>
 static HOST std::ostream& operator<<(std::ostream& out,
                                      const RegTile<T, Layout>& tile) {

@@ -6,256 +6,205 @@
 #include "cell/copy/constants.hpp"
 #include "cell/copy/vectorize.hpp"
 #include "cell/copy/warp.hpp"
-#include "traits/base.hpp"
 #include "types/mod.hpp"
 
 namespace tilefusion::cell::copy {
 
-/**
- * @brief Load a BastTile Matrix from Global memory to Register.
- * @param Global Global memory tile type.
- * @param BaseTile BaseTile type.
- * @param kType Global Layout type.
- */
-template <typename Global, typename BaseTile, const tl::Layout kType>
-struct GlobalToRegMatLoader;
-
-template <typename Global_, typename BaseTile_>
-struct GlobalToRegMatLoader<Global_, BaseTile_, tl::Layout::kRowMajor> {
-    using Global = Global_;
-    using BaseTile = BaseTile_;
-    using DType = Global::DType;
-
-    static constexpr int kStride = Global::kRowStride;
-
-    DEVICE void operator()(const DType* src, BaseTile& dst) {
-        Vectorize<DType, 2> vectorize;
-        vectorize.copy(src + 0 * kStride + 0, &dst(0, 0));
-        vectorize.copy(src + 0 * kStride + 8, &dst(1, 0));
-        vectorize.copy(src + 8 * kStride + 0, &dst(0, 2));
-        vectorize.copy(src + 8 * kStride + 8, &dst(1, 2));
-    }
+namespace {
+struct BaseTileConfig {
+    static constexpr int kRows = 16;
+    static constexpr int kCols = 16;
+    static constexpr int kThreadRows = 8;
+    static constexpr int kThreadCols = 4;
 };
-
-template <typename Global_, typename BaseTile_>
-struct GlobalToRegMatLoader<Global_, BaseTile_, tl::Layout::kColMajor> {
-    using Global = Global_;
-    using BaseTile = BaseTile_;
-    using DType = Global::DType;
-
-    static constexpr int kStride = Global::kColStride;
-
-    DEVICE void operator()(const DType* src, BaseTile& dst) {
-        Vectorize<DType, 2> vectorize;
-        vectorize.copy(src + 0 * kStride + 0, &dst(0, 0));
-        vectorize.copy(src + 0 * kStride + 8, &dst(0, 1));
-        vectorize.copy(src + 8 * kStride + 0, &dst(2, 0));
-        vectorize.copy(src + 8 * kStride + 8, &dst(2, 1));
-    }
-};
-
-/**
- * @brief Store a [`BaseTile`] to Global memory.
- * @param Global Global memory tile type.
- * @param BaseTile BaseTile type.
- * @param kType Global Layout type.
- */
-template <typename Global_, typename BaseTile_, const tl::Layout kType>
-struct RegToGlobalMatStorer;
-
-template <typename Global_, typename BaseTile_>
-struct RegToGlobalMatStorer<Global_, BaseTile_, tl::Layout::kRowMajor> {
-    using Global = Global_;
-    using BaseTile = BaseTile_;
-    using DType = Global::DType;
-
-    static constexpr int kStride = Global::kRowStride;
-
-    DEVICE void operator()(const BaseTile& src, DType* dst) {
-        Vectorize<DType, 2> vectorize;
-        vectorize.copy(&src(0, 0), dst + 0 * kStride + 0);
-        vectorize.copy(&src(1, 0), dst + 0 * kStride + 8);
-        vectorize.copy(&src(0, 2), dst + 8 * kStride + 0);
-        vectorize.copy(&src(1, 2), dst + 8 * kStride + 8);
-    }
-};
-
-template <typename Global_, typename BaseTile_>
-struct RegToGlobalMatStorer<Global_, BaseTile_, tl::Layout::kColMajor> {
-    using Global = Global_;
-    using BaseTile = BaseTile_;
-    using DType = Global::DType;
-
-    static constexpr int kStride = Global::kColStride;
-
-    DEVICE void operator()(const BaseTile& src, DType* dst) {
-        Vectorize<DType, 2> vectorize;
-        vectorize.copy(&src(0, 0), dst + 0 * kStride + 0);
-        vectorize.copy(&src(0, 1), dst + 0 * kStride + 8);
-        vectorize.copy(&src(2, 0), dst + 8 * kStride + 0);
-        vectorize.copy(&src(2, 1), dst + 8 * kStride + 8);
-    }
-};
+}  // namespace
 
 /**
  * @brief Load a RegTile from Global memory to Register.
  * @param Global Global memory tile type.
  * @param Reg Register tile type.
- * @param kRowExec Number of times a `RegTile` is executed along the row
- * @param kColExec Number of times a `RegTile` is executed along the column
  * @param kType Global Layout type.
  */
-template <typename Global, typename Reg, const int kRowExec, const int kColExec,
-          const tl::Layout kType>
+template <typename Global, typename Reg, const tl::Layout kType>
 struct GlobalToRegLoaderImpl;
 
-template <typename Global_, typename Reg_, const int kRowExec_,
-          const int kColExec_>
-struct GlobalToRegLoaderImpl<Global_, Reg_, kRowExec_, kColExec_,
-                             tl::Layout::kRowMajor> {
+template <typename Global_, typename Reg_>
+struct GlobalToRegLoaderImpl<Global_, Reg_, tl::Layout::kRowMajor> {
     using Global = Global_;
     using Reg = Reg_;
     using DType = typename Global::DType;
-    using BaseShape = traits::BaseTileShape<DType>;
-
-    static constexpr int kRowExec = kRowExec_;
-    static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const DType* src, Reg& dst) {
         int lane_id = threadIdx.x % WARP_SIZE;
         const DType* data;
+        int land_row = lane_id / kThreadCol;
+        int land_col = lane_id % kThreadCol * 2;
 
-        using Loader = GlobalToRegMatLoader<Global, typename Reg::DType,
-                                            tl::Layout::kRowMajor>;
-        Loader loader;
-
+        Vectorize<DType, 2> copy;
 #pragma unroll
         for (int i = 0; i < kRowExec; ++i) {
-            int row = i * BaseShape::kCols + lane_id / 4;
+            int row = i * kCols + land_row;
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
-                int col = j * BaseShape::kRows + (lane_id % 4) * 2;
+                int col = j * kRows + land_col;
+                data = src + row * kStride + col;
 
-                data = src + row * Global::kRowStride + col;
-                loader(data, dst(i, j));
+                copy(data, &dst(i, j)(0, 0));
+                copy(data + 8, &dst(i, j)(1, 0));
+                copy(data + 8 * kStride, &dst(i, j)(0, 2));
+                copy(data + 8 * kStride + 8, &dst(i, j)(1, 2));
             }
         }
     }
+
+  private:
+    // pre-computed values
+    static constexpr int kThreadCol = BaseTileConfig::kThreadCols;
+    static constexpr int kRows = BaseTileConfig::kRows;
+    static constexpr int kCols = BaseTileConfig::kCols;
+    static constexpr int kStride = Global::kRowStride;
+
+    // how many times a `BaseTile` is executed along the row and column
+    // direction.
+    static constexpr int kRowExec = Reg::kRows;
+    static constexpr int kColExec = Reg::kCols;
 };
 
-template <typename Global_, typename Reg_, const int kRowExec_,
-          const int kColExec_>
-struct GlobalToRegLoaderImpl<Global_, Reg_, kRowExec_, kColExec_,
-                             tl::Layout::kColMajor> {
+template <typename Global_, typename Reg_>
+struct GlobalToRegLoaderImpl<Global_, Reg_, tl::Layout::kColMajor> {
     using Global = Global_;
     using Reg = Reg_;
     using DType = typename Global::DType;
-    using BaseShape = traits::BaseTileShape<DType>;
-
-    static constexpr int kRowExec = kRowExec_;
-    static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const DType* src, Reg& dst) {
         int lane_id = threadIdx.x % WARP_SIZE;
 
+        int land_row = lane_id / kThreadCol;
+        int land_col = lane_id % kThreadCol * 2;
+
         const DType* data;
-        using Loader = GlobalToRegMatLoader<Global, typename Reg::DType,
-                                            tl::Layout::kColMajor>;
-        Loader loader;
+        Vectorize<DType, 2> copy;
 
 #pragma unroll
         for (int i = 0; i < kColExec; ++i) {
-            int col = i * BaseShape::kRows + lane_id / 4;
+            int col = i * BaseTileConfig::kRows + land_row;
             for (int j = 0; j < kRowExec; ++j) {
-                int row = j * BaseShape::kCols + (lane_id % 4) * 2;
-                data = src + col * Global::kColStride + row;
+                int row = j * BaseTileConfig::kCols + land_col;
+                data = src + col * kStride + row;
 
-                loader(data, dst(j, i));
+                copy(data, &dst(j, i)(0, 0));
+                copy(data + 8, &dst(j, i)(0, 1));
+                copy(data + 8 * kStride, &dst(j, i)(2, 0));
+                copy(data + 8 * kStride + 8, &dst(j, i)(2, 1));
             }
         }
     }
+
+  private:
+    // pre-computed values
+    static constexpr int kThreadCol = BaseTileConfig::kThreadCols;
+    static constexpr int kRows = BaseTileConfig::kRows;
+    static constexpr int kCols = BaseTileConfig::kCols;
+    static constexpr int kStride = Global::kColStride;
+
+    // how many times a `BaseTile` is executed along the row and column
+    // direction.
+    static constexpr int kRowExec = Reg::kRows;
+    static constexpr int kColExec = Reg::kCols;
 };
 
 /**
  * @brief Store a RegTile to Global memory.
  * @param Global Global memory tile type.
  * @param Reg Register tile type.
- * @param kRowExec Number of times a `RegTile` is executed along the row
- * @param kColExec Number of times a `RegTile` is executed along the column
  * @param kType Global Layout type.
  */
-template <typename Global, typename Reg, const int kRowExec, const int kColExec,
-          const tl::Layout kType>
+template <typename Global, typename Reg, const tl::Layout kType>
 struct RegToGlobalStorerImpl;
 
-template <typename Global_, typename Reg_, const int kRowExec_,
-          const int kColExec_>
-struct RegToGlobalStorerImpl<Global_, Reg_, kRowExec_, kColExec_,
-                             tl::Layout::kRowMajor> {
+template <typename Global_, typename Reg_>
+struct RegToGlobalStorerImpl<Global_, Reg_, tl::Layout::kRowMajor> {
     using Global = Global_;
     using Reg = Reg_;
     using DType = typename Global::DType;
-
-    using BaseShape = traits::BaseTileShape<DType>;
-
-    static constexpr int kRowExec = kRowExec_;
-    static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const Reg& src, DType* dst) {
         int lane_id = threadIdx.x % WARP_SIZE;
         DType* data;
 
-        using Storer = RegToGlobalMatStorer<Global, typename Reg::DType,
-                                            tl::Layout::kRowMajor>;
-        Storer storer;
+        int land_row = lane_id / kThreadCol;
+        int land_col = lane_id % kThreadCol * 2;
 
+        Vectorize<DType, 2> copy;
 #pragma unroll
         for (int i = 0; i < kRowExec; ++i) {
-            int row = i * BaseShape::kCols + lane_id / 4;
+            int row = i * kCols + land_row;
 #pragma unroll
             for (int j = 0; j < kColExec; ++j) {
-                int col = j * BaseShape::kRows + (lane_id % 4) * 2;
-                data = dst + row * Global::kRowStride + col;
+                int col = j * kRows + land_col;
+                data = dst + row * kStride + col;
 
-                storer(src(i, j), data);
+                copy(&src(i, j)(0, 0), data);
+                copy(&src(i, j)(1, 0), data + 8);
+                copy(&src(i, j)(0, 2), data + 8 * kStride);
+                copy(&src(i, j)(1, 2), data + 8 * kStride + 8);
             }
         }
     }
+
+  private:
+    // pre-computed values
+    static constexpr int kThreadCol = BaseTileConfig::kThreadCols;
+    static constexpr int kRows = BaseTileConfig::kRows;
+    static constexpr int kCols = BaseTileConfig::kCols;
+    static constexpr int kStride = Global::kRowStride;
+
+    // how many times a `BaseTile` is executed along the row and column
+    // direction.
+    static constexpr int kRowExec = Reg::kRows;
+    static constexpr int kColExec = Reg::kCols;
 };
 
-template <typename Global_, typename Reg_, const int kRowExec_,
-          const int kColExec_>
-struct RegToGlobalStorerImpl<Global_, Reg_, kRowExec_, kColExec_,
-                             tl::Layout::kColMajor> {
+template <typename Global_, typename Reg_>
+struct RegToGlobalStorerImpl<Global_, Reg_, tl::Layout::kColMajor> {
     using Global = Global_;
     using Reg = Reg_;
     using DType = typename Global::DType;
-
-    using BaseShape = traits::BaseTileShape<DType>;
-
-    static constexpr int kRowExec = kRowExec_;
-    static constexpr int kColExec = kColExec_;
 
     DEVICE void operator()(const Reg& src, DType* dst) {
         int lane_id = threadIdx.x % WARP_SIZE;
         DType* data;
 
-        using Storer = RegToGlobalMatStorer<Global, typename Reg::DType,
-                                            tl::Layout::kColMajor>;
-        Storer storer;
+        int land_row = lane_id / kThreadCol;
+        int land_col = lane_id % kThreadCol * 2;
 
+        Vectorize<DType, 2> copy;
 #pragma unroll
         for (int i = 0; i < kColExec; ++i) {
-            int col = i * BaseShape::kRows + lane_id / 4;
+            int col = i * kRows + land_row;
 #pragma unroll
             for (int j = 0; j < kRowExec; ++j) {
-                int row = j * BaseShape::kCols + (lane_id % 4) * 2;
-                data = dst + col * Global::kColStride + row;
+                int row = j * kCols + land_col;
+                data = dst + col * kStride + row;
 
-                storer(src(j, i), data);
+                copy(&src(j, i)(0, 0), data);
+                copy(&src(j, i)(0, 1), data + 8);
+                copy(&src(j, i)(2, 0), data + 8 * kStride);
+                copy(&src(j, i)(2, 1), data + 8 * kStride + 8);
             }
         }
     }
+
+  private:
+    // pre-computed values
+    static constexpr int kThreadCol = BaseTileConfig::kThreadCols;
+    static constexpr int kRows = BaseTileConfig::kRows;
+    static constexpr int kCols = BaseTileConfig::kCols;
+    static constexpr int kStride = Global::kColStride;
+    // how many times a `BaseTile` is executed along the row and column
+    // direction.
+    static constexpr int kRowExec = Reg::kRows;
+    static constexpr int kColExec = Reg::kCols;
 };
 
 /**
@@ -272,19 +221,13 @@ struct GlobalToRegLoader {
     using WarpLayout = WarpLayout_;
     static constexpr WarpReuse kMode = kMode_;
 
-    // how many times a `BaseTile` is executed along the row and column
-    // direction.
-    static constexpr int kRowExec = Reg::kRows;
-    static constexpr int kColExec = Reg::kCols;
-
     template <typename Global>
     DEVICE void operator()(const Global& src, Reg& dst) {
         // advance the pointer to input data to the current warp
         // according to warp reuse mode.
         int offset = global_offset_.template get_warp_offset<Global>();
 
-        using Loader = GlobalToRegLoaderImpl<Global, Reg, kRowExec, kColExec,
-                                             Global::kType>;
+        using Loader = GlobalToRegLoaderImpl<Global, Reg, Global::kType>;
         Loader loader;
         loader(src.data() + offset, dst);
     }
@@ -309,11 +252,6 @@ struct RegToGlobalStorer {
     using DType = typename Global::DType;
     using WarpLayout = WarpLayout_;
 
-    // how many times a `BaseTile` is executed along the row and column
-    // direction.
-    static constexpr int kRowExec = Reg::kRows;
-    static constexpr int kColExec = Reg::kCols;
-
     DEVICE void operator()(const Reg& src, Global& dst) {
         DType* dst_ptr = dst.mutable_data();
 
@@ -321,8 +259,7 @@ struct RegToGlobalStorer {
         // according to warp reuse mode.
         int offset = global_offset_.template get_warp_offset<Global>();
 
-        using Storer = RegToGlobalStorerImpl<Global, Reg, kRowExec, kColExec,
-                                             Global::kType>;
+        using Storer = RegToGlobalStorerImpl<Global, Reg, Global::kType>;
         Storer storer;
         storer(src, dst_ptr + offset);
     }

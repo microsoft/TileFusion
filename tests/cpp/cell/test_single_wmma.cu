@@ -10,7 +10,8 @@
 
 namespace tilefusion::testing {
 using namespace cell;
-using namespace cell::copy;
+using namespace copy;
+using namespace compute;
 namespace tl = tile_layout;
 
 namespace {
@@ -111,7 +112,7 @@ __global__ void test_wmma(LoadRegA& load_rA, LoadRegB& load_rB,
         load_rB(sB, rB);
         __syncthreads();
 
-        compute::gemm(rA, rB, acc);
+        gemm(rA, rB, acc);
     }
 
     __syncthreads();
@@ -140,8 +141,8 @@ struct TestTraits {
     static constexpr int kWarpPerCol = tl::num_cols<WarpLayout>;
 
     // ============= shared to register loader =================
-    // TODO: whether BaseTileShape should depend on Element type?
-    using BaseShape = traits::BaseTileShape<Element>;
+    using MmaAtom = MmaAtom<Element, Element, ElementAcc, MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     static constexpr int kAMs = kM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kAKs = kK / BaseShape::kCols;
