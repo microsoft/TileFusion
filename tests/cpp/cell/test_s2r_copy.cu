@@ -162,7 +162,6 @@ TEST(TestShared2Reg, operand_A) {  // load mode for loading operand A in gemm
     // within a 16x16 `BaseTile`. These 2x4 elements are accessed 2x2 times
     // along each dimension, contributing to the final register tile handled by
     // a single thread.
-    // using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<1, 4>>;
     using Reg = RegTile<BaseTileRowMajor<Element>, tl::RowMajor<4, 4>>;
 
     // In the `RowReuseCont` mode, warps in the same row repeatedly access the

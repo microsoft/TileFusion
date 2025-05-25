@@ -12,12 +12,6 @@ REGISTER_OP(scatter_nd,
             "scatter_nd(Tensor data, Tensor(a!) updates, Tensor indices) -> ()",
             &scatter_nd);
 
-REGISTER_OP(
-    flash_attention,
-    "flash_attention(Tensor Q, Tensor K, Tensor V, Tensor(a!) O, "
-    "int m, int n, int k, int p, float softmax_scale, bool causal) -> ()",
-    &flash_attention);
-
 REGISTER_OP(gemm,
             "gemm(Tensor A, Tensor B, Tensor(a!) C, int tm, int tn, int tk, "
             "int num_stages, int pipeline_level, Tensor warp_layout, int "
@@ -28,5 +22,12 @@ REGISTER_OP(fused_two_gemms,
             "fused_two_gemms(Tensor A, Tensor B, Tensor C, Tensor(a!) D, "
             "int tm, int tn, int tk, int tp) ->()",
             &fused_two_gemms);
+
+REGISTER_OP(flash_attention,
+            "flash_attention(Tensor Q, Tensor K, Tensor V, Tensor(a!) O, "
+            "int tile_length_q, int tile_length_kv, "
+            "int tile_hidden_qk, int tile_hidden_v, "
+            "float softmax_scale, bool causal) -> ()",
+            &flash_attention);
 
 }  // namespace tilefusion::kernels

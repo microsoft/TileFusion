@@ -4,10 +4,16 @@
 #include "common/test_utils.hpp"
 #include "types/mod.hpp"
 
+#include <cute/tensor.hpp>
+
 namespace tilefusion::testing {
+
 using namespace cell;
 namespace tl = tile_layout;
 
+using namespace cute;
+
+namespace {
 int flatten(int x, int y, int width) { return x * width + y; }
 
 template <const int kB, const int kM, const int kS>
@@ -37,8 +43,9 @@ int2 test_swizzle(int x, int y) {
 
     return make_int2(swizzled_idx, ref_swizzled_idx);
 }
+}  // namespace
 
-TEST(TESTSwizzle, test_swizzle_apply) {
+TEST(TestSwizzle, test_swizzle_function) {
     const int kB = 3;
     const int kM = 3;
     const int kS = 3;
@@ -56,66 +63,45 @@ TEST(TESTSwizzle, test_swizzle_apply) {
     EXPECT_EQ(swizzled_idx_2_4.x, swizzled_idx_2_4.y);
 }
 
-TEST(TESTSwizzle, test_naive_swizzle_layout) {
-    const int kB = 3;
-    const int kM = 3;
-    const int kS = 3;
+TEST(TestSwizzle, test_swizzled_row_major) {
+    using BlockRowMajor = tl::BlockRowMajor<
+        tl::RowMajor<16, 64>,
+        SwizzledLayout<tl::RowMajor<8, 64>, Swizzle<3, 3, 3>>>;
 
-    const int kRows = 1 << kB;
-    const int kCols = 1 << (kM + kS);
+    // for unit test
+    using Atom =
+        decltype(composition(cute::Swizzle<3, 3, 3>{},
+                             cute::Layout<Shape<_8, _64>, Stride<_64, _1>>{}));
+    using CuteLayout =
+        decltype(tile_to_shape(Atom{}, Shape<_16, _64>{}, Step<_16, _1>{}));
 
-    using NaiveRowMajorLayout = tl::RowMajor<kRows, kCols>;
-    using NaiveSwizzledRowMajorLayout =
-        SwizzledLayout<NaiveRowMajorLayout, kB, kM, kS, tl::Layout::kRowMajor>;
+    BlockRowMajor layout1;
+    CuteLayout layout2;
 
-    NaiveSwizzledRowMajorLayout naive_row_major_swizzled_layout;
-
-    EXPECT_EQ((naive_row_major_swizzled_layout(0, 0)),
-              (swizzle_ref<kB, kM, kS>(0, 0)));
-    EXPECT_EQ((naive_row_major_swizzled_layout(1, 0)),
-              (swizzle_ref<kB, kM, kS>(1, 0)));
-    EXPECT_EQ((naive_row_major_swizzled_layout(1, 4)),
-              (swizzle_ref<kB, kM, kS>(1, 4)));
-    EXPECT_EQ((naive_row_major_swizzled_layout(2, 0)),
-              (swizzle_ref<kB, kM, kS>(2, 0)));
-    EXPECT_EQ((naive_row_major_swizzled_layout(2, 4)),
-              (swizzle_ref<kB, kM, kS>(2, 4)));
+    for (int i = 0; i < int(size<0>(layout2)); ++i) {
+        for (int j = 0; j < int(size<1>(layout2)); ++j) {
+            EXPECT_EQ(layout1(i, j), layout2(i, j));
+        }
+    }
 }
 
-TEST(TESTSwizzle, test_nested_basetile_swizzle_layout) {
-    const int kB = 3;
-    const int kM = 3;
-    const int kS = 3;
+TEST(TestSwizzle, test_swizzled_col_major) {
+    using BlockColMajor = tl::BlockColMajor<
+        tl::ColMajor<64, 16>,
+        SwizzledLayout<tl::ColMajor<64, 8>, Swizzle<3, 3, 3>>>;
 
-    const int kRows = 1 << kB;
-    const int kCols = 1 << (kM + kS);
+    using Atom = decltype(composition(cute::Swizzle<3, 3, 3>{},
+                                      cute::Layout<Shape<_64, _8>>{}));
+    using CuteLayout = decltype(tile_to_shape(Atom{}, Shape<_64, _16>{}));
 
-    using NestedBaseTileLayout = tl::MatrixLayout<kRows, kCols, kCols * 16, 16>;
-    using NestedBaseTileSwizzledLayout =
-        SwizzledLayout<NestedBaseTileLayout, kB, kM, kS, tl::Layout::kRowMajor>;
+    BlockColMajor layout1;
+    CuteLayout layout2;
 
-    NestedBaseTileLayout nested_base_tile_layout;
-    NestedBaseTileSwizzledLayout nested_base_tile_swizzled_layout;
-
-    int idx_0_0 = nested_base_tile_layout(0, 0);
-    int idx_1_0 = nested_base_tile_layout(1, 0);
-    int idx_1_4 = nested_base_tile_layout(1, 4);
-    int idx_2_0 = nested_base_tile_layout(2, 0);
-    int idx_2_4 = nested_base_tile_layout(2, 4);
-
-    int swizzled_idx_0_0 = nested_base_tile_swizzled_layout(0, 0);
-    int swizzled_idx_1_0 = nested_base_tile_swizzled_layout(1, 0);
-    int swizzled_idx_1_4 = nested_base_tile_swizzled_layout(1, 4);
-    int swizzled_idx_2_0 = nested_base_tile_swizzled_layout(2, 0);
-    int swizzled_idx_2_4 = nested_base_tile_swizzled_layout(2, 4);
-
-#ifdef DEBUG
-    printf("idx_0_0: %d, swizzled_idx_0_0: %d\n", idx_0_0, swizzled_idx_0_0);
-    printf("idx_1_0: %d, swizzled_idx_1_0: %d\n", idx_1_0, swizzled_idx_1_0);
-    printf("idx_1_4: %d, swizzled_idx_1_4: %d\n", idx_1_4, swizzled_idx_1_4);
-    printf("idx_2_0: %d, swizzled_idx_2_0: %d\n", idx_2_0, swizzled_idx_2_0);
-    printf("idx_2_4: %d, swizzled_idx_2_4: %d\n", idx_2_4, swizzled_idx_2_4);
-#endif
+    for (int i = 0; i < int(size<0>(layout2)); ++i) {
+        for (int j = 0; j < int(size<1>(layout2)); ++j) {
+            EXPECT_EQ(layout1(i, j), layout2(i, j));
+        }
+    }
 }
 
 }  // namespace tilefusion::testing

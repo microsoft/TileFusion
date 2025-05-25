@@ -1,11 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#include "cell/mod.hpp"
 #include "cuda_info.hpp"
 #include "jit/mod.hpp"
 #include "kernels/common.hpp"
 #include "kernels/ops.hpp"
+#include "types/layout.hpp"
 
 namespace tilefusion::kernels {
 
@@ -20,6 +20,7 @@ namespace {
 ///        B has a shape of (k, n) and laid out in column-major fashion,
 ///        C has a shape of (n, p) and laid out in column-major fashion,
 ///        D has a shape of (m, p) and laid out in row-major fashion.
+/// @param kernel_name The name of the kernel.
 /// @param in_type The input type.
 /// @param acc_type The accumulation type.
 /// @param m The number of rows of the input matrix A.
@@ -31,28 +32,33 @@ namespace {
 /// @param tk The shared memory tile size of the k-dimension.
 /// @param tp The shared memory tile size of the p-dimension.
 /// @return The kernel wrapper for the fused two gemms kernel.
-std::string generate_kernel_wrapper(const std::string& in_type,
+std::string generate_kernel_wrapper(const std::string& kernel_name,
+                                    const std::string& in_type,
                                     const std::string& acc_type, int64_t m,
                                     int64_t n, int64_t k, int64_t p,
                                     int64_t tm = 64, int64_t tn = 64,
                                     int64_t tk = 64, int64_t tp = 64) {
     std::stringstream ss;
+
     ss << R"(
 #include "kernels/fused_two_gemms_device.cuh"
 
 using namespace tilefusion::kernels;
-using Config = FusedTwoGemmsTraits<)"
-       << in_type << ", " << acc_type << R"(,
-        tl::RowMajor<2, 1>, )"
-       << m << ", " << n << ", " << k << ", " << p << ", " << tm << ", " << tn
-       << ", " << tk << ", " << tp << R"(>;
+)";
 
-extern "C" __global__ void fused_two_gemms_kernel_)"
-       << in_type << "_" << acc_type << "_" << m << "_" << n << "_" << k << "_"
-       << p << R"((const )" << in_type << R"(* A, const )" << in_type
-       << R"(* B, const )" << in_type << R"(* C, )" << in_type << R"(* D) {
-    ke_fused_two_gemms<Config::InType, Config::AccType, Config>(A, B, C, D);
-})";
+    ss << "\n// Fused two gemms configuration\n";
+    ss << "using Config = FusedTwoGemmsTraits<" << in_type << ", " << acc_type
+       << ", tl::RowMajor<2, 1>, " << m << ", " << n << ", " << k << ", " << p
+       << ", " << tm << ", " << tn << ", " << tk << ", " << tp << ">;\n\n";
+
+    ss << "// Kernel function\n";
+    ss << "extern \"C\" __global__ void " << kernel_name << "(const " << in_type
+       << "* A, const " << in_type << "* B, const " << in_type << "* C, "
+       << in_type << "* D) {\n";
+    ss << "    ke_fused_two_gemms<" << in_type << ", " << acc_type << ", "
+       << "Config>(A, B, C, D);\n";
+    ss << "}\n";
+
     return ss.str();
 }
 }  // namespace
@@ -89,13 +95,13 @@ void fused_two_gemms(const torch::Tensor& A, const torch::Tensor& B,
     std::string in_type = jit::get_type_string<InType>();
     std::string acc_type = jit::get_type_string<AccType>();
 
-    std::string kernel_wrapper =
-        generate_kernel_wrapper(in_type, acc_type, m, n, k, p, tm, tn, tk, tp);
+    std::stringstream kernel_name_ss;
+    kernel_name_ss << "fused_two_gemms_kernel_" << in_type << "_" << acc_type
+                   << "_" << m << "_" << n << "_" << k << "_" << p;
+    std::string kernel_name = kernel_name_ss.str();
 
-    std::string kernel_name = "fused_two_gemms_kernel_" + in_type + "_" +
-                              acc_type + "_" + std::to_string(m) + "_" +
-                              std::to_string(n) + "_" + std::to_string(k) +
-                              "_" + std::to_string(p);
+    std::string kernel_wrapper = generate_kernel_wrapper(
+        kernel_name, in_type, acc_type, m, n, k, p, tm, tn, tk, tp);
 
     auto& jit = jit::JitCompiler::instance();
 

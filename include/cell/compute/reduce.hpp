@@ -1,37 +1,21 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-
 #pragma once
 
 #include "cell/compute/math_functor.hpp"
 #include "cell/warp.hpp"
-#include "cuda_utils.hpp"
-#include "traits/base.hpp"
 #include "types/layout.hpp"
-#include "types/tile_shape.hpp"
 
 namespace tilefusion::cell::compute {
-
 namespace tl = tile_layout;
 
 namespace detail {
-
 template <typename RegTile, const tl::Layout kLayout>
-struct Reduce {
-    using DType = typename RegTile::DType::DType;
-    using BaseShape = traits::BaseTileShape<DType>;
-
-    static constexpr int kRows = RegTile::kRows;
-    static constexpr int kCols = RegTile::kCols;
-
-    template <typename DstTile, typename Reduce>
-    DEVICE void operator()(const RegTile& src, DstTile& dst, Reduce reduce) {}
-};
+struct Reduce;
 
 template <typename RegTile>
 struct Reduce<RegTile, tl::Layout::kRowMajor> {
     using DType = typename RegTile::DType::DType;
-    using BaseShape = traits::BaseTileShape<DType>;
 
     static constexpr int kRows = RegTile::kRows;
     static constexpr int kCols = RegTile::kCols;
@@ -89,7 +73,6 @@ struct Reduce<RegTile, tl::Layout::kRowMajor> {
 template <typename RegTile>
 struct Reduce<RegTile, tl::Layout::kColMajor> {
     using DType = typename RegTile::DType::DType;
-    using BaseShape = traits::BaseTileShape<DType>;
 
     static constexpr int kRows = RegTile::kRows;
     static constexpr int kCols = RegTile::kCols;

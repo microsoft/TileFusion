@@ -56,7 +56,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
   private:
     using BaseShape = traits::BaseTileShape<DType>;
     static constexpr int kSharedRowStride = Shared::kRowStride;
-
     Shared shared_tile;
 };
 
@@ -102,7 +101,6 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
   private:
     using BaseShape = traits::BaseTileShape<DType>;
     static constexpr int kSharedColStride = Shared::kColStride;
-
     Shared shared_tile;
 };
 

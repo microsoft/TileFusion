@@ -8,8 +8,6 @@
 
 typedef __nv_bfloat16 __bfloat16;
 
-#include <type_traits>
-
 namespace tilefusion::traits {
 
 template <typename Element>

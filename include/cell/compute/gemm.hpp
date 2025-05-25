@@ -11,17 +11,23 @@
 namespace tilefusion::cell::compute {
 namespace tl = tile_layout;
 
-namespace detail {
+using MMA_ATOM_16x16x16 = TileShape<16, 16, 16>;
 
-namespace {
-using GEMM_ATOM_16x16x16 = TileShape<16, 16, 16>;
-}
-
-template <typename InType, typename AccType, typename AtomicShape>
-struct Mma;
+template <typename InTypeA, typename InTypeB, typename AccType,
+          typename AtomicShape>
+struct MmaAtom;
 
 template <>
-struct Mma<__half, float, GEMM_ATOM_16x16x16> {
+struct MmaAtom<__half, __half, float, MMA_ATOM_16x16x16> {
+    struct BaseTile {
+        static constexpr int kRows = 16;
+        static constexpr int kCols = 16;
+        static constexpr int kNumel = 256;
+    };
+    using BaseTileA = BaseTile;
+    using BaseTileB = BaseTile;
+    using BaseTileC = BaseTile;
+
     DEVICE void operator()(const __half* ra, const __half* rb, float* rc) {
         const uint32_t* A = reinterpret_cast<const uint32_t*>(ra);
         const uint32_t* B = reinterpret_cast<const uint32_t*>(rb);
@@ -57,7 +63,16 @@ struct Mma<__half, float, GEMM_ATOM_16x16x16> {
 };
 
 template <>
-struct Mma<__half, __half, GEMM_ATOM_16x16x16> {
+struct MmaAtom<__half, __half, __half, MMA_ATOM_16x16x16> {
+    struct BaseTile {
+        static constexpr int kRows = 16;
+        static constexpr int kCols = 16;
+        static constexpr int kNumel = 256;
+    };
+    using BaseTileA = BaseTile;
+    using BaseTileB = BaseTile;
+    using BaseTileC = BaseTile;
+
     DEVICE void operator()(const __half* ra, const __half* rb, __half* rc) {
         const uint32_t* A = reinterpret_cast<const uint32_t*>(ra);
         const uint32_t* B = reinterpret_cast<const uint32_t*>(rb);
@@ -92,7 +107,16 @@ struct Mma<__half, __half, GEMM_ATOM_16x16x16> {
 };
 
 template <>
-struct Mma<__bfloat16, float, GEMM_ATOM_16x16x16> {
+struct MmaAtom<__bfloat16, __bfloat16, float, MMA_ATOM_16x16x16> {
+    struct BaseTile {
+        static constexpr int kRows = 16;
+        static constexpr int kCols = 16;
+        static constexpr int kNumel = 256;
+    };
+    using BaseTileA = BaseTile;
+    using BaseTileB = BaseTile;
+    using BaseTileC = BaseTile;
+
     DEVICE void operator()(const __bfloat16* ra, const __bfloat16* rb,
                            float* rc) {
         const uint32_t* A = reinterpret_cast<const uint32_t*>(ra);
@@ -130,8 +154,9 @@ struct Mma<__bfloat16, float, GEMM_ATOM_16x16x16> {
 /// @brief: Functor to warp wmma PTX instruction. See the below document for
 ///         various choices and detailed parameters of the wmma PTX instruction.
 ///         https://docs.nvidia.com/cuda/parallel-thread-execution/#warp-level-matrix-instructions-mma
-template <typename RegTileA, typename RegTileB, typename RegTileC>
-struct Gemm_16x16x16 {
+template <typename RegTileA, typename RegTileB, typename RegTileC,
+          typename AtomicShape>
+struct Gemm {
     using InTypeA = typename RegTileA::DType::DType;
     using InTypeB = typename RegTileB::DType::DType;
     using OutType = typename RegTileC::DType::DType;
@@ -165,14 +190,15 @@ struct Gemm_16x16x16 {
     }
 
   private:
-    Mma<InTypeA, OutType, GEMM_ATOM_16x16x16> mma;
+    using MmaAtom = MmaAtom<InTypeA, InTypeB, OutType, AtomicShape>;
+    MmaAtom mma;
 };
 
-}  // namespace detail
-
-template <typename RegTileA, typename RegTileB, typename RegTileC>
+template <typename RegTileA, typename RegTileB, typename RegTileC,
+          typename AtomicShape = MMA_ATOM_16x16x16,
+          typename GemmOp = Gemm<RegTileA, RegTileB, RegTileC, AtomicShape>>
 DEVICE void gemm(const RegTileA& a, const RegTileB& b, RegTileC& c) {
-    detail::Gemm_16x16x16<RegTileA, RegTileB, RegTileC> gemm;
+    GemmOp gemm;
     gemm(a, b, c);
 }
 

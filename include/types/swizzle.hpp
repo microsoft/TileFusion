@@ -56,28 +56,32 @@ struct Swizzle {
  *        2-D coordinate in the space defined by `Layout`.
  * @tparam Layout The `Layout` that defines a function mapping a 2-D coordinate
  *                to a 1-D index.
- * @tparam kB The number of bits for B.
- * @tparam kM The number of bits for M.
- * @tparam kS The number of bits for S.
+ * @tparam Swizzle The swizzle function.
  * @tparam kType The type of the Layout.
  */
-template <typename Layout, const int kB, const int kM, const int kS,
+template <typename Layout, typename Swizzle,
           const tl::Layout kType = Layout::kType>
 struct SwizzledLayout;
 
-template <typename Layout_, const int kB, const int kM, const int kS>
-struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kRowMajor> {
-    static constexpr int Bbits = kB;
-    static constexpr int Mbits = kM;
-    static constexpr int Sbits = kS;
-
+template <typename Layout_, typename Swizzle_>
+struct SwizzledLayout<Layout_, Swizzle_, tl::Layout::kRowMajor> {
     using Layout = Layout_;
-    using Swizzle = Swizzle<Bbits, Mbits, Sbits>;
+    using Swizzle = Swizzle_;
+
+    static constexpr int Bbits = Swizzle_::Bbits;
+    static constexpr int Mbits = Swizzle_::Mbits;
+    static constexpr int Sbits = Swizzle_::Sbits;
 
     static_assert(Layout::kRows == (1 << Bbits),
                   "The number of rows in the layout should be 2^B.");
     static_assert(Layout::kCols == (1 << (Mbits + Sbits)),
                   "The number of columns in the layout should be 2^S * 2^M.");
+
+    // to be compatible with all the other layouts
+    static constexpr int kRows = Layout::kRows;
+    static constexpr int kCols = Layout::kCols;
+    static constexpr int kNumel = Layout::kNumel;
+    static constexpr tl::Layout kType = Layout::kType;
 
     /**
      * @brief Compose the swizzle function with the layout function.
@@ -100,19 +104,25 @@ struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kRowMajor> {
     Layout layout_;
 };
 
-template <typename Layout_, const int kB, const int kM, const int kS>
-struct SwizzledLayout<Layout_, kB, kM, kS, tl::Layout::kColMajor> {
-    static constexpr int Bbits = kB;
-    static constexpr int Mbits = kM;
-    static constexpr int Sbits = kS;
-
+template <typename Layout_, typename Swizzle_>
+struct SwizzledLayout<Layout_, Swizzle_, tl::Layout::kColMajor> {
     using Layout = Layout_;
-    using Swizzle = Swizzle<Bbits, Mbits, Sbits>;
+    using Swizzle = Swizzle_;
+
+    static constexpr int Bbits = Swizzle::Bbits;
+    static constexpr int Mbits = Swizzle::Mbits;
+    static constexpr int Sbits = Swizzle::Sbits;
 
     static_assert(Layout::kRows == (1 << (Mbits + Sbits)),
                   "The number of rows in the layout should be 2^S * 2^M.");
     static_assert(Layout::kCols == (1 << Bbits),
                   "The number of columns in the layout should be 2^B.");
+
+    // to be compatible with all the other layouts
+    static constexpr int kRows = Layout::kRows;
+    static constexpr int kCols = Layout::kCols;
+    static constexpr int kNumel = Layout::kNumel;
+    static constexpr tl::Layout kType = Layout::kType;
 
     /**
      * @brief Compose the swizzle function with the layout function.
