@@ -157,7 +157,7 @@ __device__ __forceinline__ void ke_gemm(const InType* dA, const InType* dB,
         g2s_b(gBs(k1), sB);
         __copy_async();
         __syncthreads();
-        // #pragma unroll
+#pragma unroll
         for (int k2 = 0; k2 < KeTraits::SIteratorA::sc1; ++k2) {
             s2r_a(sAs(k2), rA);
             s2r_b(sBs(k2), rB);
@@ -213,7 +213,7 @@ __device__ __forceinline__ void ke_gemm_level1_pipeline(const InType* dA,
     for (int k = 0; k < KeTraits::PipelineG2SA::Iterations - 1; ++k) {
         // Barrier to wait for the previous copy to finish.
         wait_group<0>();
-        __syncthreads();
+        // __syncthreads();
         pipeline_g2s_a.commit();
         pipeline_g2s_b.commit();
         commit_copy_group();
@@ -230,13 +230,14 @@ __device__ __forceinline__ void ke_gemm_level1_pipeline(const InType* dA,
         }
     }
     wait_group<0>();
-    __syncthreads();
+    // __syncthreads();
 
     // Compute(i)
     const InType* sA_ptr_cur = pipeline_g2s_a.get_cur_dst();
     const InType* sB_ptr_cur = pipeline_g2s_b.get_cur_dst();
     typename KeTraits::SIteratorA sAs(sA_ptr_cur);
     typename KeTraits::SIteratorB sBs(sB_ptr_cur);
+#pragma unroll
     for (int k2 = 0; k2 < KeTraits::SIteratorA::sc1; ++k2) {
         s2r_a(sAs(k2), rA);
         s2r_b(sBs(k2), rB);

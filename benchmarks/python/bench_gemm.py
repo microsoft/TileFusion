@@ -159,10 +159,12 @@ if __name__ == "__main__":
         (4096, 4096, 4096),
         (8192, 8192, 8192),
         (16384, 16384, 16384),
-        (1024, 1024, 16384),
+        (64, 128, 16384),
+        (64, 128, 32768),
     ]
 
-    tile_shapes = [(64, 128, 128)]
+    tile_shapes = [(64, 64, 64)]
+    warp_layouts = [(2, 1), (1, 2), (2, 2)]
     results = []
 
     logging.basicConfig(level=logging.INFO)
@@ -170,35 +172,36 @@ if __name__ == "__main__":
 
     for matrix_shape in matrix_shapes:
         for tile_shape in tile_shapes:
-            # Run single-stage benchmark
-            single_stage_results = run_gemm(
-                matrix_m=matrix_shape[0],
-                matrix_n=matrix_shape[1],
-                matrix_k=matrix_shape[2],
-                tile_m=tile_shape[0],
-                tile_n=tile_shape[1],
-                tile_k=tile_shape[2],
-                num_stages=1,
-                pipeline_level=0,
-                warp_layout=torch.tensor([2, 2], dtype=torch.int64),
-                swizzle_bytes=128,
-            )
-            results.append(single_stage_results)
+            for warp_layout in warp_layouts:
+                # Run single-stage benchmark
+                single_stage_results = run_gemm(
+                    matrix_m=matrix_shape[0],
+                    matrix_n=matrix_shape[1],
+                    matrix_k=matrix_shape[2],
+                    tile_m=tile_shape[0],
+                    tile_n=tile_shape[1],
+                    tile_k=tile_shape[2],
+                    num_stages=1,
+                    pipeline_level=0,
+                    warp_layout=torch.tensor(warp_layout, dtype=torch.int64),
+                    swizzle_bytes=64,
+                )
+                results.append(single_stage_results)
 
-            # Run multi-stage benchmark
-            multi_stage_results = run_gemm(
-                matrix_m=matrix_shape[0],
-                matrix_n=matrix_shape[1],
-                matrix_k=matrix_shape[2],
-                tile_m=tile_shape[0],
-                tile_n=tile_shape[1],
-                tile_k=tile_shape[2],
-                num_stages=3,
-                pipeline_level=1,
-                warp_layout=torch.tensor([2, 2], dtype=torch.int64),
-                swizzle_bytes=128,
-            )
-            results.append(multi_stage_results)
+                # Run multi-stage benchmark
+                multi_stage_results = run_gemm(
+                    matrix_m=matrix_shape[0],
+                    matrix_n=matrix_shape[1],
+                    matrix_k=matrix_shape[2],
+                    tile_m=tile_shape[0],
+                    tile_n=tile_shape[1],
+                    tile_k=tile_shape[2],
+                    num_stages=2,
+                    pipeline_level=1,
+                    warp_layout=torch.tensor(warp_layout, dtype=torch.int64),
+                    swizzle_bytes=64,
+                )
+                results.append(multi_stage_results)
 
     csv_filename = "benchmarks/python/gemm_benchmark.csv"
 
