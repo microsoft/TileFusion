@@ -6,6 +6,10 @@ isort:skip_file
 
 import torch
 import logging
+import csv
+import os
+
+# from typing import Tuple, Dict, List
 from tilefusion.ops import gemm
 from bench_utils import do_bench
 
@@ -21,8 +25,12 @@ def run_gemm(
     pipeline_level: int,
     warp_layout: torch.Tensor,
     swizzle_bytes: int,
-) -> None:
-    """Run GEMM operation and benchmark it."""
+) -> dict[str, float]:
+    """Run GEMM operation and benchmark it.
+
+    Returns:
+        Dict containing performance metrics
+    """
     tensor_a = torch.randn(
         matrix_m, matrix_k, dtype=torch.float16, device="cuda"
     )
@@ -75,72 +83,130 @@ def run_gemm(
         cublas_avg_time_ms * 1e12
     )
 
-    # print(f"Benchmarking GEMM with M={matrix_m}, N={matrix_n}, K={matrix_k}")
-    # print(f"Tile: M={tile_m}, N={tile_n}, K={tile_k}")
-    # print(f"Stages: {num_stages}, Pipeline Level: {pipeline_level}")
-    # print(f"Warp Layout: {warp_layout.tolist()}")
-    # print(f"Average execution time: {avg_time_ms:.3f} ms")
-    # print(f"Achieved TFLOPs: {tflops:.2f}")
-    logging.info(
-        f"Benchmarking GEMM with M={matrix_m}, N={matrix_n}, K={matrix_k}"
+    return {
+        "matrix_m": matrix_m,
+        "matrix_n": matrix_n,
+        "matrix_k": matrix_k,
+        "tile_m": tile_m,
+        "tile_n": tile_n,
+        "tile_k": tile_k,
+        "num_stages": num_stages,
+        "pipeline_level": pipeline_level,
+        "warp_per_row": warp_layout[0].item(),
+        "warp_per_col": warp_layout[1].item(),
+        "tilefusion_time_ms": tilefusion_avg_time_ms,
+        "cublas_time_ms": cublas_avg_time_ms,
+        "tilefusion_tflops": tilefusion_tflops,
+        "cublas_tflops": cublas_tflops,
+        "speedup_vs_cublas": cublas_avg_time_ms / tilefusion_avg_time_ms,
+    }
+
+
+def write_results_to_csv(
+    results: list[dict[str, float]], filename: str
+) -> None:
+    """Write benchmark results to CSV file."""
+    if not results:
+        return
+
+    # Get fieldnames from the first result
+    fieldnames = list(results[0].keys())
+
+    with open(filename, "w", newline="") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+
+        # Format floating point numbers to 4 decimal places
+        formatted_results = []
+        for result in results:
+            formatted_result = {}
+            for key, value in result.items():
+                formatted_result[key] = f"{value:.4f}"
+            formatted_results.append(formatted_result)
+
+        writer.writerows(formatted_results)
+
+
+def print_summary(results: list[dict[str, float]]) -> None:
+    """Print summary statistics of benchmark results."""
+    print(  # noqa: T201
+        "\nSummary Statistics by Matrix Size and Pipeline Configuration:"
     )
-    logging.info(f"Tile: M={tile_m}, N={tile_n}, K={tile_k}")
-    logging.info(f"Stages: {num_stages}, Pipeline Level: {pipeline_level}")
-    logging.info(f"Warp Layout: {warp_layout.tolist()}")
-    logging.info(f"Average execution time: {tilefusion_avg_time_ms:.3f} ms")
-    logging.info(f"Achieved TFLOPs: {tilefusion_tflops:.2f}")
-    logging.info(f"Cublas Average execution time: {cublas_avg_time_ms:.3f} ms")
-    logging.info(f"Cublas Achieved TFLOPs: {cublas_tflops:.2f}")
-    logging.info(
-        f"Tilefusion is {cublas_avg_time_ms / tilefusion_avg_time_ms:.2f}x "
-        f"faster than Cublas"
+    print(  # noqa: T201, E501
+        "Matrix Size(M, N, K) | Tile Size(M, N, K) | Stages | Cublas(ms) | "
+        "TileFusion(ms) | Ratio "
     )
+    print("-" * 100)  # noqa: T201
+
+    for result in results:
+        print(  # noqa: T201, E501
+            f"({result['matrix_m']}, {result['matrix_n']}, {result['matrix_k']}) | "  # noqa: E501
+            f"({result['tile_m']}, {result['tile_n']}, {result['tile_k']}) | "
+            f"{result['num_stages']} | "
+            f"{result['cublas_time_ms']:.4f} | "
+            f"{result['tilefusion_time_ms']:.4f} | "
+            f"{result['speedup_vs_cublas']:.4f}"
+        )
 
 
 if __name__ == "__main__":
+    # Create results directory if it doesn't exist
+    os.makedirs("results", exist_ok=True)
 
-    mat_m, mat_n, mat_k = 8192, 8192, 1024
+    matrix_shapes = [
+        (1024, 1024, 1024),
+        (2048, 2048, 2048),
+        (4096, 4096, 4096),
+        (8192, 8192, 8192),
+        (16384, 16384, 16384),
+        (1024, 1024, 16384),
+    ]
 
-    tl_m, tl_n, tl_k = 64, 128, 128
+    tile_shapes = [(64, 128, 128)]
+    results = []
 
     logging.basicConfig(level=logging.INFO)
     logging.info("--- Starting GEMM Benchmark ---")
-    run_gemm(
-        matrix_m=mat_m,
-        matrix_n=mat_n,
-        matrix_k=mat_k,
-        tile_m=tl_m,
-        tile_n=tl_n,
-        tile_k=tl_k,
-        num_stages=1,
-        pipeline_level=0,
-        warp_layout=torch.tensor([2, 2], dtype=torch.int64),
-        swizzle_bytes=128,
-    )
 
-    run_gemm(
-        matrix_m=mat_m,
-        matrix_n=mat_n,
-        matrix_k=mat_k,
-        tile_m=tl_m,
-        tile_n=tl_n,
-        tile_k=tl_k,
-        num_stages=2,
-        pipeline_level=1,
-        warp_layout=torch.tensor([2, 2], dtype=torch.int64),
-        swizzle_bytes=128,
-    )
+    for matrix_shape in matrix_shapes:
+        for tile_shape in tile_shapes:
+            # Run single-stage benchmark
+            single_stage_results = run_gemm(
+                matrix_m=matrix_shape[0],
+                matrix_n=matrix_shape[1],
+                matrix_k=matrix_shape[2],
+                tile_m=tile_shape[0],
+                tile_n=tile_shape[1],
+                tile_k=tile_shape[2],
+                num_stages=1,
+                pipeline_level=0,
+                warp_layout=torch.tensor([2, 2], dtype=torch.int64),
+                swizzle_bytes=128,
+            )
+            results.append(single_stage_results)
 
-    run_gemm(
-        matrix_m=mat_m,
-        matrix_n=mat_n,
-        matrix_k=mat_k,
-        tile_m=tl_m,
-        tile_n=tl_n,
-        tile_k=tl_k,
-        num_stages=3,
-        pipeline_level=2,
-        warp_layout=torch.tensor([2, 2], dtype=torch.int64),
-        swizzle_bytes=128,
-    )
+            # Run multi-stage benchmark
+            multi_stage_results = run_gemm(
+                matrix_m=matrix_shape[0],
+                matrix_n=matrix_shape[1],
+                matrix_k=matrix_shape[2],
+                tile_m=tile_shape[0],
+                tile_n=tile_shape[1],
+                tile_k=tile_shape[2],
+                num_stages=3,
+                pipeline_level=1,
+                warp_layout=torch.tensor([2, 2], dtype=torch.int64),
+                swizzle_bytes=128,
+            )
+            results.append(multi_stage_results)
+
+    csv_filename = "benchmarks/python/gemm_benchmark.csv"
+
+    # Save results to CSV
+    write_results_to_csv(results, csv_filename)
+    print(f"\nResults saved to {csv_filename}")  # noqa: T201
+
+    # Print summary statistics
+    print_summary(results)
+
     logging.info("--- GEMM Benchmark Finished ---")

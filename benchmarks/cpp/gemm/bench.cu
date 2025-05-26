@@ -7,6 +7,7 @@
 #include "util/cuda_info.hpp"
 
 #include <cutlass/half.h>
+#include <cxxopts.hpp>
 
 #include <fstream>
 #include <iomanip>
