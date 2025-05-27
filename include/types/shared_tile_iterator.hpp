@@ -7,8 +7,6 @@
 #include "types/shared.hpp"
 #include "types/tile_shape.hpp"
 
-#include <iostream>
-
 namespace tilefusion::cell {
 namespace tl = tile_layout;
 using namespace compute;
@@ -121,6 +119,10 @@ class STileIterator {
     /// @param i Linear index of the sub-tile
     /// @return A new tile representing the sub-tile
     DEVICE auto operator()(int i) {
+        static_assert(sc0 == 1 || sc1 == 1,
+                      "A single index is supported only when the strip count "
+                      "of one of the iterator's dimensions is 1.");
+
         assert(data_ != nullptr);
 
         const int x = sc0 == 1 ? 0 : i;
@@ -210,6 +212,7 @@ class STileIterator2 {
 
     static constexpr int sc0 = Tile::kRows / kChunkRows;
     static constexpr int sc1 = Tile::kCols / kChunkCols;
+    static constexpr int kNumel = sc0 * sc1;
 
     HOST_DEVICE STileIterator2() : tile_(nullptr), data_(nullptr) {}
 
@@ -220,6 +223,9 @@ class STileIterator2 {
     /// @param i Linear index of the sub-tile
     /// @return A new tile representing the sub-tile
     DEVICE auto operator()(int i) {
+        static_assert(sc0 == 1 || sc1 == 1,
+                      "A single index is supported only when the strip count "
+                      "of one of the iterator's dimensions is 1.");
         assert(tile_ != nullptr && data_ != nullptr);
 
         // A tile is partitioned into sub-tiles along the row or column

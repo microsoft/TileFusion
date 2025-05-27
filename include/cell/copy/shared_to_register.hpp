@@ -54,6 +54,10 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     }
 
   private:
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape.
+    // Future refactoring of the program's concepts and interfaces should
+    // eliminate this dependency.
     using MmaAtom =
         compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
     using BaseShape = MmaAtom::BaseTile;
@@ -101,6 +105,10 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     }
 
   private:
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape.
+    // Future refactoring of the program's concepts and interfaces should
+    // eliminate this dependency.
     using MmaAtom =
         compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
     using BaseShape = MmaAtom::BaseTile;
@@ -162,6 +170,10 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     }
 
   private:
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape.
+    // Future refactoring of the program's concepts and interfaces should
+    // eliminate this dependency.
     using MmaAtom =
         compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
     using BaseShape = MmaAtom::BaseTile;
@@ -225,6 +237,10 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     }
 
   private:
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape.
+    // Future refactoring of the program's concepts and interfaces should
+    // eliminate this dependency.
     using MmaAtom =
         compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
     using BaseShape = MmaAtom::BaseTile;
@@ -302,6 +318,9 @@ struct RegToSharedStorer {
     using DType = typename Reg::DType::DType;
     using WarpLayout = WarpLayout_;
 
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape. Future refactoring of the program's concepts and interfaces
+    // should eliminate this dependency.
     using MmaAtom =
         compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
     using BaseShape = MmaAtom::BaseTile;
