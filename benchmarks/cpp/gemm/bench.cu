@@ -7,7 +7,6 @@
 #include "util/cuda_info.hpp"
 
 #include <cutlass/half.h>
-#include <cxxopts.hpp>
 
 #include <fstream>
 #include <iomanip>
@@ -25,12 +24,12 @@ __attribute__((global)) void ke_gemm_wrapper(const InType* A, const InType* B,
 //// =============== Test Config=============== ////
 static const int kWarpPerRow = 2;
 static const int kWarpPerCol = 2;
-using WholeShape = GemmShape<4096, 4096, 128>;
+using WholeShape = GemmShape<64, 128, 128>;
 using CtaTileShape = GemmShape<64, 128, 128>;
 using WarpLayout = tl::RowMajor<kWarpPerRow, kWarpPerCol>;
 static constexpr int kRK = 16;
 static constexpr int kSharedAccess = 128;
-static constexpr int kNumStages = 1;
+static constexpr int kNumStages = 3;
 
 void run_test(std::ofstream& fout) {
     //// =============== Declaration =============== ////
@@ -56,9 +55,18 @@ void run_test(std::ofstream& fout) {
         &benchmarks::cutlass_wrapper::gemm_kernel<cutlass::half_t, kM, kN, kK,
                                                   kTM, kTN, kTK, KeTraits>;
 
+    auto cutlass_gemm_pipeline =
+        &benchmarks::cutlass_wrapper::gemm_pipeline_kernel<
+            cutlass::half_t, kM, kN, kK, kTM, kTN, kTK, kNumStages, KeTraits>;
+
     static constexpr int inputs = kTK * (kTN + kTM) * sizeof(InType);
     static constexpr int acc = kTM * kTN * sizeof(InType);
     static constexpr int smem_size = inputs > acc ? inputs : acc;
+
+    static constexpr int pipeline_inputs_size =
+        kNumStages * (inputs > acc ? inputs : acc);
+    static constexpr int pipeline_smem_size =
+        pipeline_inputs_size > acc ? pipeline_inputs_size : acc;
 
     const int kMaxSmemPerBlock = 48 * 1024;
     if (smem_size > kMaxSmemPerBlock) {
@@ -69,6 +77,12 @@ void run_test(std::ofstream& fout) {
         cudaFuncSetAttribute(cutlass_gemm,
                              cudaFuncAttributeMaxDynamicSharedMemorySize,
                              smem_size);
+    }
+
+    if (pipeline_smem_size > kMaxSmemPerBlock) {
+        cudaFuncSetAttribute(cutlass_gemm_pipeline,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize,
+                             pipeline_smem_size);
     }
 
     int block_x = benchmarks::CeilDiv<kM, kTM>;
@@ -175,6 +189,14 @@ void run_test(std::ofstream& fout) {
 
     timer.start();
     for (int i = 0; i < iters; ++i) {
+        cutlass_gemm_pipeline<<<dim_grid, dim_block, pipeline_smem_size>>>(
+            dA, dB, dC);
+    }
+    cudaDeviceSynchronize();
+    float cutlass_pipeline_time = timer.stop() / iters;
+
+    timer.start();
+    for (int i = 0; i < iters; ++i) {
         tilefusion_gemm<<<dim_grid, dim_block, smem_size>>>(dA2, dB2, dC2);
     }
     cudaDeviceSynchronize();
@@ -193,8 +215,11 @@ void run_test(std::ofstream& fout) {
               << kTN << ", " << kTK << "]\t" << kRK << "\t[" << kWarpPerRow
               << ", " << kWarpPerCol << "]\t" << cublas_time << "\t"
               << cutlass_time << "(" << cutlass_time / base << ")"
-              << "\t" << std::setprecision(6) << tilefusion_time << " ("
-              << std::setprecision(2) << tilefusion_time / base << ")"
+              << "\t" << std::setprecision(6) << cutlass_pipeline_time << " ("
+              << std::setprecision(2) << cutlass_pipeline_time / base
+              << ")"
+              //   << "\t" << std::setprecision(6) << tilefusion_time << " ("
+              //   << std::setprecision(2) << tilefusion_time / base << ")"
               << std::endl;
 }
 

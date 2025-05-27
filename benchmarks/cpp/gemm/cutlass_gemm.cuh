@@ -7,6 +7,7 @@
 #include "cutlass/copy.cuh"
 #include "cutlass/traits_base.cuh"
 
+#include <cute/algorithm/copy.hpp>
 #include <cute/tensor.hpp>
 
 namespace benchmarks {
@@ -62,6 +63,14 @@ struct GemmTraits : public Base {
 #else
     using CopyInstG2S = Copy_Atom<DefaultCopy, Element>;
 #endif
+
+    using GmemCopyLayoutAtom =
+        Layout<Shape<Int<kThreads / kThreadsPerRow>, Int<kThreadsPerRow>>,
+               Stride<Int<kThreadsPerRow>, _1>>;
+
+    using GmemTiledCopy = decltype(make_tiled_copy(
+        Copy_Atom<SM80_CP_ASYNC_CACHEGLOBAL<cute::uint128_t>, Element>{},
+        GmemCopyLayoutAtom{}, Layout<Shape<_1, Int<Base::kNumPerAccess>>>{}));
 
     using TiledCopyG2S = decltype(make_tiled_copy(
         CopyInstG2S{},
@@ -129,5 +138,176 @@ __global__ void gemm_kernel(const Element* dA, const Element* dB, Element* dC) {
                   typename KeTraits::GmemLayoutC{},
                   typename KeTraits::TiledCopyS2G{});
 }
+
+template <typename Element, const int kM, const int kN, const int kK,
+          const int kTM, const int kTN, const int kTK, const int num_stages,
+          typename KeTraits>
+__global__ void gemm_pipeline_kernel(const Element* dA, const Element* dB,
+                                     Element* dC) {
+    using namespace cute;
+
+    extern __shared__ __align__(sizeof(double)) unsigned char shared_buf[];
+    auto* shm = reinterpret_cast<Element*>(shared_buf);
+
+    Element* gA_ptr = const_cast<Element*>(dA) + blockIdx.x * kK * kTM;
+    Element* gB_ptr = const_cast<Element*>(dB) + blockIdx.y * kK * kTN;
+    Element* gC_ptr = dC + blockIdx.x * kTM * kN + blockIdx.y * kTN;
+
+    Element* sA_ptr = shm;
+    Element* sC_ptr = shm;
+
+    // load the first A, B tiles from global memory to shared memory
+    typename KeTraits::GmemTiledCopy tiled_copy;
+    auto copy_thrd = tiled_copy.get_thread_slice(threadIdx.x);
+
+    auto gA =
+        make_tensor(make_gmem_ptr(gA_ptr), typename KeTraits::GmemLayoutA{});
+    auto gA_thrd = copy_thrd.partition_S(gA);
+    auto sA =
+        make_tensor(make_smem_ptr(sA_ptr), typename KeTraits::SmemLayoutA{});
+    auto sA_thrd = copy_thrd.partition_D(sA);
+
+    auto gB =
+        make_tensor(make_gmem_ptr(gB_ptr), typename KeTraits::GmemLayoutB{});
+    auto gB_thrd = copy_thrd.partition_S(gB);
+    auto sB = make_tensor(sA.data() + num_stages * size(sA),
+                          typename KeTraits::SmemLayoutB{});
+    auto sB_thrd = copy_thrd.partition_D(sB);
+
+    CopyAsyncG2S g2s(num_stages, tiled_copy, gA_thrd, kTK, sA_thrd, size(sA),
+                     gB_thrd, kTK, sB_thrd, size(sB));
+
+    g2s.copy();  // commit the 1st async copy group
+    g2s.copy();  // commit the 2nd async copy group
+    // Allows for one unfinished cp.async operation.
+    g2s.template wait_group<1>();
+    __syncthreads();
+
+    typename KeTraits::TiledMma tiled_mma;
+    auto thr_mma = tiled_mma.get_thread_slice(threadIdx.x);
+    auto acc = partition_fragment_C(tiled_mma, Shape<Int<kTM>, Int<kTN>>{});
+    clear(acc);
+
+    // data tiles that are stored on local registers
+    using SmemLoadAtom = Copy_Atom<SM75_U32x4_LDSM_N, Element>;
+    auto s2r_copy_A = make_tiled_copy_A(SmemLoadAtom{}, tiled_mma);
+    auto s2r_copy_A_thrd = s2r_copy_A.get_thread_slice(threadIdx.x);
+    auto sArA = s2r_copy_A_thrd.partition_S(sA);
+    auto rA = thr_mma.partition_fragment_A(sA);
+    auto rA_view = s2r_copy_A_thrd.retile_D(rA);  // retile for copy
+
+    auto s2r_copy_B = make_tiled_copy_B(SmemLoadAtom{}, tiled_mma);
+    auto s2r_copy_B_thrd = s2r_copy_B.get_thread_slice(threadIdx.x);
+    auto sBrB = s2r_copy_B_thrd.partition_S(sB);
+    auto rB = thr_mma.partition_fragment_B(sB);
+    auto rB_view = s2r_copy_B_thrd.retile_D(rB);  // retile for copy
+
+    static_assert(size<2>(rA) == size<2>(rB),
+                  "Error partition of thread tiles.");
+    const int k_tiles = size<2>(rB);
+    const int Na = size<1>(sA_thrd) * size<2>(sA_thrd);
+    const int na = CeilDiv<Na, k_tiles>;
+    const int stride_a = size<2>(sA_thrd);
+
+    const int Nb = size<1>(sB_thrd) * size<2>(sB_thrd);
+    const int nb = CeilDiv<Nb, k_tiles>;
+    const int stride_b = size<2>(sB_thrd);
+
+    // issue the first data loading from shared memory to register
+    cute::copy(s2r_copy_A, sArA(_, _, _0{}), rA_view(_, _, _0{}));
+    cute::copy(s2r_copy_B, sBrB(_, _, _0{}), rB_view(_, _, _0{}));
+
+    // stage 1
+    for (int blk = 0; blk < kK / kTK - 2; ++blk) {
+        CUTE_UNROLL
+        for (int i = 0; i < k_tiles; ++i) {
+            // circular issue next data loading from shared memory
+            // into registers
+            int pos = (i + 1) % k_tiles;
+            cute::copy(s2r_copy_A, sArA(_, _, pos), rA_view(_, _, pos));
+            cute::copy(s2r_copy_B, sBrB(_, _, pos), rB_view(_, _, pos));
+
+            if (i < k_tiles - 1) {
+                // gmem -> shared memory
+                g2s.copy2(i, na, Na, stride_a, nb, Nb, stride_b);
+            }
+
+            if (i == k_tiles - 2) {
+                sArA.data() = sArA.data() + size(sA);
+                sBrB.data() = sBrB.data() + size(sB);
+
+                if ((blk + 1) % num_stages == 0) {
+                    sArA.data() = sArA.data() + (-size(sA) * num_stages);
+                    sBrB.data() = sBrB.data() + (-size(sB) * num_stages);
+                }
+
+                g2s.copy2(i + 1, na, Na, stride_a, nb, Nb, stride_b);
+                g2s.commit_copy_group();
+                g2s.next();
+                if ((blk + 2 + 1) % num_stages == 0) g2s.cycle_dst();
+
+                g2s.template wait_group<1>();
+                __syncthreads();
+            }
+
+            cute::gemm(tiled_mma, rA(_, _, i), rB(_, _, i),
+                       acc);  // compute
+        }
+    }
+
+    // stage 2
+    CUTE_UNROLL
+    for (int i = 0; i < k_tiles; ++i) {
+        // circular issue next data loading from shared memory into
+        // registers
+        int pos = (i + 1) % k_tiles;
+        cute::copy(s2r_copy_A, sArA(_, _, pos), rA_view(_, _, pos));
+        cute::copy(s2r_copy_B, sBrB(_, _, pos), rB_view(_, _, pos));
+
+        if (i == k_tiles - 2) {
+            sArA.data() = sArA.data() + size(sA);
+            sBrB.data() = sBrB.data() + size(sB);
+            if ((kK / kTK - 2 + 1) % num_stages == 0) {
+                sArA.data() = sArA.data() + (-size(sA) * num_stages);
+                sBrB.data() = sBrB.data() + (-size(sB) * num_stages);
+            }
+
+            g2s.template wait_group<0>();
+            __syncthreads();
+        }
+
+        cute::gemm(tiled_mma, rA(_, _, i), rB(_, _, i),
+                   acc);  // compute
+    }
+
+    // stage 3
+    CUTE_UNROLL
+    for (int i = 0; i < k_tiles; ++i) {
+        if (i < k_tiles - 1) {
+            // circular issue next data loading from shared memory
+            // into registers
+            int pos = (i + 1) % k_tiles;
+            cute::copy(s2r_copy_A, sArA(_, _, pos), rA_view(_, _, pos));
+            cute::copy(s2r_copy_B, sBrB(_, _, pos), rB_view(_, _, pos));
+        }
+
+        cute::gemm(tiled_mma, rA(_, _, i), rB(_, _, i),
+                   acc);  // compute
+    }
+    __syncthreads();
+
+    // convert the accumulator to the output type
+    // auto rC = convert_type<Element>(acc);
+
+    typename KeTraits::StoreC_R2S sC;
+    sC.copy(acc, sC_ptr);
+    __syncthreads();
+
+    // copy the result from shared memory to global memory
+    copy_tile_s2g(sC_ptr, gC_ptr, typename KeTraits::SmemLayoutC{},
+                  typename KeTraits::GmemLayoutC{},
+                  typename KeTraits::TiledCopyS2G{});
+}
+
 }  // namespace cutlass_wrapper
 }  // namespace benchmarks
