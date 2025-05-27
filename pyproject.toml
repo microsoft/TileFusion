@@ -2,23 +2,21 @@
 name = "tilefusion"
 dynamic = ["version"]
 authors = [
-    {name="Ying Cao", email="lcy.seso@gmail.com"},
-    {name="ChengXiang Qi", email="KuangjuX@outlook.com"},
+    { name = "Ying Cao", email = "lcy.seso@gmail.com" },
+    { name = "ChengXiang Qi", email = "KuangjuX@outlook.com" },
 ]
 
 description = "TileFusion: Simplifying Kernel Fusion with Tile Processing"
 readme = "README.md"
 requires-python = ">=3.9"
-license = "MIT"
+license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Libraries",
 ]
 
-dependencies = [
-    "torch",
-]
+dependencies = ["torch"]
 
 [project.optional-dependencies]
 dev = [
@@ -60,7 +58,7 @@ Issues = "https://github.com/microsoft/TileFusion/issues"
 
 [build-system]
 requires = [
-    "cmake>=3.25.0",  # required by c++ 20
+    "cmake>=3.25.0",      # required by c++ 20
     "packaging",
     "setuptools>=64.0.0",
     "wheel",
@@ -89,34 +87,34 @@ per-file-ignores = [
 ]
 docstring-convention = "google"
 ignore = [
-    "D100",  # Missing docstring in public module
-    "D101",  # Missing docstring in public class
-    "D102",  # Missing docstring in public method
-    "D103",  # Missing docstring in public function
-    "D104",  # Missing docstring in public package
-    "D105",  # Missing docstring in magic method
-    "D106",  # Missing docstring in public nested class
-    "D107",  # Missing docstring in __init__
-    "D203",  # 1 blank line required before class docstring
-    "D213",  # Multi-line docstring summary should start at the second line
-    "D406",  # Section name should end with a period
-    "D407",  # Missing dashed underline after section
-    "D408",  # Section underline should match the length of its name
-    "D409",  # Section underline should be in the same line as the section name
-    "D410",  # Missing blank line after section
-    "D411",  # Missing blank line before section
-    "D412",  # No blank lines allowed between a section header and its content
-    "D413",  # Missing blank line after last section
-    "D414",  # Section has no content
-    "D415",  # First line should end with a period
-    "D416",  # Section name should end with a period
-    "D417",  # Missing argument descriptions in the docstring
-    "D418",  # Missing blank line after function decorator
-    "D419",  # First line should be in imperative mood
+    "D100", # Missing docstring in public module
+    "D101", # Missing docstring in public class
+    "D102", # Missing docstring in public method
+    "D103", # Missing docstring in public function
+    "D104", # Missing docstring in public package
+    "D105", # Missing docstring in magic method
+    "D106", # Missing docstring in public nested class
+    "D107", # Missing docstring in __init__
+    "D203", # 1 blank line required before class docstring
+    "D213", # Multi-line docstring summary should start at the second line
+    "D406", # Section name should end with a period
+    "D407", # Missing dashed underline after section
+    "D408", # Section underline should match the length of its name
+    "D409", # Section underline should be in the same line as the section name
+    "D410", # Missing blank line after section
+    "D411", # Missing blank line before section
+    "D412", # No blank lines allowed between a section header and its content
+    "D413", # Missing blank line after last section
+    "D414", # Section has no content
+    "D415", # First line should end with a period
+    "D416", # Section name should end with a period
+    "D417", # Missing argument descriptions in the docstring
+    "D418", # Missing blank line after function decorator
+    "D419", # First line should be in imperative mood
 ]
 
 [tool.mypy]
-python_version = "3.9"  # Base version for type checking
+python_version = "3.9"              # Base version for type checking
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -137,7 +135,7 @@ ignore_nosec = false
 
 [tool.flake8.bugbear]
 extend-select = ["B"]
-ignore = ["B007"]  # Loop control variable not used within loop body
+ignore = ["B007"]     # Loop control variable not used within loop body
 
 [tool.flake8.comprehensions]
 extend-select = ["C4"]
@@ -164,14 +162,11 @@ tag_format = "v$version"
 bump_message = "bump: version $current_version → $new_version [skip ci]"
 update_changelog_on_bump = true
 major_version_zero = true
-version_files = [
-    "pyproject.toml:version",
-    "setup.py:version",
-]
+version_files = ["pyproject.toml:version", "setup.py:version"]
 
 [tool.pyupgrade]
 py39-plus = true
 args = ["--keep-percent-format", "--py39-plus"]
 
 [tool.setuptools.dynamic]
-version = {attr = "tilefusion.__version__.__version__"}
+version = { attr = "tilefusion.__version__.__version__" }

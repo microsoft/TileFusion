@@ -13,8 +13,9 @@ REGISTER_OP(scatter_nd,
             &scatter_nd);
 
 REGISTER_OP(gemm,
-            "gemm(Tensor A, Tensor B, Tensor(a!) C, int m, int n, int k, "
-            "int num_stages, int pipeline_level) -> ()",
+            "gemm(Tensor A, Tensor B, Tensor(a!) C, int tm, int tn, int tk, "
+            "int num_stages, int pipeline_level, Tensor warp_layout, int "
+            "swizzle_bytes) -> ()",
             &gemm);
 
 REGISTER_OP(fused_two_gemms,

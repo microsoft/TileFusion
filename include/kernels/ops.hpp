@@ -41,7 +41,9 @@ TILEFUSION_EXPORT void scatter_nd(const torch::Tensor& data,
 TILEFUSION_EXPORT void gemm(const torch::Tensor& A, const torch::Tensor& B,
                             torch::Tensor& C, int64_t tm, int64_t tn,
                             int64_t tk, int64_t num_stages,
-                            int64_t pipeline_level);
+                            int64_t pipeline_level,
+                            const torch::Tensor& warp_layout,
+                            int64_t swizzle_bytes);
 
 // declare the host function for fused two gemms
 TILEFUSION_EXPORT void fused_two_gemms(const torch::Tensor& A,

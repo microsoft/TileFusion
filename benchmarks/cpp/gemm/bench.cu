@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+#include "cutlass_gemm.cuh"
+#include "kernels/gemm_device.cuh"
 #include "util.cuh"
 #include "util/cuda_info.hpp"
 
@@ -9,16 +11,25 @@
 #include <fstream>
 #include <iomanip>
 
+using namespace tilefusion::kernels;
+
+template <typename InType, typename AccType, typename Config>
+__attribute__((global)) void ke_gemm_wrapper(const InType* A, const InType* B,
+                                             AccType* C) {
+    ke_gemm<InType, AccType, Config>(A, B, C);
+}
+
 #define CHECK_CORRECTNESS true
 
 //// =============== Test Config=============== ////
 static const int kWarpPerRow = 2;
 static const int kWarpPerCol = 2;
-using WholeShape = GemmShape<4096, 4096, 128>;
+using WholeShape = GemmShape<64, 128, 128>;
 using CtaTileShape = GemmShape<64, 128, 128>;
 using WarpLayout = tl::RowMajor<kWarpPerRow, kWarpPerCol>;
-static constexpr int kRK = 64;
-static constexpr int kSharedAccess = 64;
+static constexpr int kRK = 16;
+static constexpr int kSharedAccess = 128;
+static constexpr int kNumStages = 3;
 
 void run_test(std::ofstream& fout) {
     //// =============== Declaration =============== ////
@@ -33,20 +44,10 @@ void run_test(std::ofstream& fout) {
     using InType = __half;
     using AccType = float;
 
-    using Config = KeGemmTraits<InType, AccType, WholeShape, CtaTileShape, kRK,
-                                kSharedAccess, WarpLayout>;
-    auto tilefusion_gemm =
-        &gemm<InType, AccType, kM, kN, kK, kTM, kTN, kTK,
-              typename Config::GIteratorA, typename Config::SIteratorA,
-              typename Config::SharedA, typename Config::RegA,
-              typename Config::LoadSharedA, typename Config::LoadRegA,
-              typename Config::GIteratorB, typename Config::SIteratorB,
-              typename Config::SharedB, typename Config::RegB,
-              typename Config::LoadSharedB, typename Config::LoadRegB,
-              typename Config::GlobalC, typename Config::SharedC,
-              typename Config::Acc, typename Config::AccHalf,
-              typename Config::ConvertAcc, typename Config::StoreRegC,
-              typename Config::StoreSharedC>;
+    using Config = KeGemmTraits<InType, AccType, WarpLayout, kM, kN, kK, kTM,
+                                kTN, kTK, kRK, kNumStages, kSharedAccess>;
+
+    auto tilefusion_gemm = &ke_gemm_wrapper<InType, AccType, Config>;
 
     using KeTraits = benchmarks::cutlass_wrapper::GemmTraits<
         cutlass::half_t, kWarpPerRow, kWarpPerCol, kM, kN, kK, kTM, kTN, kTK>;
@@ -54,18 +55,34 @@ void run_test(std::ofstream& fout) {
         &benchmarks::cutlass_wrapper::gemm_kernel<cutlass::half_t, kM, kN, kK,
                                                   kTM, kTN, kTK, KeTraits>;
 
+    auto cutlass_gemm_pipeline =
+        &benchmarks::cutlass_wrapper::gemm_pipeline_kernel<
+            cutlass::half_t, kM, kN, kK, kTM, kTN, kTK, kNumStages, KeTraits>;
+
     static constexpr int inputs = kTK * (kTN + kTM) * sizeof(InType);
     static constexpr int acc = kTM * kTN * sizeof(InType);
     static constexpr int smem_size = inputs > acc ? inputs : acc;
+
+    static constexpr int pipeline_inputs_size =
+        kNumStages * (inputs > acc ? inputs : acc);
+    static constexpr int pipeline_smem_size =
+        pipeline_inputs_size > acc ? pipeline_inputs_size : acc;
 
     const int kMaxSmemPerBlock = 48 * 1024;
     if (smem_size > kMaxSmemPerBlock) {
         cudaFuncSetAttribute(tilefusion_gemm,
                              cudaFuncAttributeMaxDynamicSharedMemorySize,
                              smem_size);
+
         cudaFuncSetAttribute(cutlass_gemm,
                              cudaFuncAttributeMaxDynamicSharedMemorySize,
                              smem_size);
+    }
+
+    if (pipeline_smem_size > kMaxSmemPerBlock) {
+        cudaFuncSetAttribute(cutlass_gemm_pipeline,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize,
+                             pipeline_smem_size);
     }
 
     int block_x = benchmarks::CeilDiv<kM, kTM>;
@@ -101,21 +118,22 @@ void run_test(std::ofstream& fout) {
     // output matrix C for cutlass GEMM kernel
     thrust::device_vector<cutlass::half_t> d_c(kM * kN);
     cutlass::half_t* dC = thrust::raw_pointer_cast(d_c.data());
-    thrust::device_vector<InType> d_c2(kM * kN);
-    InType* dC2 = thrust::raw_pointer_cast(d_c2.data());
+
+    thrust::device_vector<AccType> d_c2(kM * kN);
+    AccType* dC2 = thrust::raw_pointer_cast(d_c2.data());
 
     // output matrix C for cublas gemm
     thrust::device_vector<__half> d_c3(kM * kN);
     __half* dC3 = thrust::raw_pointer_cast(d_c3.data());
 
     thrust::host_vector<cutlass::half_t> h_c;
-    thrust::host_vector<InType> h_c2;
+    thrust::host_vector<AccType> h_c2;
     thrust::host_vector<__half> h_c3;
 
 //// =============== check correctness =============== ////
 #ifdef CHECK_CORRECTNESS
     thrust::fill(d_c.begin(), d_c.end(), static_cast<cutlass::half_t>(0.));
-    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<InType>(0.));
+    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<AccType>(0.));
     thrust::fill(d_c3.begin(), d_c3.end(), static_cast<__half>(0.));
 
     cutlass_gemm<<<dim_grid, dim_block, smem_size>>>(dA, dB, dC);
@@ -147,7 +165,7 @@ void run_test(std::ofstream& fout) {
 
     //// =============== Timing =============== ////
     thrust::fill(d_c.begin(), d_c.end(), static_cast<cutlass::half_t>(0.));
-    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<InType>(0.));
+    thrust::fill(d_c2.begin(), d_c2.end(), static_cast<AccType>(0.));
     thrust::fill(d_c3.begin(), d_c3.end(), static_cast<__half>(0.));
 
     float cublas_time = cublas_hgemm(kM, kN, kK, dA2, dB2, dC3, true);
@@ -171,6 +189,14 @@ void run_test(std::ofstream& fout) {
 
     timer.start();
     for (int i = 0; i < iters; ++i) {
+        cutlass_gemm_pipeline<<<dim_grid, dim_block, pipeline_smem_size>>>(
+            dA, dB, dC);
+    }
+    cudaDeviceSynchronize();
+    float cutlass_pipeline_time = timer.stop() / iters;
+
+    timer.start();
+    for (int i = 0; i < iters; ++i) {
         tilefusion_gemm<<<dim_grid, dim_block, smem_size>>>(dA2, dB2, dC2);
     }
     cudaDeviceSynchronize();
@@ -184,6 +210,17 @@ void run_test(std::ofstream& fout) {
          << std::setprecision(2) << cutlass_time / base << ")"
          << "\t" << std::setprecision(6) << tilefusion_time << " ("
          << std::setprecision(2) << tilefusion_time / base << ")" << std::endl;
+
+    std::cout << "[" << kM << ", " << kN << ", " << kK << "]\t[" << kTM << ", "
+              << kTN << ", " << kTK << "]\t" << kRK << "\t[" << kWarpPerRow
+              << ", " << kWarpPerCol << "]\t" << cublas_time << "\t"
+              << cutlass_time << "(" << cutlass_time / base << ")"
+              << "\t" << std::setprecision(6) << cutlass_pipeline_time << " ("
+              << std::setprecision(2) << cutlass_pipeline_time / base
+              << ")"
+              //   << "\t" << std::setprecision(6) << tilefusion_time << " ("
+              //   << std::setprecision(2) << tilefusion_time / base << ")"
+              << std::endl;
 }
 
 int main() {
