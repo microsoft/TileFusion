@@ -45,8 +45,8 @@ struct STileIterator2PrettyPrinter {
 template <typename Layout>
 struct is_block_layout : std::false_type {};
 
-template <typename OuterLayout, typename InnerLayout, bool kStrided>
-struct is_block_layout<tl::BlockMatrxLayout<OuterLayout, InnerLayout, kStrided>>
+template <typename OuterLayout, typename InnerLayout>
+struct is_block_layout<tl::BlockMatrxLayout<OuterLayout, InnerLayout>>
     : std::true_type {};
 
 template <typename Layout>
@@ -57,32 +57,23 @@ template <typename TileLayout, int kChunkRows, int kChunkCols,
           bool IsBlockLayout = is_block_layout_v<TileLayout>>
 struct SubTileLayoutCreator;
 
-/// @brief Specialization for simple MatrixLayout
-template <typename TileLayout, int kChunkRows, int kChunkCols>
-struct SubTileLayoutCreator<TileLayout, kChunkRows, kChunkCols, false> {
-    static constexpr int kTileRowStride =
-        TileLayout::kType == tl::Layout::kRowMajor ? TileLayout::kCols : 1;
-    static constexpr int kTileColStride =
-        TileLayout::kType == tl::Layout::kRowMajor ? 1 : TileLayout::kRows;
-
-    using type = tl::MatrixLayout<kChunkRows, kChunkCols, kTileRowStride,
-                                  kTileColStride>;
-};
-
 /// @brief Specialization for BlockMatrxLayout. For block layouts, we need to
 ///        preserve the block structure
 template <typename TileLayout, int kChunkRows, int kChunkCols>
 struct SubTileLayoutCreator<TileLayout, kChunkRows, kChunkCols, true> {
-    using InnerLayout = typename TileLayout::InnerLayout;
-
-    static constexpr int kRowStride = TileLayout::kRowStride;
-    static constexpr int kColStride = TileLayout::kColStride;
-
-    using OuterLayout = tl::MatrixLayout<kChunkRows, kChunkCols, kRowStride,
-                                         kColStride, TileLayout::kType>;
-
+    using OuterLayout =
+        tl::MatrixLayout<kChunkRows, kChunkCols, TileLayout::kRowStride,
+                         TileLayout::kColStride, TileLayout::kType>;
     using type =
-        tl::BlockMatrxLayout<OuterLayout, InnerLayout, true /*kStrided*/>;
+        tl::BlockMatrxLayout<OuterLayout, typename TileLayout::InnerLayout>;
+};
+
+/// @brief Specialization for simple MatrixLayout
+template <typename TileLayout, int kChunkRows, int kChunkCols>
+struct SubTileLayoutCreator<TileLayout, kChunkRows, kChunkCols, false> {
+    using type =
+        tl::MatrixLayout<kChunkRows, kChunkCols, TileLayout::kRowStride,
+                         TileLayout::kColStride, TileLayout::kType>;
 };
 
 template <typename TileLayout, int kChunkRows, int kChunkCols>
@@ -206,7 +197,6 @@ class STileIterator2 {
     using Tile = Tile_;
     using DType = Tile::DType;
     using ChunkShape = ChunkShape_;
-    using Layout = typename Tile::Layout;
 
     static constexpr int kChunkRows = dim_size<0, ChunkShape>;
     static constexpr int kChunkCols = dim_size<1, ChunkShape>;
@@ -267,6 +257,7 @@ class STileIterator2 {
     }
 
   private:
+    using Layout = typename Tile::Layout;
     static constexpr bool kIsBlockLayout = is_block_layout_v<Layout>;
 
     // Compute stride multipliers based on layout type
@@ -274,7 +265,7 @@ class STileIterator2 {
         if constexpr (kIsBlockLayout) {
             return kChunkRows / Layout::InnerLayout::kRows;
         } else {
-            return 1;
+            return kChunkRows;
         }
     }();
 
@@ -282,7 +273,7 @@ class STileIterator2 {
         if constexpr (kIsBlockLayout) {
             return kChunkCols / Layout::InnerLayout::kCols;
         } else {
-            return 1;
+            return kChunkCols;
         }
     }();
 

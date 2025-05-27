@@ -118,8 +118,15 @@ struct is_col_major {
     static constexpr bool value = Layout_::kType == Layout::kColMajor;
 };
 
-template <typename OuterLayout_, typename InnerLayout_,
-          const bool kStrided = false>
+template <typename Layout>
+struct is_contiguous {
+    static constexpr bool value =
+        is_row_major<Layout>::value
+            ? (Layout::kRowStride == Layout::kCols && Layout::kColStride == 1)
+            : (Layout::kColStride == Layout::kRows && Layout::kRowStride == 1);
+};
+
+template <typename OuterLayout_, typename InnerLayout_>
 struct BlockMatrxLayout {
     using InnerLayout = InnerLayout_;
     using OuterLayout = OuterLayout_;
@@ -142,12 +149,15 @@ struct BlockMatrxLayout {
     static constexpr int kTileRows = kRows / kInnerRows;
     static constexpr int kTileCols = kCols / kInnerCols;
 
-    static constexpr int kRowStride = is_row_major<OuterLayout>::value
-                                          ? kTileCols * kInnerNumel
-                                          : kInnerNumel;
-    static constexpr int kColStride = is_row_major<OuterLayout>::value
-                                          ? kInnerNumel
-                                          : kTileRows * kInnerNumel;
+    static constexpr bool kIsRowMajor = is_row_major<OuterLayout>::value;
+    static constexpr bool kIsContiguous = is_contiguous<OuterLayout>::value;
+
+    static constexpr int kRowStride =
+        kIsContiguous ? (kIsRowMajor ? kTileCols * kInnerNumel : kInnerNumel)
+                      : OuterLayout::kRowStride;
+    static constexpr int kColStride =
+        kIsContiguous ? (kIsRowMajor ? kInnerNumel : kTileRows * kInnerNumel)
+                      : OuterLayout::kColStride;
 
     HOST_DEVICE int operator()(int i, int j) const {
         const int outer_i = RowDivMod::div(i);
@@ -179,19 +189,17 @@ struct BlockMatrxLayout {
     using RowDivMod = DivModSelector<kInnerRowsIsPow2, kInnerRows>;
     using ColDivMod = DivModSelector<kInnerColsIsPow2, kInnerCols>;
 
-    using BlockOuter =
-        std::conditional_t<kStrided, OuterLayout,
-                           MatrixLayout<kTileRows, kTileCols, kRowStride,
-                                        kColStride, OuterLayout::kType>>;
+    using BlockOuter = MatrixLayout<kTileRows, kTileCols, kRowStride,
+                                    kColStride, OuterLayout::kType>;
     BlockOuter outer_;
     InnerLayout inner_;
 };
 
 /// @brief Pretty printer for BlockMatrxLayout
-template <typename OuterLayout_, typename InnerLayout_, bool kStrided>
+template <typename OuterLayout_, typename InnerLayout_>
 static HOST std::ostream& operator<<(
     std::ostream& out,
-    const BlockMatrxLayout<OuterLayout_, InnerLayout_, kStrided>& layout) {
+    const BlockMatrxLayout<OuterLayout_, InnerLayout_>& layout) {
     out << "BlockMatrixLayout {" << std::endl
         << "    Outer: " << layout.get_outer_layout() << ", " << std::endl
         << "    Inner: " << InnerLayout_{} << std::endl
