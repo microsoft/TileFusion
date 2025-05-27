@@ -22,7 +22,10 @@ struct SharedTilePrettyPrinter {
     static HOST void print(std::ostream& out, const Shared& tile) {
         // parameter `tile` here is not used
         auto swizzled = Shared::kSwizzled ? "swizzled" : "non-swizzled";
-        out << "\t" << typename Shared::Layout{} << ", Swizzled = " << swizzled;
+        out << "SharedTile {" << std::endl
+            << "  " << typename Shared::Layout{} << std::endl
+            << "  Swizzled = " << swizzled << std::endl
+            << "}";
     }
 };
 

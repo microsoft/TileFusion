@@ -40,7 +40,7 @@ template <typename DType, typename Layout>
 DEVICE void print_numeric_tile(const DType* data, const Layout& layout) {
     for (int i = 0; i < Layout::kRows; ++i) {
         for (int j = 0; j < Layout::kCols; ++j)
-            printf("%.2f, ", to_float(data[layout(i, j)]));
+            printf("%.0f, ", to_float(data[layout(i, j)]));
         printf("\n");
 
         if (i && (i + 1) % 16 == 0) printf("\n");
