@@ -4,6 +4,7 @@
 #pragma once
 
 #include "cuda_utils.hpp"
+#include "util/fp8_utils.hpp"
 
 namespace tilefusion::cell::compute {
 
@@ -146,14 +147,12 @@ struct Relu<__half> {
 };
 #endif
 
-template <typename SrcType, typename DstType>
+template <typename InType, typename OutType>
 struct Convert {
-    DEVICE DstType operator()(SrcType a) const {
-        return static_cast<DstType>(a);
-    }
+    DEVICE OutType operator()(InType a) const { return OutType(a); }
 
-    DEVICE void operator()(const SrcType& src, DstType& dst) {
-        dst = static_cast<DstType>(src);
+    DEVICE void operator()(const InType& src, OutType& dst) {
+        dst = OutType(src);
     }
 };
 
@@ -176,6 +175,51 @@ struct Convert<__half, float> {
         dst = __half2float(src);
     }
 };
-#endif
+
+    #ifdef CUDA_FP8_AVAILABLE
+// FP8 E4M3 conversions
+template <>
+struct Convert<float, __nv_fp8_e4m3> {
+    DEVICE __nv_fp8_e4m3 operator()(float a) const {
+        return util::from_float<__nv_fp8_e4m3>(a);
+    }
+
+    DEVICE void operator()(const float& src, __nv_fp8_e4m3& dst) {
+        dst = util::from_float<__nv_fp8_e4m3>(src);
+    }
+};
+
+template <>
+struct Convert<__nv_fp8_e4m3, float> {
+    DEVICE float operator()(__nv_fp8_e4m3 a) const { return util::to_float(a); }
+
+    DEVICE void operator()(const __nv_fp8_e4m3& src, float& dst) {
+        dst = util::to_float(src);
+    }
+};
+
+// FP8 E5M2 conversions
+template <>
+struct Convert<float, __nv_fp8_e5m2> {
+    DEVICE __nv_fp8_e5m2 operator()(float a) const {
+        return util::from_float<__nv_fp8_e5m2>(a);
+    }
+
+    DEVICE void operator()(const float& src, __nv_fp8_e5m2& dst) {
+        dst = util::from_float<__nv_fp8_e5m2>(src);
+    }
+};
+
+template <>
+struct Convert<__nv_fp8_e5m2, float> {
+    DEVICE float operator()(__nv_fp8_e5m2 a) const { return util::to_float(a); }
+
+    DEVICE void operator()(const __nv_fp8_e5m2& src, float& dst) {
+        dst = util::to_float(src);
+    }
+};
+    #endif  // CUDA_FP8_AVAILABLE
+
+#endif  // defined(__CUDA_ARCH__)
 
 }  // namespace tilefusion::cell::compute

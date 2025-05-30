@@ -6,6 +6,7 @@
 #include "traits/base.hpp"
 #include "types/layout.hpp"
 #include "util/debug.hpp"
+#include "util/fp8_utils.hpp"
 
 namespace tilefusion::cell {
 namespace tl = tile_layout;
@@ -16,6 +17,12 @@ DEVICE DType from_float(float v, DType vv) {
         return vv = __float2bfloat16(v);
     } else if constexpr (std::is_same<DType, float>::value) {
         return vv = v;
+#ifdef CUDA_FP8_AVAILABLE
+    } else if constexpr (std::is_same<DType, __nv_fp8_e4m3>::value) {
+        return vv = tilefusion::util::from_float<__nv_fp8_e4m3>(v);
+    } else if constexpr (std::is_same<DType, __nv_fp8_e5m2>::value) {
+        return vv = tilefusion::util::from_float<__nv_fp8_e5m2>(v);
+#endif
     } else {
         static_assert(std::is_same<DType, __half>::value);
         return vv = __float2half(v);
@@ -28,6 +35,12 @@ DEVICE float to_float(DType v) {
         return __bfloat162float(v);
     } else if constexpr (std::is_same<DType, float>::value) {
         return v;
+#ifdef CUDA_FP8_AVAILABLE
+    } else if constexpr (std::is_same<DType, __nv_fp8_e4m3>::value) {
+        return tilefusion::util::to_float(v);
+    } else if constexpr (std::is_same<DType, __nv_fp8_e5m2>::value) {
+        return tilefusion::util::to_float(v);
+#endif
     } else {
         static_assert(std::is_same<DType, __half>::value);
         return __half2float(v);
@@ -40,7 +53,7 @@ template <typename DType, typename Layout>
 DEVICE void print_numeric_tile(const DType* data, const Layout& layout) {
     for (int i = 0; i < Layout::kRows; ++i) {
         for (int j = 0; j < Layout::kCols; ++j)
-            printf("%.2f, ", to_float(data[layout(i, j)]));
+            printf("%.0f, ", to_float(data[layout(i, j)]));
         printf("\n");
 
         if (i && (i + 1) % 16 == 0) printf("\n");
@@ -59,7 +72,12 @@ template <typename DType, typename Layout>
 DEVICE void print_tile(const DType* data, const Layout& layout) {
     if constexpr (std::is_same<DType, float>::value ||
                   std::is_same<DType, __half>::value ||
-                  std::is_same<DType, __bfloat16>::value) {
+                  std::is_same<DType, __bfloat16>::value
+#ifdef CUDA_FP8_AVAILABLE
+                  || std::is_same<DType, __nv_fp8_e4m3>::value ||
+                  std::is_same<DType, __nv_fp8_e5m2>::value
+#endif
+    ) {
         print_numeric_tile(data, layout);
     } else {
         /// Since register tile is a nested array-like structure. printing
