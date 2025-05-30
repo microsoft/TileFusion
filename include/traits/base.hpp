@@ -20,7 +20,7 @@ concept HalfType =
     std::is_same_v<Element, __half> || std::is_same_v<Element, __bfloat16>;
 
 /// @brief Architecture-specific magic numbers.
-/// @tparam Element: the data type of the elements.
+/// @param Element: the data type of the elements.
 template <typename Element>
 struct AccessBase {
     // the maximal width of vectorized access.
@@ -48,5 +48,4 @@ struct BaseTileShape {
     static constexpr int kCols = 16;
     static constexpr int kNumel = 256 /* kRows * kCols */;
 };
-
 }  // namespace tilefusion::traits

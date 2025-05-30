@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+#include "cell/compute/gemm.hpp"
 #include "cell/copy/mod.hpp"
 #include "common/test_utils.hpp"
 #include "types/mod.hpp"
@@ -14,6 +15,7 @@
 namespace tilefusion::testing {
 using namespace cell;
 using namespace copy;
+using namespace compute;
 namespace tl = tile_layout;
 
 namespace {
@@ -116,7 +118,12 @@ void run_test_rowmajor() {
                                kSharedAccessInBytes>;
     using SIterator2 = STileIterator<Shared2, TileShape<kShmRows, kChunkShm>>;
 
-    using BaseShape = traits::BaseTileShape<Element>;
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape. Future refactoring of the program's concepts and interfaces
+    // should eliminate this dependency.
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     const int kSc0 = kShmRows / kWarpPerRow / BaseShape::kRows;
     const int kSc1 = kChunkShm / BaseShape::kCols;
@@ -208,7 +215,12 @@ void run_test_colmajor() {
                                kSharedAccessInBytes>;
     using SIterator2 = STileIterator<Shared2, TileShape<kChunkShm, kShmCols>>;
 
-    using BaseShape = traits::BaseTileShape<Element>;
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape. Future refactoring of the program's concepts and interfaces
+    // should eliminate this dependency.
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     const int kSc0 = kChunkShm / BaseShape::kRows;
     const int kSc1 = kShmCols / BaseShape::kCols / kWarpPerCol;
@@ -311,7 +323,12 @@ __global__ void swizzled_store(const Element* src, Element* dst) {
 template <typename Element, typename WarpLayout, const int kRows,
           const int kCols, const bool kSwizzled, const int kSharedAccessInBytes>
 void test_row_major_store() {
-    using BaseShape = traits::BaseTileShape<Element>;
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape. Future refactoring of the program's concepts and interfaces
+    // should eliminate this dependency.
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
@@ -365,7 +382,13 @@ void test_row_major_store() {
 template <typename Element, typename WarpLayout, const int kRows,
           const int kCols, const bool kSwizzled>
 void test_col_major_store() {
-    using BaseShape = traits::BaseTileShape<Element>;
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape.
+    // Future refactoring of the program's concepts and interfaces should
+    // eliminate this dependency.
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
     const int kThreads = tl::get_numel<WarpLayout> * 32;
 
     // define tiles
@@ -602,33 +625,27 @@ TEST(TestSwizzledStored, test_row_major) {
     }
 }
 
-TEST(TestNonSwizzledStored, test_col_major) {
-    // static constexpr int kSwizzled = false;
+// TEST(TestNonSwizzledStored, test_col_major) {
+//     static constexpr int kSwizzled = false;
 
-    // test_col_major_store<__half, tl::RowMajor<1, 1>, 64, 16, kSwizzled>();
+//     test_col_major_store<__half, tl::RowMajor<1, 1>, 64, 16, kSwizzled>();
 
-    // test_col_major_store<__half, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
-    // test_col_major_store<__half, tl::RowMajor<2, 1>, 32, 32, kSwizzled>();
-    // test_col_major_store<__half, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
-    // test_col_major_store<__half, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+//     test_col_major_store<__half, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+//     test_col_major_store<__half, tl::RowMajor<2, 1>, 32, 32, kSwizzled>();
+//     test_col_major_store<__half, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
+//     test_col_major_store<__half, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
 
-    // FIXME(ying): temporarily disable the test to refactor the copy.
-    // Make sure all the unit tests pass after the refactor.
-    // test_col_major_store<float, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
-    // test_col_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
-    // test_col_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
-    // test_col_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
-}
+//     test_col_major_store<float, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+//     test_col_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
+//     test_col_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
+//     test_col_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+// }
 
-TEST(TestSwizzledStored, test_col_major) {
-    // FIXME(ying): temporarily disable the test to refactor the copy.
-    // Make sure all the unit tests pass after the refactor.
-
-    //     static constexpr int kSwizzled = true;
-    //     test_col_major_store<float, tl::RowMajor<1, 1>, 16, 16,
-    //     kSwizzled>(); test_col_major_store<float, tl::RowMajor<2, 1>, 64,
-    //     32, kSwizzled>(); test_col_major_store<float, tl::RowMajor<1, 2>,
-    //     128, 64, kSwizzled>(); test_col_major_store<float,
-    //     tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
-}
+// TEST(TestSwizzledStored, test_col_major) {
+//     static constexpr int kSwizzled = true;
+//     test_col_major_store<float, tl::RowMajor<1, 1>, 16, 16, kSwizzled>();
+//     test_col_major_store<float, tl::RowMajor<2, 1>, 64, 32, kSwizzled>();
+//     test_col_major_store<float, tl::RowMajor<1, 2>, 128, 64, kSwizzled>();
+//     test_col_major_store<float, tl::RowMajor<2, 2>, 64, 64, kSwizzled>();
+// }
 }  // namespace tilefusion::testing

@@ -3,9 +3,6 @@
 
 #pragma once
 
-#include "config.hpp"
-#include "cuda_utils.hpp"
-
 namespace tilefusion::cell::copy {
 
 /**

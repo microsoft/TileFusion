@@ -54,7 +54,13 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape.
+    // Future refactoring of the program's concepts and interfaces should
+    // eliminate this dependency.
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
     static constexpr int kSharedRowStride = Shared::kRowStride;
     Shared shared_tile;
 };
@@ -99,7 +105,13 @@ struct SharedToRegLoaderImpl<Shared, Reg_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape.
+    // Future refactoring of the program's concepts and interfaces should
+    // eliminate this dependency.
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
     static constexpr int kSharedColStride = Shared::kColStride;
     Shared shared_tile;
 };
@@ -158,7 +170,13 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape.
+    // Future refactoring of the program's concepts and interfaces should
+    // eliminate this dependency.
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
     using PackedType =
         typename Packing<DType, StoreMat::kElemPerSeg>::PackedType;
 
@@ -219,7 +237,13 @@ struct RegToSharedStorerImpl<Reg_, Shared_, kRowExec_, kColExec_,
     }
 
   private:
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape.
+    // Future refactoring of the program's concepts and interfaces should
+    // eliminate this dependency.
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
     using PackedType =
         typename Packing<DType, StoreMat::kElemPerSeg>::PackedType;
 
@@ -240,7 +264,9 @@ struct SharedToRegLoader {
     using WarpLayout = WarpLayout_;
     static constexpr WarpReuse kMode = kMode_;
 
-    using BaseShape = traits::BaseTileShape<DType>;
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     // how many times a `BaseTile` is executed along the row and column
     // direction.
@@ -292,7 +318,12 @@ struct RegToSharedStorer {
     using DType = typename Reg::DType::DType;
     using WarpLayout = WarpLayout_;
 
-    using BaseShape = traits::BaseTileShape<DType>;
+    // FIXME(ying): Address the unnatural dependency on the MMA atom caused by
+    // BaseShape. Future refactoring of the program's concepts and interfaces
+    // should eliminate this dependency.
+    using MmaAtom =
+        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using BaseShape = MmaAtom::BaseTile;
 
     // how many times a `BaseTile` is executed along the row and column
     // direction.

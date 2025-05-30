@@ -4,6 +4,7 @@
 #include "common/test_utils.hpp"
 #include "types/mod.hpp"
 
+#include <glog/logging.h>
 #include <thrust/host_vector.h>
 
 namespace tilefusion::testing {

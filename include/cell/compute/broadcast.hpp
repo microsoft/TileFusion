@@ -156,7 +156,6 @@ struct BroadcastScalar {
         Functor f;
         for (int i = 0; i < kRows; ++i) {
             for (int j = 0; j < kCols; ++j) {
-                // src(i, j), scalar, dst(i, j) have the same data type.
                 f(src(i, j), scalar, dst(i, j));
             }
         }

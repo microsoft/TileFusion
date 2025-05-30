@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include "cuda_utils.hpp"
-#include "traits/base.hpp"
 #include "types/layout.hpp"
 #include "types/tile_shape.hpp"
 

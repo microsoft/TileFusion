@@ -2,8 +2,7 @@
 // Licensed under the MIT License.
 
 #pragma once
-#include "config.hpp"
-#include "cuda_utils.hpp"
+
 #include "traits/base.hpp"
 #include "util/math_utils.hpp"
 
@@ -48,7 +47,9 @@ struct MatrixLayoutPrettyPrinter {
 }  // namespace
 
 template <const int kRows_, const int kCols_, const int kRowStride_,
-          const int kColStride_>
+          const int kColStride_,
+          const Layout kType_ =
+              kColStride_ == 1 ? Layout::kRowMajor : Layout::kColMajor>
 struct MatrixLayout {
     static constexpr int kRows = kRows_;
     static constexpr int kCols = kCols_;
@@ -58,8 +59,7 @@ struct MatrixLayout {
 
     static constexpr int kNumel = kRows * kCols;
 
-    static constexpr Layout kType =
-        kColStride == 1 ? Layout::kRowMajor : Layout::kColMajor;
+    static constexpr Layout kType = kType_;
 
     HOST_DEVICE int operator()(int i, int j) const {
         return i * kRowStride + j * kColStride;
@@ -69,10 +69,10 @@ struct MatrixLayout {
 /// @brief Pretty printer for the static shape information of a MatrixLayout.
 ///        Note: This printer function works ONLY on the host.
 template <const int kRows, const int kCols, const int kRowStride,
-          const int kColStride>
+          const int kColStride, const Layout kType>
 static HOST std::ostream& operator<<(
     std::ostream& out,
-    const MatrixLayout<kRows, kCols, kRowStride, kColStride>& layout) {
+    const MatrixLayout<kRows, kCols, kRowStride, kColStride, kType>& layout) {
     MatrixLayoutPrettyPrinter::print(out, layout);
     return out;
 }
@@ -118,6 +118,14 @@ struct is_col_major {
     static constexpr bool value = Layout_::kType == Layout::kColMajor;
 };
 
+template <typename Layout>
+struct is_contiguous {
+    static constexpr bool value =
+        is_row_major<Layout>::value
+            ? (Layout::kRowStride == Layout::kCols && Layout::kColStride == 1)
+            : (Layout::kColStride == Layout::kRows && Layout::kRowStride == 1);
+};
+
 template <typename OuterLayout_, typename InnerLayout_>
 struct BlockMatrxLayout {
     using InnerLayout = InnerLayout_;
@@ -125,6 +133,7 @@ struct BlockMatrxLayout {
 
     static constexpr int kRows = OuterLayout_::kRows;
     static constexpr int kCols = OuterLayout_::kCols;
+    static constexpr int kNumel = OuterLayout_::kNumel;
 
     static constexpr int kInnerRows = InnerLayout_::kRows;
     static constexpr int kInnerCols = InnerLayout_::kCols;
@@ -140,17 +149,21 @@ struct BlockMatrxLayout {
     static constexpr int kTileRows = kRows / kInnerRows;
     static constexpr int kTileCols = kCols / kInnerCols;
 
-    static constexpr int kRowStride = is_row_major<OuterLayout>::value
-                                          ? kTileCols * kInnerNumel
-                                          : kInnerNumel;
-    static constexpr int kColStride = is_row_major<OuterLayout>::value
-                                          ? kInnerNumel
-                                          : kTileRows * kInnerNumel;
+    static constexpr bool kIsRowMajor = is_row_major<OuterLayout>::value;
+    static constexpr bool kIsContiguous = is_contiguous<OuterLayout>::value;
+
+    static constexpr int kRowStride =
+        kIsContiguous ? (kIsRowMajor ? kTileCols * kInnerNumel : kInnerNumel)
+                      : OuterLayout::kRowStride;
+    static constexpr int kColStride =
+        kIsContiguous ? (kIsRowMajor ? kInnerNumel : kTileRows * kInnerNumel)
+                      : OuterLayout::kColStride;
 
     HOST_DEVICE int operator()(int i, int j) const {
         const int outer_i = RowDivMod::div(i);
-        const int inner_i = RowDivMod::mod(i);
         const int outer_j = ColDivMod::div(j);
+
+        const int inner_i = RowDivMod::mod(i);
         const int inner_j = ColDivMod::mod(j);
 
         return outer_(outer_i, outer_j) + inner_(inner_i, inner_j);
@@ -165,6 +178,8 @@ struct BlockMatrxLayout {
         }
     }
 
+    HOST auto get_outer_layout() const { return decltype(outer_){}; }
+
   private:
     static constexpr bool kInnerRowsIsPow2 =
         (kInnerRows & (kInnerRows - 1)) == 0;
@@ -174,12 +189,23 @@ struct BlockMatrxLayout {
     using RowDivMod = DivModSelector<kInnerRowsIsPow2, kInnerRows>;
     using ColDivMod = DivModSelector<kInnerColsIsPow2, kInnerCols>;
 
-    using BlockOuter =
-        MatrixLayout<kTileRows, kTileCols, kRowStride, kColStride>;
+    using BlockOuter = MatrixLayout<kTileRows, kTileCols, kRowStride,
+                                    kColStride, OuterLayout::kType>;
     BlockOuter outer_;
-
     InnerLayout inner_;
 };
+
+/// @brief Pretty printer for BlockMatrxLayout
+template <typename OuterLayout_, typename InnerLayout_>
+static HOST std::ostream& operator<<(
+    std::ostream& out,
+    const BlockMatrxLayout<OuterLayout_, InnerLayout_>& layout) {
+    out << "BlockMatrixLayout {" << std::endl
+        << "    Outer: " << layout.get_outer_layout() << ", " << std::endl
+        << "    Inner: " << InnerLayout_{} << std::endl
+        << "  }";
+    return out;
+}
 
 template <typename OuterLayout_, typename InnerLayout_>
 concept BlockRowMajorLayout =

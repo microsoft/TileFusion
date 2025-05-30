@@ -145,6 +145,16 @@ struct SwizzledLayout<Layout_, Swizzle_, tl::Layout::kColMajor> {
     Layout layout_;
 };
 
+/// @brief Pretty printer for SwizzledLayout
+template <typename Layout_, typename Swizzle_, const tl::Layout kType_>
+static HOST std::ostream& operator<<(
+    std::ostream& out,
+    const SwizzledLayout<Layout_, Swizzle_, kType_>& layout) {
+    out << "SwizzledLayout { " << Layout_{} << ", Swizzle<" << Swizzle_::Bbits
+        << ", " << Swizzle_::Mbits << ", " << Swizzle_::Sbits << "> }";
+    return out;
+}
+
 /**
  * @brief The base tile shape for Swizzle<3, 3, 3>.
  */

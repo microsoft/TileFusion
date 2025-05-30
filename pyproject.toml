@@ -9,7 +9,7 @@ authors = [
 description = "TileFusion: Simplifying Kernel Fusion with Tile Processing"
 readme = "README.md"
 requires-python = ">=3.9"
-license = "MIT"
+license = {text = "MIT"}
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
