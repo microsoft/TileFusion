@@ -18,7 +18,7 @@
 
 typedef __nv_bfloat16 __bfloat16;
 
-namespace tilefusion::traits {
+namespace tilefusion::cell {
 
 template <typename Element>
 concept BaseType =
@@ -69,4 +69,4 @@ struct BaseTileShape {
     static constexpr int kCols = 16;
     static constexpr int kNumel = 256 /* kRows * kCols */;
 };
-}  // namespace tilefusion::traits
+}  // namespace tilefusion::cell
