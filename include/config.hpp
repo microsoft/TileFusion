@@ -22,11 +22,8 @@
 #endif
 
 // FP8 support requires CUDA 11.8+ AND Ada Lovelace (8.9+) or Hopper (9.0+)
-// architecture
-#if defined(__CUDA_ARCH__) &&                                      \
-    (__CUDACC_VER_MAJOR__ >= 12 ||                                 \
-     (__CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ >= 8)) && \
-    (__CUDA_ARCH__ >= 890)  // Ada Lovelace (8.9) or Hopper (9.0+)
+// architecture. The hardware support is detected at build time by CMake.
+#if defined(CUDA_FP8_HARDWARE_AVAILABLE) && CUDA_FP8_HARDWARE_AVAILABLE == 1
     #include <cuda_fp8.h>
     #define CUDA_FP8_AVAILABLE 1
 #endif
