@@ -6,7 +6,7 @@
 #include <cute/container/tuple.hpp>
 #include <cute/int_tuple.hpp>
 
-namespace tilefusion::cell {
+namespace tilefusion {
 
 template <size_t... Ns>
 struct TileShape {
@@ -29,4 +29,4 @@ inline static constexpr size_t dim_size = cute::get<I>(TileShape::shape);
 
 struct Underscore {};                  // dummy type for underscore
 static const __device__ Underscore _;  // for slicing
-}  // namespace tilefusion::cell
+}  // namespace tilefusion

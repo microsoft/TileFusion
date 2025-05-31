@@ -5,7 +5,7 @@
 #include "types/layout.hpp"
 #include "types/tile_shape.hpp"
 
-namespace tilefusion::cell {
+namespace tilefusion {
 namespace tl = tile_layout;
 
 namespace {
@@ -30,7 +30,7 @@ struct WarpBaseTileShape;
 
 template <typename DType, typename TileShape>
 struct WarpBaseTileShape<DType, TileShape, tl::Layout::kRowMajor> {
-    using AccessInfo = traits::AccessBase<DType>;
+    using AccessInfo = AccessBase<DType>;
 
     static constexpr int kTileRows = dim_size<0, TileShape>;
     static constexpr int kTileCols = dim_size<1, TileShape>;
@@ -73,7 +73,7 @@ struct WarpBaseTileShape<DType, TileShape, tl::Layout::kRowMajor> {
 
 template <typename DType, typename TileShape>
 struct WarpBaseTileShape<DType, TileShape, tl::Layout::kColMajor> {
-    using AccessInfo = traits::AccessBase<DType>;
+    using AccessInfo = AccessBase<DType>;
 
     static constexpr int kTileRows = dim_size<0, TileShape>;
     static constexpr int kTileCols = dim_size<1, TileShape>;
@@ -123,4 +123,4 @@ static HOST std::ostream& operator<<(
     BaseTilePrettyPrinter::print(out, tile);
     return out;
 }
-}  // namespace tilefusion::cell
+}  // namespace tilefusion

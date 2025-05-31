@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "traits/base.hpp"
+#include "types/base.hpp"
 
 namespace tilefusion::jit {
 template <typename DType>

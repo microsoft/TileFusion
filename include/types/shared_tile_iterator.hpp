@@ -7,9 +7,9 @@
 #include "types/shared.hpp"
 #include "types/tile_shape.hpp"
 
-namespace tilefusion::cell {
+namespace tilefusion {
 namespace tl = tile_layout;
-using namespace compute;
+using namespace cell::compute;
 
 namespace {
 /// @brief Helper for pretty printing a tile iterator's static shape-related
@@ -93,8 +93,7 @@ class STileIterator {
 
     // FIXME(ying): a hotfix. The akwared dependencies on mma will be removed
     // in future refactor.
-    using MmaAtom =
-        compute::MmaAtom<__half, __half, __half, compute::MMA_ATOM_16x16x16>;
+    using MmaAtom = MmaAtom<__half, __half, __half, MMA_ATOM_16x16x16>;
     using BaseShape = typename MmaAtom::BaseTile;
 
     static constexpr int kChunkRows = dim_size<0, ChunkShape>;
@@ -302,4 +301,4 @@ static HOST std::ostream& operator<<(
     STileIterator2PrettyPrinter::print(out, itr);
     return out;
 }
-}  // namespace tilefusion::cell
+}  // namespace tilefusion

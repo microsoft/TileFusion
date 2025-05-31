@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "traits/base.hpp"
+#include "types/base.hpp"
 #include "util/math_utils.hpp"
 
 #include <iostream>

@@ -3,15 +3,13 @@
 
 #pragma once
 
-#include "traits/base.hpp"
+#include "types/base.hpp"
 #include "types/layout.hpp"
 #include "types/swizzle.hpp"
 #include "util/print.hpp"
 
-namespace tilefusion::cell {
+namespace tilefusion {
 namespace tl = tile_layout;
-
-using namespace tilefusion::traits;
 
 namespace {
 
@@ -111,7 +109,7 @@ class SharedTile {
         return swizzle_offset(offset);
     }
 
-    DEVICE void dump_value() { print_tile(data_, layout_); }
+    DEVICE void dump_value() { util::print_tile(data_, layout_); }
 
   private:
     DType* data_;
@@ -162,4 +160,4 @@ static HOST std::ostream& operator<<(
     return out;
 }
 
-}  // namespace tilefusion::cell
+}  // namespace tilefusion

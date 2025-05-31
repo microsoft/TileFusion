@@ -3,7 +3,7 @@
 
 #include "kernels/dispatch_macros.hpp"
 #include "kernels/ops.hpp"
-#include "traits/base.hpp"
+#include "types/base.hpp"
 
 namespace tilefusion::kernels {
 
