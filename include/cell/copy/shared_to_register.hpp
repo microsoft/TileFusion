@@ -3,7 +3,6 @@
 #pragma once
 
 #include "cell/copy/mod.hpp"
-#include "traits/base.hpp"
 #include "types/mod.hpp"
 
 namespace tilefusion::cell::copy {

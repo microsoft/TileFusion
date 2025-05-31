@@ -3,13 +3,10 @@
 
 #pragma once
 
-#include "cuda_utils.hpp"
-#include "traits/base.hpp"
+#include "types/base.hpp"
 #include "types/layout.hpp"
 
-namespace tilefusion::cell {
-
-using namespace tilefusion::traits;
+namespace tilefusion {
 namespace tl = tile_layout;
 
 /**
@@ -216,4 +213,4 @@ struct SwizzleBaseTileShape<float, 64> {
     static constexpr int S = 2;
 };
 
-}  // namespace tilefusion::cell
+}  // namespace tilefusion

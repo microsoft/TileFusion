@@ -3,8 +3,7 @@
 
 #pragma once
 
-#include "cuda_utils.hpp"
-#include "util/fp8_utils.hpp"
+#include "types/base.hpp"
 
 namespace tilefusion::cell::compute {
 
@@ -181,20 +180,20 @@ struct Convert<__half, float> {
 template <>
 struct Convert<float, __nv_fp8_e4m3> {
     DEVICE __nv_fp8_e4m3 operator()(float a) const {
-        return util::from_float<__nv_fp8_e4m3>(a);
+        return from_float<__nv_fp8_e4m3>(a);
     }
 
     DEVICE void operator()(const float& src, __nv_fp8_e4m3& dst) {
-        dst = util::from_float<__nv_fp8_e4m3>(src);
+        dst = from_float<__nv_fp8_e4m3>(src);
     }
 };
 
 template <>
 struct Convert<__nv_fp8_e4m3, float> {
-    DEVICE float operator()(__nv_fp8_e4m3 a) const { return util::to_float(a); }
+    DEVICE float operator()(__nv_fp8_e4m3 a) const { return to_float(a); }
 
     DEVICE void operator()(const __nv_fp8_e4m3& src, float& dst) {
-        dst = util::to_float(src);
+        dst = to_float(src);
     }
 };
 
@@ -202,20 +201,20 @@ struct Convert<__nv_fp8_e4m3, float> {
 template <>
 struct Convert<float, __nv_fp8_e5m2> {
     DEVICE __nv_fp8_e5m2 operator()(float a) const {
-        return util::from_float<__nv_fp8_e5m2>(a);
+        return from_float<__nv_fp8_e5m2>(a);
     }
 
     DEVICE void operator()(const float& src, __nv_fp8_e5m2& dst) {
-        dst = util::from_float<__nv_fp8_e5m2>(src);
+        dst = from_float<__nv_fp8_e5m2>(src);
     }
 };
 
 template <>
 struct Convert<__nv_fp8_e5m2, float> {
-    DEVICE float operator()(__nv_fp8_e5m2 a) const { return util::to_float(a); }
+    DEVICE float operator()(__nv_fp8_e5m2 a) const { return to_float(a); }
 
     DEVICE void operator()(const __nv_fp8_e5m2& src, float& dst) {
-        dst = util::to_float(src);
+        dst = to_float(src);
     }
 };
     #endif  // CUDA_FP8_AVAILABLE

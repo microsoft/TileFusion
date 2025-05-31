@@ -3,11 +3,10 @@
 
 #pragma once
 
-#include "cuda_utils.hpp"
 #include "types/layout.hpp"
 #include "util/print.hpp"
 
-namespace tilefusion::cell {
+namespace tilefusion {
 namespace tl = tile_layout;
 
 namespace {
@@ -115,7 +114,7 @@ class RegTile {
     }
 
     DEVICE void dump_value() const {
-        print_tile(const_cast<DType*>(data_), layout_);
+        util::print_tile(const_cast<DType*>(data_), layout_);
     }
 
     DEVICE void clear() { clear_impl<DType>(data_, kNumel); }
@@ -145,4 +144,4 @@ static HOST std::ostream& operator<<(std::ostream& out,
     return out;
 }
 
-}  // namespace tilefusion::cell
+}  // namespace tilefusion

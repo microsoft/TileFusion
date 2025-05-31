@@ -20,7 +20,7 @@ template <typename InType_, typename AccType_, typename WarpLayout,  //
 struct KeGemmTraits {
     using InType = InType_;
     using AccType = AccType_;
-    using BaseShape = traits::BaseTileShape<InType>;
+    using BaseShape = BaseTileShape<InType>;
     static constexpr int kNumStages = kNumStages_;
 
     static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;

@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include "traits/base.hpp"
+#include "types/base.hpp"
 #include "types/layout.hpp"
 
 namespace tilefusion::cell::copy::atom {
@@ -150,7 +150,7 @@ DEVICE void ld_shared_st_global<16>(void* dst, uint32_t src) {
 }  // namespace
 
 template <typename Element>
-    requires traits::HalfType<Element>
+    requires HalfType<Element>
 struct LoadMatBase {
     using DType = Element;
     using ThreadLayout = tile_layout::ColMajor<16, 2>;

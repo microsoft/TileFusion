@@ -2,8 +2,8 @@
 // Licensed under the MIT License.
 
 #include "common/test_utils.hpp"
+#include "types/base.hpp"
 #include "types/mod.hpp"
-#include "util/fp8_utils.hpp"
 
 /// @brief Device kernel for testing FP8 operations (must be at global scope)
 __global__ void fp8_conversion_kernel(const float* input, void* output_e4m3,
@@ -50,15 +50,13 @@ TEST(TestFP8, test_fp8_utility_functions) {
     float original = 1.5f;
 
     // Test E4M3 conversions
-    __nv_fp8_e4m3 e4m3_val =
-        tilefusion::util::from_float<__nv_fp8_e4m3>(original);
-    float e4m3_result = tilefusion::util::to_float(e4m3_val);
+    __nv_fp8_e4m3 e4m3_val = from_float<__nv_fp8_e4m3>(original);
+    float e4m3_result = to_float(e4m3_val);
     EXPECT_NEAR(e4m3_result, original, 0.01f);
 
     // Test E5M2 conversions
-    __nv_fp8_e5m2 e5m2_val =
-        tilefusion::util::from_float<__nv_fp8_e5m2>(original);
-    float e5m2_result = tilefusion::util::to_float(e5m2_val);
+    __nv_fp8_e5m2 e5m2_val = from_float<__nv_fp8_e5m2>(original);
+    float e5m2_result = to_float(e5m2_val);
     EXPECT_NEAR(e5m2_result, original, 0.01f);
 }
 
@@ -86,17 +84,17 @@ TEST(TestFP8, test_fp8_arithmetic) {
 /// @brief Test FP8 type traits
 TEST(TestFP8, test_fp8_traits) {
     // Test that FP8 types satisfy BaseType concept
-    static_assert(tilefusion::traits::BaseType<__nv_fp8_e4m3>);
-    static_assert(tilefusion::traits::BaseType<__nv_fp8_e5m2>);
+    static_assert(BaseType<__nv_fp8_e4m3>);
+    static_assert(BaseType<__nv_fp8_e5m2>);
 
     // Test that FP8 types satisfy Fp8Type concept
-    static_assert(tilefusion::traits::Fp8Type<__nv_fp8_e4m3>);
-    static_assert(tilefusion::traits::Fp8Type<__nv_fp8_e5m2>);
+    static_assert(Fp8Type<__nv_fp8_e4m3>);
+    static_assert(Fp8Type<__nv_fp8_e5m2>);
 
     // Test that other types don't satisfy Fp8Type concept
-    static_assert(!tilefusion::traits::Fp8Type<float>);
-    static_assert(!tilefusion::traits::Fp8Type<__half>);
-    static_assert(!tilefusion::traits::Fp8Type<__bfloat16>);
+    static_assert(!Fp8Type<float>);
+    static_assert(!Fp8Type<__half>);
+    static_assert(!Fp8Type<__bfloat16>);
 }
 
 /// @brief Test precision and range characteristics
@@ -144,10 +142,8 @@ TEST(TestFP8, test_fp8_device_operations) {
     cudaMalloc(&d_fp8_e4m3, size * sizeof(__nv_fp8_e4m3));
     cudaMalloc(&d_fp8_e5m2, size * sizeof(__nv_fp8_e5m2));
 
-    // Copy input to device
     cudaMemcpy(d_input, h_input.data(), bytes, cudaMemcpyHostToDevice);
 
-    // Launch kernel
     dim3 block(256);
     dim3 grid((size + block.x - 1) / block.x);
     fp8_conversion_kernel<<<grid, block>>>(
@@ -168,7 +164,6 @@ TEST(TestFP8, test_fp8_device_operations) {
             << "E5M2 mismatch at index " << i;
     }
 
-    // Cleanup
     cudaFree(d_input);
     cudaFree(d_result_e4m3);
     cudaFree(d_result_e5m2);
@@ -181,8 +176,8 @@ TEST(TestFP8, test_fp8_device_operations) {
 /// @brief Test that runs when FP8 is not available
 TEST(TestFP8, test_fp8_not_available) {
     // This test ensures that the build works even when FP8 is not available
-    GTEST_SKIP() << "FP8 support not available - requires Ada Lovelace (RTX "
-                    "4090) or Hopper (H100) GPU with CUDA 11.8+";
+    GTEST_SKIP() << "FP8 support not available - requires Ada Lovelace or "
+                    "Hopper GPU with CUDA 11.8+";
 }
 
 #endif  // CUDA_FP8_AVAILABLE

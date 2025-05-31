@@ -3,7 +3,6 @@
 #pragma once
 
 #include "cell/copy/mod.hpp"
-#include "traits/base.hpp"
 #include "types/mod.hpp"
 
 namespace tilefusion::cell::copy {
@@ -77,11 +76,9 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     }
 
   private:
-    static constexpr int kNumPerAccess =
-        traits::AccessBase<DType>::kNumPerAccess;
+    static constexpr int kNumPerAccess = AccessBase<DType>::kNumPerAccess;
 
-    static constexpr int kAccessInBytes =
-        traits::AccessBase<DType>::kAccessInBytes;
+    static constexpr int kAccessInBytes = AccessBase<DType>::kAccessInBytes;
 
     using SrcLayout = tl::MatrixLayout<kRowExec, kColExec,
                                        BaseShape::kRows * Global::kRowStride,
@@ -168,11 +165,9 @@ struct GlobalToSharedLoaderImpl<Global_, Shared_, BaseShape_, kRowExec_,
     }
 
   private:
-    static constexpr int kNumPerAccess =
-        traits::AccessBase<DType>::kNumPerAccess;
+    static constexpr int kNumPerAccess = AccessBase<DType>::kNumPerAccess;
 
-    static constexpr int kAccessInBytes =
-        traits::AccessBase<DType>::kAccessInBytes;
+    static constexpr int kAccessInBytes = AccessBase<DType>::kAccessInBytes;
 
     using SrcLayout = tl::MatrixLayout<kRowExec, kColExec, BaseShape::kRows,
                                        BaseShape::kCols * Global::kColStride>;
@@ -257,8 +252,7 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape_, kRowExec_,
     }
 
   private:
-    static constexpr int kAccessInBytes =
-        traits::AccessBase<DType>::kAccessInBytes;
+    static constexpr int kAccessInBytes = AccessBase<DType>::kAccessInBytes;
 
     using DstLayout = tl::MatrixLayout<kRowExec, kColExec,
                                        BaseShape::kRows * Global::kRowStride,
@@ -271,8 +265,7 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape_, kRowExec_,
     // consistent with those used in `SharedLayoutWrapper` within the
     // register-to-shared storer.
     static constexpr int kAccessInBits = 2 * int(sizeof(DType) * 8);
-    static constexpr int kNumPerAccess =
-        traits::AccessBase<DType>::kNumPerAccess;
+    static constexpr int kNumPerAccess = AccessBase<DType>::kNumPerAccess;
 
     using GlobalLayout = tl::MatrixLayout<BaseShape::kRows, BaseShape::kCols,
                                           Global::kRowStride, 1>;
@@ -342,8 +335,7 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape_, kRowExec_,
     }
 
   private:
-    static constexpr int kAccessInBytes =
-        traits::AccessBase<DType>::kAccessInBytes;
+    static constexpr int kAccessInBytes = AccessBase<DType>::kAccessInBytes;
 
     using DstLayout = tl::MatrixLayout<kRowExec, kColExec, BaseShape::kRows,
                                        BaseShape::kCols * Global::kColStride>;
@@ -355,8 +347,7 @@ struct SharedToGlobalStorerImpl<Shared_, Global_, BaseShape_, kRowExec_,
     // consistent with those used in `SharedLayoutWrapper` within the
     // register-to-shared storer.
     static constexpr int kAccessInBits = 2 * int(sizeof(DType) * 8);
-    static constexpr int kNumPerAccess =
-        traits::AccessBase<DType>::kNumPerAccess;
+    static constexpr int kNumPerAccess = AccessBase<DType>::kNumPerAccess;
 
     using GlobalLayout = tl::MatrixLayout<BaseShape::kRows, BaseShape::kCols, 1,
                                           Global::kColStride>;

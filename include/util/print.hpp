@@ -3,53 +3,15 @@
 
 #pragma once
 
-#include "traits/base.hpp"
+#include "types/base.hpp"
 #include "types/layout.hpp"
 #include "util/debug.hpp"
-#include "util/fp8_utils.hpp"
 
-namespace tilefusion::cell {
+namespace tilefusion::util {
 namespace tl = tile_layout;
 
-template <typename DType>
-DEVICE DType from_float(float v, DType vv) {
-    if constexpr (std::is_same<DType, __bfloat16>::value) {
-        return vv = __float2bfloat16(v);
-    } else if constexpr (std::is_same<DType, float>::value) {
-        return vv = v;
-#ifdef CUDA_FP8_AVAILABLE
-    } else if constexpr (std::is_same<DType, __nv_fp8_e4m3>::value) {
-        return vv = tilefusion::util::from_float<__nv_fp8_e4m3>(v);
-    } else if constexpr (std::is_same<DType, __nv_fp8_e5m2>::value) {
-        return vv = tilefusion::util::from_float<__nv_fp8_e5m2>(v);
-#endif
-    } else {
-        static_assert(std::is_same<DType, __half>::value);
-        return vv = __float2half(v);
-    }
-}
-
-template <typename DType>
-DEVICE float to_float(DType v) {
-    if constexpr (std::is_same<DType, __bfloat16>::value) {
-        return __bfloat162float(v);
-    } else if constexpr (std::is_same<DType, float>::value) {
-        return v;
-#ifdef CUDA_FP8_AVAILABLE
-    } else if constexpr (std::is_same<DType, __nv_fp8_e4m3>::value) {
-        return tilefusion::util::to_float(v);
-    } else if constexpr (std::is_same<DType, __nv_fp8_e5m2>::value) {
-        return tilefusion::util::to_float(v);
-#endif
-    } else {
-        static_assert(std::is_same<DType, __half>::value);
-        return __half2float(v);
-    }
-}
-
-namespace {
 template <typename DType, typename Layout>
-    requires traits::BaseType<DType>
+    requires BaseType<DType>
 DEVICE void print_numeric_tile(const DType* data, const Layout& layout) {
     for (int i = 0; i < Layout::kRows; ++i) {
         for (int j = 0; j < Layout::kCols; ++j)
@@ -59,7 +21,6 @@ DEVICE void print_numeric_tile(const DType* data, const Layout& layout) {
         if (i && (i + 1) % 16 == 0) printf("\n");
     }
 }
-}  // namespace
 
 /// @brief Print a tile of floating point numbers. NOTE: when
 //         use print in the device function, do add (if(thread0())) to avoid
@@ -196,4 +157,4 @@ struct RegTilePrinter<RegTile, tl::Layout::kRowMajor> {
     }
 };
 
-}  // namespace tilefusion::cell
+}  // namespace tilefusion::util

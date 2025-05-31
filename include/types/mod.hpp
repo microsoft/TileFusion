@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "types/base.hpp"
 #include "types/base_tile.hpp"
 #include "types/global.hpp"
 #include "types/global_tile_iterator.hpp"

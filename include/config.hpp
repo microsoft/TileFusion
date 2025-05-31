@@ -20,3 +20,13 @@
 #if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 800))
     #define CP_ASYNC_SM80_ENABLED
 #endif
+
+// FP8 support requires CUDA 11.8+ AND Ada Lovelace (8.9+) or Hopper (9.0+)
+// architecture
+#if defined(__CUDA_ARCH__) &&                                      \
+    (__CUDACC_VER_MAJOR__ >= 12 ||                                 \
+     (__CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ >= 8)) && \
+    (__CUDA_ARCH__ >= 890)  // Ada Lovelace (8.9) or Hopper (9.0+)
+    #include <cuda_fp8.h>
+    #define CUDA_FP8_AVAILABLE 1
+#endif
