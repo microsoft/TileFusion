@@ -9,7 +9,8 @@
 
 namespace tilefusion::testing {
 using namespace cell;
-using namespace copy::warp;
+using namespace copy;
+using namespace warp;
 namespace tl = tile_layout;
 
 namespace {
@@ -59,13 +60,14 @@ void run_test_row_major() {
     thrust::device_vector<Element> d_A = h_A;
 
     using SrcTile = GlobalTile<Element, tl::RowMajor<kRows, kCols>>;
+
     using DstTile = SharedTile<Element, tl::RowMajor<kRows, kCols>, kSwizzled,
                                kSharedAccessInBytes>;
 
-    using Loader = copy::GlobalToSharedLoader<DstTile, WarpLayout>;
+    using Loader = GlobalToSharedLoader<DstTile, WarpLayout>;
     Loader loader;
 
-    using Storer = copy::SharedToGlobalStorer<DstTile, WarpLayout>;
+    using Storer = SharedToGlobalStorer<DstTile, WarpLayout>;
     Storer storer;
 
     auto copy_kernel = copy_g2s<Element, SrcTile, DstTile, Loader, Storer>;

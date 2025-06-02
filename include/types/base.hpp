@@ -10,6 +10,11 @@
 
 typedef __nv_bfloat16 __bfloat16;
 
+#ifdef CUDA_FP8_AVAILABLE
+typedef __nv_fp8_e4m3 __fp8_e4m3;
+typedef __nv_fp8_e5m2 __fp8_e5m2;
+#endif
+
 namespace tilefusion {
 
 template <typename Element>
@@ -17,8 +22,8 @@ concept BaseType =
     std::is_same_v<Element, float> || std::is_same_v<Element, __half> ||
     std::is_same_v<Element, __bfloat16>
 #ifdef CUDA_FP8_AVAILABLE
-    || std::is_same_v<Element, __nv_fp8_e4m3> ||
-    std::is_same_v<Element, __nv_fp8_e5m2>
+    || std::is_same_v<Element, __fp8_e4m3> ||
+    std::is_same_v<Element, __fp8_e5m2>
 #endif
     ;
 
@@ -28,8 +33,8 @@ concept HalfType =
 
 #ifdef CUDA_FP8_AVAILABLE
 template <typename Element>
-concept Fp8Type = std::is_same_v<Element, __nv_fp8_e4m3> ||
-                  std::is_same_v<Element, __nv_fp8_e5m2>;
+concept Fp8Type =
+    std::is_same_v<Element, __fp8_e4m3> || std::is_same_v<Element, __fp8_e5m2>;
 #endif
 
 /// @brief Architecture-specific magic numbers.
@@ -67,13 +72,13 @@ struct BaseTileShape {
 /// constructors/conversions
 template <typename T>
 DEVICE T from_float(float val) {
-    if constexpr (std::is_same_v<T, __nv_fp8_e4m3>) {
-        return __nv_fp8_e4m3(val);
-    } else if constexpr (std::is_same_v<T, __nv_fp8_e5m2>) {
-        return __nv_fp8_e5m2(val);
+    if constexpr (std::is_same_v<T, __fp8_e4m3>) {
+        return __fp8_e4m3(val);
+    } else if constexpr (std::is_same_v<T, __fp8_e5m2>) {
+        return __fp8_e5m2(val);
     } else if constexpr (std::is_same_v<T, __half>) {
         return __float2half(val);
-    } else if constexpr (std::is_same_v<T, __nv_bfloat16>) {
+    } else if constexpr (std::is_same_v<T, __bfloat16>) {
         return __float2bfloat16(val);
     } else if constexpr (std::is_same_v<T, float>) {
         return val;
@@ -87,13 +92,13 @@ DEVICE T from_float(float val) {
 /// operators/conversions
 template <typename T>
 DEVICE float to_float(const T& val) {
-    if constexpr (std::is_same_v<T, __nv_fp8_e4m3>) {
+    if constexpr (std::is_same_v<T, __fp8_e4m3>) {
         return static_cast<float>(val);
-    } else if constexpr (std::is_same_v<T, __nv_fp8_e5m2>) {
+    } else if constexpr (std::is_same_v<T, __fp8_e5m2>) {
         return static_cast<float>(val);
     } else if constexpr (std::is_same_v<T, __half>) {
         return __half2float(val);
-    } else if constexpr (std::is_same_v<T, __nv_bfloat16>) {
+    } else if constexpr (std::is_same_v<T, __bfloat16>) {
         return __bfloat162float(val);
     } else if constexpr (std::is_same_v<T, float>) {
         return val;
@@ -110,7 +115,7 @@ template <typename T>
 DEVICE T from_float(float val) {
     if constexpr (std::is_same_v<T, __half>) {
         return __float2half(val);
-    } else if constexpr (std::is_same_v<T, __nv_bfloat16>) {
+    } else if constexpr (std::is_same_v<T, __bfloat16>) {
         return __float2bfloat16(val);
     } else if constexpr (std::is_same_v<T, float>) {
         return val;
@@ -125,7 +130,7 @@ template <typename T>
 DEVICE float to_float(const T& val) {
     if constexpr (std::is_same_v<T, __half>) {
         return __half2float(val);
-    } else if constexpr (std::is_same_v<T, __nv_bfloat16>) {
+    } else if constexpr (std::is_same_v<T, __bfloat16>) {
         return __bfloat162float(val);
     } else if constexpr (std::is_same_v<T, float>) {
         return val;

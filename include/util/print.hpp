@@ -35,8 +35,8 @@ DEVICE void print_tile(const DType* data, const Layout& layout) {
                   std::is_same<DType, __half>::value ||
                   std::is_same<DType, __bfloat16>::value
 #ifdef CUDA_FP8_AVAILABLE
-                  || std::is_same<DType, __nv_fp8_e4m3>::value ||
-                  std::is_same<DType, __nv_fp8_e5m2>::value
+                  || std::is_same<DType, __fp8_e4m3>::value ||
+                  std::is_same<DType, __fp8_e5m2>::value
 #endif
     ) {
         print_numeric_tile(data, layout);
