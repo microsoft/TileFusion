@@ -121,9 +121,14 @@ function(cuda_test TARGET_NAME)
   cmake_parse_arguments(cuda_test "${options}" "${oneValueArgs}"
                         "${multiValueArgs}" ${ARGN})
 
-  list(APPEND UT_SRCS "${PROJECT_SOURCE_DIR}/tests/cpp/test_unit.cc"
-       "${PROJECT_SOURCE_DIR}/src/cuda_utils.cc"
-       "${PROJECT_SOURCE_DIR}/tests/cpp/common/test_utils.cc" ${cuda_test_SRCS})
+  list(
+    APPEND
+    UT_SRCS
+    "${PROJECT_SOURCE_DIR}/tests/cpp/test_unit.cc"
+    "${PROJECT_SOURCE_DIR}/src/cuda_utils.cc"
+    "${PROJECT_SOURCE_DIR}/tests/cpp/common/test_utils.cc"
+    "${PROJECT_SOURCE_DIR}/src/cuda_info.cc"
+    ${cuda_test_SRCS})
 
   cuda_add_executable(${TARGET_NAME} ${UT_SRCS})
   target_link_libraries(${TARGET_NAME} ${cuda_test_DEPS} gtest glog::glog)

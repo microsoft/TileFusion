@@ -10,19 +10,17 @@ namespace tilefusion {
 namespace tl = tile_layout;
 
 namespace {
-
 /// @brief Helper for pretty printing a GlobalTile's static shape-related
 ///        information. This printer works ONLY on the host.
 struct GlobalTilePrettyPrinter {
   template <typename Global>
   static HOST void print(std::ostream& out, const Global& tile) {
     // parameter `tile` here is not used
-    out << layout_type_to_str(Global::kType) << "(" << Global::kRows << ", "
-        << Global::kCols << ", " << Global::kRowStride << ", "
-        << Global::kColStride << "), numel = " << Global::kNumel;
+    out << "GlobalTile {" << std::endl
+        << "  " << typename Global::Layout{} << std::endl
+        << "}";
   }
 };
-
 }  // namespace
 
 template <typename Element_, typename Layout_>

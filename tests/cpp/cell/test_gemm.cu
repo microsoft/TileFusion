@@ -16,13 +16,6 @@ using namespace cell::copy;
 namespace tl = tile_layout;
 
 namespace {
-float rand_float(float a = 1e-3, float b = 1) {
-  float random = ((float)rand()) / (float)RAND_MAX;
-  float diff = b - a;
-  float r = random * diff;
-  return a + r;
-}
-
 bool check_correctness(const half* hc1, const float* hc2, int row, int col) {
   int numel = row * col;
   bool pass_unittest = true;

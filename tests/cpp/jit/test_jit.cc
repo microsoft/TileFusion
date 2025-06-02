@@ -18,13 +18,6 @@ namespace tilefusion::testing {
 using namespace tilefusion::jit;
 
 namespace {
-float rand_float(float a = 1e-3, float b = 1) {
-  float random = ((float)rand()) / (float)RAND_MAX;
-  float diff = b - a;
-  float r = random * diff;
-  return a + r;
-}
-
 std::string generate_add_kernel_source(const std::string& dtype, int numel) {
   std::stringstream ss;
   ss << R"(

@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include "config.hpp"
-
 #include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -53,18 +51,5 @@ inline void __cublasCheck(const cublasStatus_t err, const char* file,
       throw std::runtime_error(err.str());                               \
     }                                                                    \
   } while (0)
-
-inline void check_gpu_memory() {
-  size_t free_byte;
-  size_t total_byte;
-  CUDA_CHECK(cudaMemGetInfo(&free_byte, &total_byte));
-
-  double free_db = (double)free_byte;
-  double total_db = (double)total_byte;
-  double used_db = total_db - free_db;
-  printf("GPU memory usage: used = %f MB, free = %f MB, total = %f MB\n",
-         used_db / 1024.0 / 1024.0, free_db / 1024.0 / 1024.0,
-         total_db / 1024.0 / 1024.0);
-}
 
 }  // namespace tilefusion

@@ -12,7 +12,6 @@ namespace tilefusion {
 namespace tl = tile_layout;
 
 namespace {
-
 /// @brief Helper for pretty printing a SharedTile's static shape-related
 ///        information. This printer works ONLY on the host.
 struct SharedTilePrettyPrinter {
@@ -27,6 +26,17 @@ struct SharedTilePrettyPrinter {
   }
 };
 
+/// @brief Helper for pretty printing a SharedTile's static shape-related
+///        information. This printer works ONLY on the host.
+struct SharedTileV2PrettyPrinter {
+  template <typename Shared>
+  static HOST void print(std::ostream& out, const Shared& tile) {
+    // parameter `tile` here is not used
+    out << "SharedTile {" << std::endl
+        << "  " << typename Shared::Layout{} << std::endl
+        << "}";
+  }
+};
 }  // namespace
 
 template <typename Element_, typename Layout_, const bool kSwizzled_ = false,
@@ -155,6 +165,57 @@ template <typename Element, typename Layout, const bool kSwizzled>
 static HOST std::ostream& operator<<(
     std::ostream& out, const SharedTile<Element, Layout, kSwizzled>& tile) {
   SharedTilePrettyPrinter::print(out, tile);
+  return out;
+}
+
+template <typename Element_, typename Layout_>
+class SharedTileV2 {
+ public:
+  using DType = Element_;
+  using Layout = Layout_;
+
+  // pre-computed values
+  static constexpr int kRows = Layout::kRows;
+  static constexpr int kCols = Layout::kCols;
+  static constexpr int kNumel = Layout::kNumel;
+
+  static constexpr tl::Layout kType = Layout::kType;
+  static constexpr bool isRowMajor = tl::is_row_major<Layout>::value;
+
+  DEVICE SharedTileV2() : data_(nullptr), layout_(Layout{}) {}
+
+  DEVICE SharedTileV2(DType* data) : data_(data), layout_(Layout{}) {}
+
+  DEVICE SharedTileV2(const DType* data)
+      : data_(const_cast<DType*>(data)), layout_(Layout{}) {}
+
+  DEVICE DType* mutable_data() { return data_; }
+
+  DEVICE const DType* data() const { return data_; }
+
+  HOST_DEVICE const Layout& layout() const { return layout_; }
+
+  // for write access
+  DEVICE DType& operator()(int x, int y) { return data_[layout_(x, y)]; }
+
+  // for read access
+  DEVICE const DType& operator()(int x, int y) const {
+    return data_[layout_(x, y)];
+  }
+
+  DEVICE void dump_value() { util::print_tile(data_, layout_); }
+
+ private:
+  DType* data_;
+  Layout layout_;
+};
+
+/// @brief Pretty printer for the static shape information of a SharedTile.
+///        Note: This printer function works ONLY on the host.
+template <typename Element, typename Layout>
+static HOST std::ostream& operator<<(
+    std::ostream& out, const SharedTileV2<Element, Layout>& tile) {
+  SharedTileV2PrettyPrinter::print(out, tile);
   return out;
 }
 
