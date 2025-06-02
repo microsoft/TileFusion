@@ -76,6 +76,38 @@ message(STATUS "tilefusion: CUDA detected: " ${CUDA_VERSION})
 message(STATUS "tilefusion: CUDA nvcc is: " ${CUDA_NVCC_EXECUTABLE})
 message(STATUS "tilefusion: CUDA toolkit directory: " ${CUDA_TOOLKIT_ROOT_DIR})
 
+# Detect GPU architecture for FP8 support
+if(${CUDA_VERSION_MAJOR} VERSION_GREATER_EQUAL "12"
+   OR (${CUDA_VERSION_MAJOR} VERSION_EQUAL "11" AND ${CUDA_VERSION_MINOR}
+                                                    VERSION_GREATER_EQUAL "8"))
+
+  cuda_select_nvcc_arch_flags(FP8_ARCH_FLAGS Auto)
+
+  set(FP8_SUPPORT_DETECTED FALSE)
+  string(REGEX MATCHALL "compute_([0-9]+)" COMPUTE_ARCHS "${FP8_ARCH_FLAGS}")
+  foreach(compute_arch ${COMPUTE_ARCHS})
+    string(REGEX REPLACE "compute_([0-9]+)" "\\1" arch_num "${compute_arch}")
+    if(arch_num GREATER_EQUAL 89)
+      set(FP8_SUPPORT_DETECTED TRUE)
+      message(
+        STATUS "tilefusion: FP8-capable architecture detected: sm_${arch_num}")
+      break()
+    endif()
+  endforeach()
+
+  if(FP8_SUPPORT_DETECTED)
+    message(STATUS "tilefusion: FP8 hardware support detected - enabling FP8")
+    add_compile_definitions(CUDA_FP8_HARDWARE_AVAILABLE=1)
+  else()
+    message(STATUS "tilefusion: FP8 hardware support NOT detected")
+    add_compile_definitions(CUDA_FP8_HARDWARE_AVAILABLE=0)
+  endif()
+else()
+  message(STATUS "tilefusion: CUDA version ${CUDA_VERSION} "
+                 "does not support FP8 (requires 11.8+)")
+  add_compile_definitions(CUDA_FP8_HARDWARE_AVAILABLE=0)
+endif()
+
 if(ENABLE_DEBUG)
   message(STATUS "tilefusion: Debug mode enabled")
   set(CMAKE_BUILD_TYPE Debug)

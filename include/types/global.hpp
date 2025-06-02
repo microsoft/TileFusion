@@ -6,7 +6,7 @@
 #include "types/layout.hpp"
 #include "util/print.hpp"
 
-namespace tilefusion::cell {
+namespace tilefusion {
 namespace tl = tile_layout;
 
 namespace {
@@ -62,7 +62,7 @@ struct GlobalTile {
     DEVICE
     const DType& operator()(int x, int y) const { return data_[layout_(x, y)]; }
 
-    DEVICE void dump_value() { print_tile(data_, layout_); }
+    DEVICE void dump_value() { util::print_tile(data_, layout_); }
 
   private:
     DType* data_;
@@ -78,4 +78,4 @@ static HOST std::ostream& operator<<(std::ostream& out,
     return out;
 }
 
-}  // namespace tilefusion::cell
+}  // namespace tilefusion

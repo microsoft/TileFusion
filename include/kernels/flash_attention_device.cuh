@@ -26,7 +26,7 @@ struct FlashAttentionTraits {
 
     static constexpr int kSharedAccess = 64;
 
-    using BaseShape = traits::BaseTileShape<InType>;
+    using BaseShape = BaseTileShape<InType>;
 
     static constexpr int kM = dim_size<0, WholeShape>;  // query length
     static constexpr int kN = dim_size<1, WholeShape>;  // key/value length

@@ -47,7 +47,7 @@ struct FusedTwoGemmsTraits {
     using SharedA = SharedTile<InType, tl::RowMajor<kTM, kTK>, kUseSwizzling,
                                kSharedAccess>;
 
-    using BaseShape = traits::BaseTileShape<InType>;
+    using BaseShape = BaseTileShape<InType>;
     static constexpr int kAMs = kTM / kWarpPerRow / BaseShape::kRows;
     static constexpr int kAKs = kTK / BaseShape::kCols;
     using RegA = RegTile<BaseTileRowMajor<InType>, tl::RowMajor<kAMs, kAKs>>;

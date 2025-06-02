@@ -6,7 +6,7 @@
 #include "types/global.hpp"
 #include "types/tile_shape.hpp"
 
-namespace tilefusion::cell {
+namespace tilefusion {
 namespace tl = tile_layout;
 
 namespace {
@@ -159,4 +159,4 @@ static HOST std::ostream& operator<<(
     return out;
 }
 
-}  // namespace tilefusion::cell
+}  // namespace tilefusion

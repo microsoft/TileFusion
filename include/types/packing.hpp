@@ -2,7 +2,7 @@
 
 #include "cuda_utils.hpp"
 
-namespace tilefusion::cell {
+namespace tilefusion {
 
 template <typename DType, const int kNums>
 struct Packing;
@@ -21,4 +21,4 @@ struct Packing<float, 2> {
     using PackedType = int2;
 };
 
-}  // namespace tilefusion::cell
+}  // namespace tilefusion

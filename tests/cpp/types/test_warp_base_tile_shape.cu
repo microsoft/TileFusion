@@ -5,8 +5,6 @@
 #include "types/base_tile.hpp"
 
 namespace tilefusion::testing {
-
-using namespace tilefusion::cell;
 namespace tl = tile_layout;
 
 TEST(InferAtomicWarpTile, test1_half_row_major) {
