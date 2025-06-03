@@ -18,8 +18,8 @@ __global__ void fp8_conversion_kernel(const float* input, void* output_e4m3,
         __nv_fp8_e5m2* e5m2_output = static_cast<__nv_fp8_e5m2*>(output_e5m2);
 
         // Convert float to FP8
-        e4m3_output[idx] = from_float<__nv_fp8_e4m3>(input[idx]);
-        e5m2_output[idx] = from_float<__nv_fp8_e5m2>(input[idx]);
+        e4m3_output[idx] = from_float<__fp8_e4m3>(input[idx]);
+        e5m2_output[idx] = from_float<__fp8_e5m2>(input[idx]);
 
         // Convert back to float
         result_e4m3[idx] = to_float(e4m3_output[idx]);
@@ -38,12 +38,12 @@ TEST(TestFP8, test_fp8_construction) {
     {
         // Test simple powers of 2 and small integers
         // usually exactly representable
-        __nv_fp8_e4m3 e4m3_val = from_float<__nv_fp8_e4m3>(2.0f);
+        __fp8_e4m3 e4m3_val = from_float<__fp8_e4m3>(2.0f);
         float e4m3_back = to_float(e4m3_val);
         printf("E4M3 (2.0): %f\n", e4m3_back);
         EXPECT_EQ(e4m3_back, 2.0f);  // Should be exact
 
-        __nv_fp8_e5m2 e5m2_val(4.0f);
+        __fp8_e5m2 e5m2_val(4.0f);
         float e5m2_back = static_cast<float>(e5m2_val);
         printf("E5M2 (4.0): %f\n", e5m2_back);
         EXPECT_EQ(e5m2_back, 4.0f);  // Should be exact
@@ -51,13 +51,13 @@ TEST(TestFP8, test_fp8_construction) {
 
     // Test edge cases
     {
-        __nv_fp8_e4m3 e4m3_zero(0.0f);
-        __nv_fp8_e5m2 e5m2_zero(0.0f);
+        __fp8_e4m3 e4m3_zero(0.0f);
+        __fp8_e5m2 e5m2_zero(0.0f);
         EXPECT_EQ(static_cast<float>(e4m3_zero), 0.0f);
         EXPECT_EQ(static_cast<float>(e5m2_zero), 0.0f);
 
-        __nv_fp8_e4m3 e4m3_one(1.0f);
-        __nv_fp8_e5m2 e5m2_one(1.0f);
+        __fp8_e4m3 e4m3_one(1.0f);
+        __fp8_e5m2 e5m2_one(1.0f);
         EXPECT_EQ(static_cast<float>(e4m3_one), 1.0f);
         EXPECT_EQ(static_cast<float>(e5m2_one), 1.0f);
     }
@@ -67,8 +67,8 @@ TEST(TestFP8, test_fp8_construction) {
 TEST(TestFP8, test_fp8_precision_characteristics) {
     {  // Test small values in the precise range
         float test_val = 0.5f;
-        __nv_fp8_e4m3 e4m3_val(test_val);
-        __nv_fp8_e5m2 e5m2_val(test_val);
+        __fp8_e4m3 e4m3_val(test_val);
+        __fp8_e5m2 e5m2_val(test_val);
 
         printf("Small value (0.5): E4M3=%f, E5M2=%f\n", to_float(e4m3_val),
                to_float(e5m2_val));
@@ -80,8 +80,8 @@ TEST(TestFP8, test_fp8_precision_characteristics) {
 
     {  // Test medium values (where precision loss starts)
         float test_val = 3.0f;  // Use a value more likely to be representable
-        __nv_fp8_e4m3 e4m3_val(test_val);
-        __nv_fp8_e5m2 e5m2_val(test_val);
+        __fp8_e4m3 e4m3_val(test_val);
+        __fp8_e5m2 e5m2_val(test_val);
 
         printf("Medium value (3.0): E4M3=%f, E5M2=%f\n", to_float(e4m3_val),
                to_float(e5m2_val));
@@ -93,8 +93,8 @@ TEST(TestFP8, test_fp8_precision_characteristics) {
 
     {  // Test larger values (significant quantization)
         float test_val = 9.0f;
-        __nv_fp8_e4m3 e4m3_val = from_float<__nv_fp8_e4m3>(test_val);
-        __nv_fp8_e5m2 e5m2_val = from_float<__nv_fp8_e5m2>(test_val);
+        __fp8_e4m3 e4m3_val = from_float<__fp8_e4m3>(test_val);
+        __fp8_e5m2 e5m2_val = from_float<__fp8_e5m2>(test_val);
 
         printf("Large value (8.0): E4M3=%f, E5M2=%f\n", to_float(e4m3_val),
                to_float(e5m2_val));
@@ -123,8 +123,8 @@ TEST(TestFP8, test_fp8_conversion_safety) {
 
     for (float val : test_values) {
         // Just test that conversion works without crashing
-        __nv_fp8_e4m3 e4m3_val = from_float<__nv_fp8_e4m3>(val);
-        __nv_fp8_e5m2 e5m2_val = from_float<__nv_fp8_e5m2>(val);
+        __fp8_e4m3 e4m3_val = from_float<__fp8_e4m3>(val);
+        __fp8_e5m2 e5m2_val = from_float<__fp8_e5m2>(val);
 
         float e4m3_back = to_float(e4m3_val);
         float e5m2_back = to_float(e5m2_val);
@@ -144,20 +144,20 @@ TEST(TestFP8, test_fp8_utility_functions) {
     float original = 1.5f;
 
     // Test E4M3 conversions
-    __nv_fp8_e4m3 e4m3_val = from_float<__nv_fp8_e4m3>(original);
+    __fp8_e4m3 e4m3_val = from_float<__fp8_e4m3>(original);
     float e4m3_result = to_float(e4m3_val);
     EXPECT_NEAR(e4m3_result, original, 0.01f);
 
     // Test E5M2 conversions
-    __nv_fp8_e5m2 e5m2_val = from_float<__nv_fp8_e5m2>(original);
+    __fp8_e5m2 e5m2_val = from_float<__fp8_e5m2>(original);
     float e5m2_result = to_float(e5m2_val);
     EXPECT_NEAR(e5m2_result, original, 0.01f);
 }
 
 /// @brief Test FP8 arithmetic operations (through float conversion)
 TEST(TestFP8, test_fp8_arithmetic) {
-    __nv_fp8_e4m3 a(3.0f);
-    __nv_fp8_e5m2 b(2.0f);
+    __fp8_e4m3 a(3.0f);
+    __fp8_e5m2 b(2.0f);
 
     // Convert to float for computation
     float a_float = to_float(a);
@@ -168,8 +168,8 @@ TEST(TestFP8, test_fp8_arithmetic) {
     float product = a_float * b_float;
 
     // Convert back to FP8
-    __nv_fp8_e4m3 sum_e4m3(sum);
-    __nv_fp8_e5m2 product_e5m2(product);
+    __fp8_e4m3 sum_e4m3(sum);
+    __fp8_e5m2 product_e5m2(product);
 
     EXPECT_NEAR(static_cast<float>(sum_e4m3), 5.0f, 0.1f);
     EXPECT_NEAR(static_cast<float>(product_e5m2), 6.0f, 0.1f);
@@ -178,12 +178,12 @@ TEST(TestFP8, test_fp8_arithmetic) {
 /// @brief Test FP8 type traits
 TEST(TestFP8, test_fp8_traits) {
     // Test that FP8 types satisfy BaseType concept
-    static_assert(BaseType<__nv_fp8_e4m3>);
-    static_assert(BaseType<__nv_fp8_e5m2>);
+    static_assert(BaseType<__fp8_e4m3>);
+    static_assert(BaseType<__fp8_e5m2>);
 
     // Test that FP8 types satisfy Fp8Type concept
-    static_assert(Fp8Type<__nv_fp8_e4m3>);
-    static_assert(Fp8Type<__nv_fp8_e5m2>);
+    static_assert(Fp8Type<__fp8_e4m3>);
+    static_assert(Fp8Type<__fp8_e5m2>);
 
     // Test that other types don't satisfy Fp8Type concept
     static_assert(!Fp8Type<float>);
@@ -217,14 +217,14 @@ TEST(TestFP8, test_fp8_device_operations) {
 
     // Device memory
     float *d_input, *d_result_e4m3, *d_result_e5m2;
-    __nv_fp8_e4m3* d_fp8_e4m3;
-    __nv_fp8_e5m2* d_fp8_e5m2;
+    __fp8_e4m3* d_fp8_e4m3;
+    __fp8_e5m2* d_fp8_e5m2;
 
     cudaMalloc(&d_input, bytes);
     cudaMalloc(&d_result_e4m3, bytes);
     cudaMalloc(&d_result_e5m2, bytes);
-    cudaMalloc(&d_fp8_e4m3, size * sizeof(__nv_fp8_e4m3));
-    cudaMalloc(&d_fp8_e5m2, size * sizeof(__nv_fp8_e5m2));
+    cudaMalloc(&d_fp8_e4m3, size * sizeof(__fp8_e4m3));
+    cudaMalloc(&d_fp8_e5m2, size * sizeof(__fp8_e5m2));
 
     cudaMemcpy(d_input, h_input.data(), bytes, cudaMemcpyHostToDevice);
 

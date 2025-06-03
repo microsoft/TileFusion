@@ -179,41 +179,41 @@ struct Convert<__half, float> {
 // FP8 E4M3 conversions
 template <>
 struct Convert<float, __nv_fp8_e4m3> {
-    DEVICE __nv_fp8_e4m3 operator()(float a) const {
-        return from_float<__nv_fp8_e4m3>(a);
+    DEVICE __fp8_e4m3 operator()(float a) const {
+        return from_float<__fp8_e4m3>(a);
     }
 
-    DEVICE void operator()(const float& src, __nv_fp8_e4m3& dst) {
-        dst = from_float<__nv_fp8_e4m3>(src);
+    DEVICE void operator()(const float& src, __fp8_e4m3& dst) {
+        dst = from_float<__fp8_e4m3>(src);
     }
 };
 
 template <>
-struct Convert<__nv_fp8_e4m3, float> {
-    DEVICE float operator()(__nv_fp8_e4m3 a) const { return to_float(a); }
+struct Convert<__fp8_e4m3, float> {
+    DEVICE float operator()(__fp8_e4m3 a) const { return to_float(a); }
 
-    DEVICE void operator()(const __nv_fp8_e4m3& src, float& dst) {
+    DEVICE void operator()(const __fp8_e4m3& src, float& dst) {
         dst = to_float(src);
     }
 };
 
 // FP8 E5M2 conversions
 template <>
-struct Convert<float, __nv_fp8_e5m2> {
-    DEVICE __nv_fp8_e5m2 operator()(float a) const {
-        return from_float<__nv_fp8_e5m2>(a);
+struct Convert<float, __fp8_e5m2> {
+    DEVICE __fp8_e5m2 operator()(float a) const {
+        return from_float<__fp8_e5m2>(a);
     }
 
-    DEVICE void operator()(const float& src, __nv_fp8_e5m2& dst) {
-        dst = from_float<__nv_fp8_e5m2>(src);
+    DEVICE void operator()(const float& src, __fp8_e5m2& dst) {
+        dst = from_float<__fp8_e5m2>(src);
     }
 };
 
 template <>
-struct Convert<__nv_fp8_e5m2, float> {
-    DEVICE float operator()(__nv_fp8_e5m2 a) const { return to_float(a); }
+struct Convert<__fp8_e5m2, float> {
+    DEVICE float operator()(__fp8_e5m2 a) const { return to_float(a); }
 
-    DEVICE void operator()(const __nv_fp8_e5m2& src, float& dst) {
+    DEVICE void operator()(const __fp8_e5m2& src, float& dst) {
         dst = to_float(src);
     }
 };

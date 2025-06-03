@@ -21,10 +21,10 @@ constexpr int get_rows<__half> = 1;
 
 #ifdef CUDA_FP8_AVAILABLE
 template <>
-constexpr int get_rows<__nv_fp8_e4m3> = 1;
+constexpr int get_rows<__fp8_e4m3> = 1;
 
 template <>
-constexpr int get_rows<__nv_fp8_e5m2> = 1;
+constexpr int get_rows<__fp8_e5m2> = 1;
 #endif
 
 template <typename DType>
@@ -38,10 +38,10 @@ constexpr int get_cols<__half> = 1;
 
 #ifdef CUDA_FP8_AVAILABLE
 template <>
-constexpr int get_cols<__nv_fp8_e4m3> = 1;
+constexpr int get_cols<__fp8_e4m3> = 1;
 
 template <>
-constexpr int get_cols<__nv_fp8_e5m2> = 1;
+constexpr int get_cols<__fp8_e5m2> = 1;
 #endif
 
 /// @brief Helper for pretty printing a register tile's static shape
@@ -64,12 +64,12 @@ DEVICE void clear(__half* data, int numel) {
 }
 
 #ifdef CUDA_FP8_AVAILABLE
-DEVICE void clear(__nv_fp8_e4m3* data, int numel) {
-    memset((void*)data, 0, sizeof(__nv_fp8_e4m3) * numel);
+DEVICE void clear(__fp8_e4m3* data, int numel) {
+    memset((void*)data, 0, sizeof(__fp8_e4m3) * numel);
 }
 
-DEVICE void clear(__nv_fp8_e5m2* data, int numel) {
-    memset((void*)data, 0, sizeof(__nv_fp8_e5m2) * numel);
+DEVICE void clear(__fp8_e5m2* data, int numel) {
+    memset((void*)data, 0, sizeof(__fp8_e5m2) * numel);
 }
 #endif
 
