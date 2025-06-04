@@ -10,15 +10,15 @@
 namespace tilefusion {
 
 DEVICE bool block(int bid) {
-    int id = blockIdx.x + blockIdx.y * gridDim.x +
-             blockIdx.z * gridDim.x * gridDim.y;
-    return id == bid;
+  int id =
+      blockIdx.x + blockIdx.y * gridDim.x + blockIdx.z * gridDim.x * gridDim.y;
+  return id == bid;
 }
 
 DEVICE bool thread(int tid, int bid) {
-    int id = threadIdx.x + threadIdx.y * blockDim.x +
-             threadIdx.z * blockDim.x * blockDim.y;
-    return id == tid && block(bid);
+  int id = threadIdx.x + threadIdx.y * blockDim.x +
+           threadIdx.z * blockDim.x * blockDim.y;
+  return id == tid && block(bid);
 }
 
 // usage, e.g.

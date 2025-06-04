@@ -38,111 +38,108 @@ std::string generate_kernel_wrapper(const std::string& kernel_name,
                                     int64_t n, int64_t k, int64_t p,
                                     int64_t tm = 64, int64_t tn = 64,
                                     int64_t tk = 64, int64_t tp = 64) {
-    std::stringstream ss;
+  std::stringstream ss;
 
-    ss << R"(
+  ss << R"(
 #include "kernels/fused_two_gemms_device.cuh"
 
 using namespace tilefusion::kernels;
 )";
 
-    ss << "\n// Fused two gemms configuration\n";
-    ss << "using Config = FusedTwoGemmsTraits<" << in_type << ", " << acc_type
-       << ", tl::RowMajor<2, 1>, " << m << ", " << n << ", " << k << ", " << p
-       << ", " << tm << ", " << tn << ", " << tk << ", " << tp << ">;\n\n";
+  ss << "\n// Fused two gemms configuration\n";
+  ss << "using Config = FusedTwoGemmsTraits<" << in_type << ", " << acc_type
+     << ", tl::RowMajor<2, 1>, " << m << ", " << n << ", " << k << ", " << p
+     << ", " << tm << ", " << tn << ", " << tk << ", " << tp << ">;\n\n";
 
-    ss << "// Kernel function\n";
-    ss << "extern \"C\" __global__ void " << kernel_name << "(const " << in_type
-       << "* A, const " << in_type << "* B, const " << in_type << "* C, "
-       << in_type << "* D) {\n";
-    ss << "    ke_fused_two_gemms<" << in_type << ", " << acc_type << ", "
-       << "Config>(A, B, C, D);\n";
-    ss << "}\n";
+  ss << "// Kernel function\n";
+  ss << "extern \"C\" __global__ void " << kernel_name << "(const " << in_type
+     << "* A, const " << in_type << "* B, const " << in_type << "* C, "
+     << in_type << "* D) {\n";
+  ss << "    ke_fused_two_gemms<" << in_type << ", " << acc_type << ", "
+     << "Config>(A, B, C, D);\n";
+  ss << "}\n";
 
-    return ss.str();
+  return ss.str();
 }
 }  // namespace
 
 void fused_two_gemms(const torch::Tensor& A, const torch::Tensor& B,
                      const torch::Tensor& C, torch::Tensor& D, int64_t tm,
                      int64_t tn, int64_t tk, int64_t tp) {
-    CHECK_INPUT(A);
-    CHECK_INPUT(B);
-    CHECK_INPUT(C);
-    CHECK_INPUT(D);
+  CHECK_INPUT(A);
+  CHECK_INPUT(B);
+  CHECK_INPUT(C);
+  CHECK_INPUT(D);
 
-    const at::ScalarType dtype = A.scalar_type();
-    TORCH_CHECK(dtype == at::ScalarType::Half && B.scalar_type() == dtype &&
-                    C.scalar_type() == dtype && D.scalar_type() == dtype,
-                "the inputs and output must be half-precision (fp16).");
+  const at::ScalarType dtype = A.scalar_type();
+  TORCH_CHECK(dtype == at::ScalarType::Half && B.scalar_type() == dtype &&
+                  C.scalar_type() == dtype && D.scalar_type() == dtype,
+              "the inputs and output must be half-precision (fp16).");
 
-    const int64_t m = A.size(0);
-    const int64_t n = B.size(0);
-    const int64_t k = B.size(1);
-    const int64_t p = C.size(0);
+  const int64_t m = A.size(0);
+  const int64_t n = B.size(0);
+  const int64_t k = B.size(1);
+  const int64_t p = C.size(0);
 
-    // TODO(ying): warp layout should be a configurable parameter
-    using WarpLayout = tl::RowMajor<2, 1>;
-    using InType = __half;
-    using AccType = float;
+  // TODO(ying): warp layout should be a configurable parameter
+  using WarpLayout = tl::RowMajor<2, 1>;
+  using InType = __half;
+  using AccType = float;
 
-    // calculate shared memory usage
-    int shm_input = (tm * tk + tk * tn + tn * tp);
-    int shm_output = tm * tp;
-    const int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
-                                                : shm_input * sizeof(InType);
+  // calculate shared memory usage
+  int shm_input = (tm * tk + tk * tn + tn * tp);
+  int shm_output = tm * tp;
+  const int shm_size = shm_input < shm_output ? shm_output * sizeof(InType)
+                                              : shm_input * sizeof(InType);
 
-    std::string in_type = jit::get_type_string<InType>();
-    std::string acc_type = jit::get_type_string<AccType>();
+  std::string in_type = jit::get_type_string<InType>();
+  std::string acc_type = jit::get_type_string<AccType>();
 
-    std::stringstream kernel_name_ss;
-    kernel_name_ss << "fused_two_gemms_kernel_" << in_type << "_" << acc_type
-                   << "_" << m << "_" << n << "_" << k << "_" << p;
-    std::string kernel_name = kernel_name_ss.str();
+  std::stringstream kernel_name_ss;
+  kernel_name_ss << "fused_two_gemms_kernel_" << in_type << "_" << acc_type
+                 << "_" << m << "_" << n << "_" << k << "_" << p;
+  std::string kernel_name = kernel_name_ss.str();
 
-    std::string kernel_wrapper = generate_kernel_wrapper(
-        kernel_name, in_type, acc_type, m, n, k, p, tm, tn, tk, tp);
+  std::string kernel_wrapper = generate_kernel_wrapper(
+      kernel_name, in_type, acc_type, m, n, k, p, tm, tn, tk, tp);
 
-    auto& jit = jit::JitCompiler::instance();
+  auto& jit = jit::JitCompiler::instance();
 
-    auto include_paths = jit::get_default_include_paths();
-    auto compile_args = jit::get_default_compile_args();
-    CUfunction kernel = jit.get_or_compile_kernel(kernel_name, kernel_wrapper,
-                                                  include_paths, compile_args);
+  auto include_paths = jit::get_default_include_paths();
+  auto compile_args = jit::get_default_compile_args();
+  CUfunction kernel = jit.get_or_compile_kernel(kernel_name, kernel_wrapper,
+                                                include_paths, compile_args);
 
-    if (!kernel) {
-        throw std::runtime_error("Failed to compile or retrieve kernel");
-    }
+  if (!kernel) {
+    throw std::runtime_error("Failed to compile or retrieve kernel");
+  }
 
-    const InType* A_ptr =
-        reinterpret_cast<const InType*>(A.data_ptr<at::Half>());
-    const InType* B_ptr =
-        reinterpret_cast<const InType*>(B.data_ptr<at::Half>());
-    const InType* C_ptr =
-        reinterpret_cast<const InType*>(C.data_ptr<at::Half>());
-    InType* D_ptr = reinterpret_cast<InType*>(D.data_ptr<at::Half>());
+  const InType* A_ptr = reinterpret_cast<const InType*>(A.data_ptr<at::Half>());
+  const InType* B_ptr = reinterpret_cast<const InType*>(B.data_ptr<at::Half>());
+  const InType* C_ptr = reinterpret_cast<const InType*>(C.data_ptr<at::Half>());
+  InType* D_ptr = reinterpret_cast<InType*>(D.data_ptr<at::Half>());
 
-    void* args[] = {(void*)&A_ptr, (void*)&B_ptr, (void*)&C_ptr, (void*)&D_ptr,
-                    (void*)&m,     (void*)&n,     (void*)&k,     (void*)&p};
+  void* args[] = {(void*)&A_ptr, (void*)&B_ptr, (void*)&C_ptr, (void*)&D_ptr,
+                  (void*)&m,     (void*)&n,     (void*)&k,     (void*)&p};
 
-    int block_x = ceil_div(m, tm);
-    int block_y = ceil_div(p, tp);
-    int block_z = 1;
-    static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
+  int block_x = ceil_div(m, tm);
+  int block_y = ceil_div(p, tp);
+  int block_z = 1;
+  static constexpr int kThreads = tl::get_numel<WarpLayout> * 32;
 
-    if (shm_size > GetMaxSharedMemoryPerBlock()) {
-        // Set shared memory size if it exceeds the device limit
-        CUDA_DRIVER_CHECK(cuFuncSetAttribute(
-            kernel, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, shm_size));
-    }
+  if (shm_size > GetMaxSharedMemoryPerBlock()) {
+    // Set shared memory size if it exceeds the device limit
+    CUDA_DRIVER_CHECK(cuFuncSetAttribute(
+        kernel, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, shm_size));
+  }
 
-    CUDA_DRIVER_CHECK(cuLaunchKernel(kernel, block_x, block_y, block_z,  // grid
-                                     kThreads, 1, 1,  // block
-                                     shm_size,        // shared memory bytes
-                                     nullptr,         // stream
-                                     args,            // kernel parameters
-                                     nullptr));       // extra parameters
+  CUDA_DRIVER_CHECK(cuLaunchKernel(kernel, block_x, block_y, block_z,  // grid
+                                   kThreads, 1, 1,                     // block
+                                   shm_size,   // shared memory bytes
+                                   nullptr,    // stream
+                                   args,       // kernel parameters
+                                   nullptr));  // extra parameters
 
-    LOG(INFO) << "Fused two gemms kernel launched successfully";
+  LOG(INFO) << "Fused two gemms kernel launched successfully";
 }
 }  // namespace tilefusion::kernels

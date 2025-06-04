@@ -49,87 +49,87 @@ template <typename Element, typename SrcTile, typename DstTile,        //
           typename TileIterator, typename Copy, const int NUM_STAGES,  //
           const int Iterations_ = TileIterator::sc1 - NUM_STAGES + 1>
 struct Pipeline {
-  public:
-    // The number of iterations for the body kernel.
-    static constexpr int Iterations = Iterations_;
+ public:
+  // The number of iterations for the body kernel.
+  static constexpr int Iterations = Iterations_;
 
-    DEVICE Pipeline(const Element* src_ptr, Element* dst_ptr)
-        : src_tile(SrcTile(src_ptr)),
-          tile_iter(TileIterator(src_tile.data())),
-          data_ptr(0),
-          cur_stages(0) {
-        // initialize the circular buffer
-        for (int i = 0; i < NUM_STAGES; i++) {
-            cyc_buffer[i] = DstTile(dst_ptr + i * DstTile::kNumel);
-        }
+  DEVICE Pipeline(const Element* src_ptr, Element* dst_ptr)
+      : src_tile(SrcTile(src_ptr)),
+        tile_iter(TileIterator(src_tile.data())),
+        data_ptr(0),
+        cur_stages(0) {
+    // initialize the circular buffer
+    for (int i = 0; i < NUM_STAGES; i++) {
+      cyc_buffer[i] = DstTile(dst_ptr + i * DstTile::kNumel);
     }
+  }
 
-    DEVICE Pipeline(SrcTile src_tile, DstTile dst_tiles[])
-        : src_tile(src_tile),
-          tile_iter(TileIterator(src_tile.data())),
-          data_ptr(0),
-          cur_stages(0) {
-        for (int i = 0; i < NUM_STAGES; i++) {
-            cyc_buffer[i] = dst_tiles[i];
-        }
+  DEVICE Pipeline(SrcTile src_tile, DstTile dst_tiles[])
+      : src_tile(src_tile),
+        tile_iter(TileIterator(src_tile.data())),
+        data_ptr(0),
+        cur_stages(0) {
+    for (int i = 0; i < NUM_STAGES; i++) {
+      cyc_buffer[i] = dst_tiles[i];
     }
+  }
 
-    /**
-     * @brief Reset the source tile.
-     * @param src_ptr The pointer to the source tile.
-     */
-    DEVICE void reset_src_tile(const Element* src_ptr) {
-        src_tile = SrcTile(src_ptr);
-        tile_iter = TileIterator(src_tile.data());
-        data_ptr = 0;
+  /**
+   * @brief Reset the source tile.
+   * @param src_ptr The pointer to the source tile.
+   */
+  DEVICE void reset_src_tile(const Element* src_ptr) {
+    src_tile = SrcTile(src_ptr);
+    tile_iter = TileIterator(src_tile.data());
+    data_ptr = 0;
+  }
+
+  /**
+   * @brief Commit the copy operation.
+   */
+  DEVICE void commit() {
+    copy(tile_iter(data_ptr), cyc_buffer[cur_stages % NUM_STAGES]);
+    data_ptr++;
+    cur_stages++;
+  }
+
+  DEVICE const Element* get_dst_ptr_by_index(int index) const {
+    return cyc_buffer[index % NUM_STAGES].data();
+  }
+
+  DEVICE const DstTile& get_dst_tile_by_index(int index) const {
+    return cyc_buffer[index % NUM_STAGES];
+  }
+
+  DEVICE const Element* get_prev_dst() const {
+    return cyc_buffer[(cur_stages - 2) % NUM_STAGES].data();
+  }
+
+  DEVICE const Element* get_cur_dst() const {
+    return cyc_buffer[(cur_stages - 1) % NUM_STAGES].data();
+  }
+
+  /**
+   * @brief Dump the destination tile value.
+   * @param index The index of the destination tile.
+   */
+  DEVICE void dump_dst_tile_value(int index) {
+    if (thread0()) {
+      printf("data[%d]:\n", index);
+      cyc_buffer[index % NUM_STAGES].dump_value();
     }
+  }
 
-    /**
-     * @brief Commit the copy operation.
-     */
-    DEVICE void commit() {
-        copy(tile_iter(data_ptr), cyc_buffer[cur_stages % NUM_STAGES]);
-        data_ptr++;
-        cur_stages++;
-    }
+ private:
+  static constexpr int kNumStages = NUM_STAGES;
 
-    DEVICE const Element* get_dst_ptr_by_index(int index) const {
-        return cyc_buffer[index % NUM_STAGES].data();
-    }
-
-    DEVICE const DstTile& get_dst_tile_by_index(int index) const {
-        return cyc_buffer[index % NUM_STAGES];
-    }
-
-    DEVICE const Element* get_prev_dst() const {
-        return cyc_buffer[(cur_stages - 2) % NUM_STAGES].data();
-    }
-
-    DEVICE const Element* get_cur_dst() const {
-        return cyc_buffer[(cur_stages - 1) % NUM_STAGES].data();
-    }
-
-    /**
-     * @brief Dump the destination tile value.
-     * @param index The index of the destination tile.
-     */
-    DEVICE void dump_dst_tile_value(int index) {
-        if (thread0()) {
-            printf("data[%d]:\n", index);
-            cyc_buffer[index % NUM_STAGES].dump_value();
-        }
-    }
-
-  private:
-    static constexpr int kNumStages = NUM_STAGES;
-
-    int data_ptr;
-    int cur_stages;
-    SrcTile src_tile;
-    // In multistage pipeline, the destination tile has circular buffer with a
-    // size of `NUM_STAGES`.
-    DstTile cyc_buffer[NUM_STAGES];
-    TileIterator tile_iter;
-    Copy copy;
+  int data_ptr;
+  int cur_stages;
+  SrcTile src_tile;
+  // In multistage pipeline, the destination tile has circular buffer with a
+  // size of `NUM_STAGES`.
+  DstTile cyc_buffer[NUM_STAGES];
+  TileIterator tile_iter;
+  Copy copy;
 };
 }  // namespace tilefusion::cell

@@ -8,10 +8,10 @@ namespace cutlass_wrapper {
 
 template <typename Element>
 struct AccessBase {
-    // the maximal width of vectorized access.
-    static constexpr int kAccessInBits = 128;
-    static constexpr int kElmentBits = cutlass::sizeof_bits<Element>::value;
-    static constexpr int kNumPerAccess = kAccessInBits / kElmentBits;
+  // the maximal width of vectorized access.
+  static constexpr int kAccessInBits = 128;
+  static constexpr int kElmentBits = cutlass::sizeof_bits<Element>::value;
+  static constexpr int kNumPerAccess = kAccessInBits / kElmentBits;
 };
 
 }  // namespace cutlass_wrapper
