@@ -10,15 +10,15 @@ namespace tilefusion {
 
 template <size_t... Ns>
 struct TileShape {
-    static constexpr cute::array<size_t, sizeof...(Ns)> shape = {Ns...};
+  static constexpr cute::array<size_t, sizeof...(Ns)> shape = {Ns...};
 
-    static constexpr size_t get_numel() {
-        size_t product = 1;
-        for (size_t n : shape) product *= n;
-        return product;
-    }
+  static constexpr size_t get_numel() {
+    size_t product = 1;
+    for (size_t n : shape) product *= n;
+    return product;
+  }
 
-    static constexpr size_t kNumel = get_numel();
+  static constexpr size_t kNumel = get_numel();
 };
 
 template <typename TileShape>

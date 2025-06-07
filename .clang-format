@@ -3,9 +3,9 @@
 BasedOnStyle: Google
 UseTab: Never
 ColumnLimit: 80
-IndentWidth: 4
+IndentWidth: 2
 
-AccessModifierOffset: -2
+AccessModifierOffset: -1
 
 DerivePointerAlignment: false
 PointerAlignment: Left

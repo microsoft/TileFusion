@@ -15,7 +15,7 @@ static constexpr uint32_t MASK_ALL = 0xFFFFFFFF;
  */
 template <typename Element>
 DEVICE Element shuffle_sync(uint32_t mask, Element value, int src_lane) {
-    return __shfl_sync(mask, value, src_lane);
+  return __shfl_sync(mask, value, src_lane);
 }
 
 /**
@@ -25,7 +25,7 @@ DEVICE Element shuffle_sync(uint32_t mask, Element value, int src_lane) {
  */
 template <typename Element>
 DEVICE Element shuffle_down_sync(uint32_t mask, Element value, int delta) {
-    return __shfl_down_sync(mask, value, delta);
+  return __shfl_down_sync(mask, value, delta);
 }
 
 }  // namespace tilefusion::cell
