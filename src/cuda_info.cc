@@ -108,4 +108,32 @@ int GetMaxSharedMemoryPerBlock() {
   return prop.sharedMemPerBlock;
 }
 
+void check_gpu_memory() {
+  size_t free_byte;
+  size_t total_byte;
+  CUDA_CHECK(cudaMemGetInfo(&free_byte, &total_byte));
+
+  double free_db = (double)free_byte;
+  double total_db = (double)total_byte;
+  double used_db = total_db - free_db;
+  printf("GPU memory usage: used = %f MB, free = %f MB, total = %f MB\n",
+         used_db / 1024.0 / 1024.0, free_db / 1024.0 / 1024.0,
+         total_db / 1024.0 / 1024.0);
+}
+
+/**
+ * Configure dynamic shared memory for a kernel if needed
+ * @param kernel The CUDA kernel function pointer
+ * @param shared_memory_size Required shared memory size in bytes
+ */
+template <typename KernelFunc>
+void configure_dynamic_shared_memory(KernelFunc kernel,
+                                     int shared_memory_size) {
+  if (shared_memory_size > GetMaxSharedMemoryPerBlock()) {
+    CUDA_CHECK(cudaFuncSetAttribute(kernel,
+                                    cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                    shared_memory_size));
+  }
+}
+
 }  // namespace tilefusion

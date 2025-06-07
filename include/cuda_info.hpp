@@ -35,4 +35,15 @@ std::string GetComputeCapability();
 
 // Returns the maximum shared memory per block for the current device.
 int GetMaxSharedMemoryPerBlock();
+
+void check_gpu_memory();
+
+/**
+ * Configure dynamic shared memory for a kernel if needed
+ * @param kernel The CUDA kernel function pointer
+ * @param shared_memory_size Required shared memory size in bytes
+ */
+template <typename KernelFunc>
+void configure_dynamic_shared_memory(KernelFunc kernel, int shared_memory_size);
+
 }  // namespace tilefusion

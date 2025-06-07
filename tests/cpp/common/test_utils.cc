@@ -27,4 +27,12 @@ void assert_equal(const float* v1, const float* v2, int64_t numel,
         << "v1[" << i << "] vs. v2[" << i << "] = " << v1[i] << " vs. " << v2[i]
         << std::endl;
 }
+
+float rand_float(float a, float b) {
+  float random = ((float)rand()) / (float)RAND_MAX;
+  float diff = b - a;
+  float r = random * diff;
+  return a + r;
+}
+
 }  // namespace tilefusion::testing
