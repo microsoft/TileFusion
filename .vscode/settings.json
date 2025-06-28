@@ -77,5 +77,28 @@
   },
   "gotoSymbolStack.currentStackPosition": 0,
   "gotoSymbolStack.maxStackPosition": 0,
-  "gotoSymbolStack.filePositionInfo": []
+  "gotoSymbolStack.filePositionInfo": [],
+  "clangd.arguments": [
+    "--all-scopes-completion=1",
+    "--background-index=1",
+    "--background-index-priority=low",
+    "--clang-tidy=1",
+    "--completion-parse=auto",
+    "--completion-style=detailed",
+    "--debug-origin=0",
+    "--fallback-style=LLVM",
+    "--function-arg-placeholders=1",
+    "--header-insertion=iwyu",
+    "--header-insertion-decorators=1",
+    "--import-insertions=0",
+    "--include-ineligible-results=0",
+    "--limit-references=1000",
+    "--limit-results=100",
+    "--ranking-model=decision_forest",
+    "--rename-file-limit=50",
+    "--malloc-trim=1",
+    "--parse-forwarding-functions=0",
+    "--pch-storage=disk",
+    "--use-dirty-headers=0"
+  ]
 }
