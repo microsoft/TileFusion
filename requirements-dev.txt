@@ -7,7 +7,7 @@ setuptools>=64.0.0
 wheel
 
 # Linting dependencies
-black==25.1.0
+black==26.10.1
 isort==6.0.1
 flake8==7.1.2
 flake8-bugbear==24.12.12
